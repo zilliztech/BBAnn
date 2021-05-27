@@ -32,10 +32,7 @@ void knn_1 (const T1 * x, // query
         auto * __restrict val_ = value  + i * k;
         auto * __restrict ids_ = labels  + i * k;
 
-        for (int32_t j = 0; j < k; j++) {
-            val_[j] = C::neutral();
-            ids_[j] = -1;
-        }
+        heap_heapify<C>(k, val_, ids_);
 
         for (int32_t j = 0; j < ny; j++) {
             auto disij = comptuer (x_i, y_j, dim);
@@ -81,10 +78,7 @@ void knn_2 (const T1 * x, // query
         int32_t thread_heap_size = size * k;
 
         // init heap
-        for (int32_t i = 0; i < all_heap_size; i++) {
-            value_global[i] = C::neutral();
-            labels_global[i] = -1;
-        }
+        heap_heapify<C>(all_heap_size, value_global, labels_global);
 
 #pragma omp parallel for schedule(static)
         for (int j = 0; j < ny; j++) {

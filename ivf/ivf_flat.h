@@ -68,10 +68,8 @@ void ivf_flat_search(int32_t nq, const T* q_in, int32_t dim,
         auto * __restrict val_ = value  + i * topk;
         auto * __restrict ids_ = labels  + i * topk;
 
-        for (int32_t j = 0; j < topk; j++) {
-            val_[j] = C::neutral();
-            ids_[j] = -1;
-        }
+        // init heap
+        heap_heapify<C>(topk, val_, ids_);
 
         for (int32_t j = 0; j < nprobe; j++) {
             auto idx_j = idx[i * nprobe + j];
