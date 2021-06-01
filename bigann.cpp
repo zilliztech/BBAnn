@@ -14,7 +14,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#define BigAnn
+#define Yandex_Text_to_Image
 
 #ifdef BigAnn
     using CODE_T = uint8_t;
@@ -25,6 +25,17 @@
     #define Dis_Computer    L2sqr<const CODE_T, const CODE_T, DIS_T>
     #define OUT_PUT         "bigann"
 #endif
+
+#ifdef Yandex_Text_to_Image
+    using CODE_T = float;
+    using DIS_T = float;
+    const char* Learn_Path = "data/Yandex_Text-to-Image/query.learn.50M.fbin";
+    const char* Query_Path = "data/Yandex_Text-to-Image/query.public.100K.fbin";
+    #define Dis_Compare     CMin<float,int>
+    #define Dis_Computer    IP<const CODE_T, const CODE_T, DIS_T>
+    #define OUT_PUT         "yandex_text_to_image"
+#endif
+
 
 timeval t1, t2;
 long int getTime(timeval end, timeval start) {
@@ -38,10 +49,10 @@ int topk = 1000;
 const int Base_Batch = 5000000;
 const int Query_Batch = 1000;
 
-DIS_T *global_dis = new int[Query_Batch * topk];
+DIS_T *global_dis = new DIS_T[Query_Batch * topk];
 int *global_lab = new int[Query_Batch * topk];
 
-DIS_T *tmp_dis = new int[Query_Batch * topk];
+DIS_T *tmp_dis = new DIS_T[Query_Batch * topk];
 int *tmp_lab = new int[Query_Batch * topk];
 
 void Output(const char* file_name, DIS_T *dis, int *lab) {
@@ -163,6 +174,7 @@ int main() {
         if (batch_from == 0) {
             IVF_Train(batch_from, batch_num);
         }
+
         codes.clear();
         ids.clear();
         IVF_Insert(batch_from, batch_num);

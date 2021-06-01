@@ -118,11 +118,20 @@ void compute_centroids (int32_t dim, int32_t k, int32_t n,
         if (hassign[ci] == 0) {
             continue;
         }
+
+        float *c = centroids + ci * dim;
+        float len = 1.0 / sqrt(IP<float, float, float>(c, c, dim));
+        for (int32_t j = 0; j < dim; j++){
+            c[j] *= len;
+        }
+
+/*
         float norm = 1.0 / hassign[ci];
-        float * c = centroids + ci * dim;
+
         for (int32_t j = 0; j < dim; j++) {
             c[j] *= norm;
         }
+*/
     }
 }
 

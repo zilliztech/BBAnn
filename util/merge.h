@@ -16,7 +16,7 @@ void merge(typename C::T* dis1, typename C::TI *id1,
 #pragma omp parallel
 {
     DIS_T* work_dis = new DIS_T[topk];
-    ID_T* work_id = new DIS_T[topk];
+    ID_T* work_id = new ID_T[topk];
 #pragma omp for
     for (int32_t q_i = 0; q_i < nq; q_i++) {
         auto d1 = dis1 + q_i * topk;
