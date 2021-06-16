@@ -4,6 +4,11 @@
 
 // constant defines
 
+// units
+constexpr static int KILOBYTE = 1024;
+constexpr static int MEGABYTE = 1024 * 1024;
+constexpr static int GIGABYTE = 1024 * 1024 * 1024;
+
 // num of clusters in the first round k-means
 constexpr static int K1 = 64;
 // sample rate of the first round k-means
