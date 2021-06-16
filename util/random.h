@@ -1,7 +1,7 @@
 #pragma once
 
-#include <bits/stdint-intn.h>
-#include <bits/move.h>
+#include <cstdint>
+#include <algorithm>
 #include <random>
 
 // perm[0...k-1] is the results

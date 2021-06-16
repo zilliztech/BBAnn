@@ -1,6 +1,6 @@
 #pragma once
 
-#include <bits/stdint-intn.h>
+#include <cstdint>
 #include <stdio.h>
 
 int32_t get_L3_Size() {
