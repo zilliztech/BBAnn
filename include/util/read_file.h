@@ -1,6 +1,6 @@
 #pragma once
 
-#include <bits/stdint-intn.h>
+#include <cstdint>
 #include <stdio.h>
 
 FILE* read_file_head (const char *fname, int32_t *n_out, int32_t *d_out) {
