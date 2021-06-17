@@ -1,13 +1,13 @@
-#include "read_file.h"
-#include "distance.h"
-#include "merge.h"
+#include "util/read_file.h"
+#include "util/distance.h"
+#include "util/merge.h"
 
-#include "flat.h"
-#include "ivf_flat.h"
+#include "flat/flat.h"
+#include "ivf/ivf_flat.h"
 
-#include "space_ui8_l2.h"
-#include "hnswlib.h"
-#include "hnswalg.h"
+#include "hnswlib/space_ui8_l2.h"
+#include "hnswlib/hnswlib.h"
+#include "hnswlib/hnswalg.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>

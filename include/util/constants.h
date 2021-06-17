@@ -23,9 +23,8 @@ constexpr static int SPLIT_THRESHOLD = 500;
 // file name rule: prefix + file_name + file_type + suffix
 
 // prefix
-constexpr static std::string KMEANS1 = "KMEANS_ROUND1";
-constexpr static std::string KMEANS2 = "KMEANS_ROUND2";
-constexpr static std::string CENTROIDS = "CENTROIDS";
+constexpr static std::string KMEANS1 = "CLUSTER";
+constexpr static std::string KMEANS2 = "BUCKET";
 
 // file type
 constexpr static std::string CENTROIDS = "CENTROIDS";

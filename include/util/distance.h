@@ -44,3 +44,8 @@ R IP(T1 *a, T2 *b, size_t n) {
     }
     return dis;
 }
+
+
+
+
+
