@@ -1,7 +1,7 @@
-#include "util/defines.h"
-#include "ivf/clusting.h"
+#include "utils/defines.h"
+#include "ivf/clustering.h"
 #include "hnswlib/hnswlib.h"
-#include "util/constants.h"
+#include "utils/constants.h"
 
 
 

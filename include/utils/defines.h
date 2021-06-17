@@ -6,8 +6,8 @@
 //
 
 enum MetricType {
-    None = 0,
-    L2 = 1,
-    IP = 2,
+    METRIC_NONE = 0,
+    METRIC_L2 = 1,
+    METRIC_IP = 2,
 };
 

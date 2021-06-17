@@ -1,8 +1,11 @@
 #pragma once
 
-#include "random.h"
-#include "distance.h"
+#include "utils/random.h"
+#include "utils/distance.h"
 
+#include <omp.h>
+
+#include <string.h>
 #include <assert.h>
 #include <memory>
 
