@@ -1,8 +1,8 @@
 #pragma once
 
-#include "distance.h"
-#include "heap.h"
-#include "system.h"
+#include "utils/distance.h"
+#include "utils/heap.h"
+#include "utils/system.h"
 
 #include <algorithm>
 #include <functional>
