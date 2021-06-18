@@ -23,19 +23,20 @@ constexpr static int SPLIT_THRESHOLD = 500;
 // file name rule: prefix + file_name + file_type + suffix
 
 // prefix
-constexpr static std::string KMEANS1 = "CLUSTER";
-constexpr static std::string KMEANS2 = "BUCKET";
+constexpr static std::string CLUSTER = "cluster-";
+constexpr static std::string BUCKET = "bucket-";
 
 // file type
-constexpr static std::string CENTROIDS = "CENTROIDS";
-constexpr static std::string PQ_CENTROIDS = "PQ_CENTROIDS";
-constexpr static std::string IDS = "IDS";
-constexpr static std::string CODEBOOK = "CODEBOOK";
-constexpr static std::string RAWDATA = "RAWDATA";
-constexpr static std::string SAMPLEDATA = "SAMPLEDATA";
-constexpr static std::string META = "META";
+constexpr static std::string CENTROIDS = "_centroids";
+constexpr static std::string PQ_CENTROIDS = "_pq_centroids";
+constexpr static std::string COMBINE_IDS = "_combine_ids";
+constexpr static std::string GLOBAL_IDS = "_global_ids";
+constexpr static std::string CODEBOOK = "_codebook";
+constexpr static std::string RAWDATA = "_raw_data";
+constexpr static std::string SAMPLEDATA = "_sampledata";
+constexpr static std::string META = "_meta";
 
 // suffix
-constexpr static std::string BIN = "BIN";
-constexpr static std::string TEXT = "TEXT";
+constexpr static std::string BIN = ".bin";
+constexpr static std::string TEXT = ".txt";
 

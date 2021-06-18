@@ -11,3 +11,9 @@ enum MetricType {
     IP = 2,
 };
 
+enum DataType {
+    None = 0,
+    INT8 = 1,
+    FLOAT = 2,
+};
+
