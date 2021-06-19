@@ -6,15 +6,17 @@
 
 #include <sys/time.h>
 
-#define Yandex_Text_to_Image
+#define BigAnn
+// #define Yandex_Text_to_Image
 
 #ifdef BigAnn
     using CODE_T = uint8_t;
     using DIS_T = int32_t;
-    const char* Learn_Path = "data/BIGANN/learn.100M.u8bin";
-    const char* Query_Path = "data/BIGANN/query.public.10K.u8bin";
+    const char* Learn_Path = "../../data/BIGANN/learn.100M.u8bin";
+    const char* Query_Path = "../../data/BIGANN/query.public.10K.u8bin";
     #define Dis_Compare     CMax<int,int>
     #define Dis_Computer    L2sqr<const CODE_T, const CODE_T, DIS_T>
+    #define PQ_DIS_Computer L2sqr<const CODE_T, const float, float>
     #define OUT_PUT         "bigann"
 #endif
 
@@ -25,6 +27,7 @@
     const char* Query_Path = "../../data/Yandex-Text-to-Image/query.public.100K.fbin";
     #define Dis_Compare     CMin<float,int>
     #define Dis_Computer    IP<const CODE_T, const CODE_T, DIS_T>
+    #define PQ_DIS_Computer IP<const CODE_T, const float, float>
     #define OUT_PUT         "yandex_text_to_image"
 #endif
 
@@ -96,11 +99,13 @@ int main() {
 
     int batch_num = read_file_data(fi, Base_Batch, dim, xb);
 
+    // Flat(0, batch_num);
+
     // pq
-    PQ<Dis_Compare, CODE_T, DIS_T> pq(batch_num, dim, m, nbits);
+    PQ<Dis_Compare, CODE_T, uint8_t> pq(batch_num, dim, m, nbits);
 
 
-    int32_t train_size = 50000;
+    int32_t train_size = 65536;
     gettimeofday(&t1, 0);
     pq.train(train_size, xb);
     gettimeofday(&t2, 0);
@@ -112,7 +117,7 @@ int main() {
     printf("Encode %d cost %ldms\n", batch_num, getTime(t2,t1));
 
     gettimeofday(&t1, 0);
-    pq.search(nq, xq, topk, global_dis, global_lab, Dis_Computer);
+    pq.search(nq, xq, topk, global_dis, global_lab, PQ_DIS_Computer);
     gettimeofday(&t2, 0);
     printf("Search nq %d, topk %d,cost %ldms\n", nq, topk, getTime(t2,t1));
 

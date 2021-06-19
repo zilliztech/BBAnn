@@ -1,0 +1,3 @@
+add_executable(calc_recall_dis EXCLUDE_FROM_ALL calc_recall_dis.cpp)
+
+add_executable(calc_recall_id EXCLUDE_FROM_ALL calc_recall_id.cpp)

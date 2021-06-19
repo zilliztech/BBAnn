@@ -223,7 +223,7 @@ void kmeans (int32_t nx, const T* x_in, int32_t dim, int32_t k, float* centroids
 
     float err = 0;
     for (int32_t i = 0; i < niter; i++) {
-        printf("iter %d ", i);
+        // printf("iter %d ", i);
 
         elkan_L2_assign<T, float, float>(x_in, centroids, dim, nx, k, assign.get(), dis.get());
 
@@ -232,7 +232,7 @@ void kmeans (int32_t nx, const T* x_in, int32_t dim, int32_t k, float* centroids
         for (int j = 0; j < nx; j++) {
             err += dis[j];
         }
-        printf("err %lf\n", err);
+        // printf("err %lf\n", err);
 
         compute_centroids<T>(dim, k, nx, x_in, assign.get(), hassign.get(), centroids);
 
