@@ -28,6 +28,7 @@ add_executable(test_bigann ${bigann})
 
 add_subdirectory(src)
 add_subdirectory(test)
+add_subdirectory(scripts)
 target_link_libraries(test_bigann BigAnn)
 
 
