@@ -26,6 +26,10 @@ constexpr static int SPLIT_THRESHOLD = 500;
 constexpr static std::string CLUSTER = "cluster-";
 constexpr static std::string BUCKET = "bucket-";
 
+// file_name
+constexpr static std::string HNSW = "hnsw";
+constexpr static std::string PQ = "pq";
+
 // file type
 constexpr static std::string CENTROIDS = "_centroids";
 constexpr static std::string PQ_CENTROIDS = "_pq_centroids";
@@ -35,6 +39,7 @@ constexpr static std::string CODEBOOK = "_codebook";
 constexpr static std::string RAWDATA = "_raw_data";
 constexpr static std::string SAMPLEDATA = "_sampledata";
 constexpr static std::string META = "_meta";
+constexpr static std::string INDEX = "_index";
 
 // suffix
 constexpr static std::string BIN = ".bin";
