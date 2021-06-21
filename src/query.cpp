@@ -17,28 +17,20 @@
 //      int         topk
 //      int         nprobe
 template<typename DATAT, typename DISTT>
-void search_disk_index_simple(const std::string& index_path, const std::string& search_parameters,
-                       MetricType metric_type = MetricType::L2) {
-
-    std::stringstream parser;
-    parser << std::string(search_parameters);
-    std::string              cur_param;
-    std::vector<std::string> param_list;
-    while (parser >> cur_param)
-        param_list.push_back(cur_param);
+void search_disk_index_simple(const std::string& index_path, 
+                              const std::string& query_bin_file,
+                              const std::string& answer_bin_file,
+                              const int topk,
+                              const int nprobe,
+                              MetricType metric_type = MetricType::L2) {
 
     // parameters
-    DataType data_type = std::stoi(param_list[0]);
-    int topk = std::stoi(param_list[3]);
-    int nprobe = std::stoi(param_list[4]);
     int refine_topk = topk;
 
     // files
     std::string hnsw_index_file = index_path + HNSW + INDEX + BIN;
     std::string pq_centroids_file = index_path + PQ + PQ_CENTROIDS + BIN;
     std::string pq_codebook_file = index_path + PQ + CODEBOOK + BIN;
-    std::string query_bin_file = param_list[1];
-    std::string answer_bin_file = param_list[2];
 
     // variables
     uint32_t num_queries, num_base, num_pq_centroids, num_pq_codebook;
@@ -57,11 +49,11 @@ void search_disk_index_simple(const std::string& index_path, const std::string& 
     }
 
     DATAT* pquery = nullptr;
-    float* pq_centroids = nullptr;
+    // float* pq_centroids = nullptr;
     // read bin files
     read_bin_file<DATAT>(query_bin_file, pquery, num_queries, dim_queries);
     // dim_pq_centroids = dim_base / PQM, num_pq_centroids = PQM * 256
-    read_bin_file<float>(pq_centroids_file, pq_centroids, num_pq_centroids, dim_pq_centroids);
+    // read_bin_file<float>(pq_centroids_file, pq_centroids, num_pq_centroids, dim_pq_centroids);
 
     // if DATAT is uint8_t, distance type is uint32_t, force transfer to uint32_t from float, size is the same
     DISTT* pq_distance = new DISTT[num_queries * refine_topk];
@@ -139,6 +131,9 @@ void search_disk_index_simple(const std::string& index_path, const std::string& 
             retnum --;
         }
     }
+
+    PQ<CMin<DISTT, uint32_t>, DATAT, uint8_t> pq_quantizer
+        (pq_sample_num, dim, PQM, PQnbits);
 
     // step2: pq search
 #pragma omp parallel for
@@ -230,8 +225,8 @@ void search_disk_index_simple(const std::string& index_path, const std::string& 
 
     delete[] pquery;
     pquery = nullptr;
-    delete[] pq_centroids;
-    pq_centroids = nullptr;
+    // delete[] pq_centroids;
+    // pq_centroids = nullptr;
     delete[] p_labels;
     p_labels = nullptr;
     // delete[] p_dists;

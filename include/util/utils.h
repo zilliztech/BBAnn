@@ -139,3 +139,11 @@ inline void parse_refine_id(uint64_t id, uint32_t& cid, uint32_t& offset, uint32
     cid = (id & 0xff);
 }
 
+inline MetricType get_metric_type_by_name(const std::string& mt_name) {
+    if (mt_name == std::string("L2"))
+        return MetricType::L2;
+    if (mt_name == std::string("IP"))
+        return MetricType::IP;
+    return MetricType::None;
+}
+

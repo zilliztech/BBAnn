@@ -10,7 +10,7 @@
 
 template<typename DATAT, typename DISTT>
 void split_raw_data(const std::string& raw_data_file, const std::string& index_output_path,
-                    const float* centroids, MetricType metric_type, DataType data_type) {
+                    const float* centroids, MetricType metric_type) {
     IOReader reader(raw_data_file);
     uint32_t nb, dim;
     reader.read((char*)&nb, sizeof(uint32_t));
@@ -82,7 +82,7 @@ void split_raw_data(const std::string& raw_data_file, const std::string& index_o
 }
 
 template<typename DATAT, typename DISTT>
-void train_clusters(const std::string& cluster_path, uint32_t& graph_nb, uint32_t& graph_dim, MetricType metric_type, DataType data_type) {
+void train_clusters(const std::string& cluster_path, uint32_t& graph_nb, uint32_t& graph_dim, MetricType metric_type) {
     std::vector<uint32_t> cluster_id;
     std::vector<DISTT> dists;
     uint32_t placeholder = 0;
@@ -195,11 +195,11 @@ void train_clusters(const std::string& cluster_path, uint32_t& graph_nb, uint32_
     set_bin_metadata(bucket_ids_file, graph_nb, bucket_id_dim);
 }
 
-void create_graph_index(const std::string& index_path, std::vector<std::string>& params, MetricType metric_type) {
-    auto M = std::stoi(params[1]);
-    auto efConstruction = std::stoi(params[2]);
-    std::cout << "parameters of create hnsw: M = " << M << ", efConstruction = " << efConstruction << std::endl;
+void create_graph_index(const std::string& index_path, 
+                        const int hnswM, const int hnswefC,
+                        MetricType metric_type) {
 
+    std::cout << "parameters of create hnsw: M = " << hnswM << ", efConstruction = " << hnswefC << std::endl;
     float* pdata = nullptr;
     uint64_t* pids = nullptr;
     uint32_t npts, ndim, nids, nidsdim;
@@ -220,7 +220,7 @@ void create_graph_index(const std::string& index_path, std::vector<std::string>&
     assert(pids != nullptr);
     assert(npts == nids);
     assert(nidsdim == 1);
-    auto index_hnsw = std::make_shared<hnswlib::HierarchicalNSW<float>>(space, npts, M, efConstruction);
+    auto index_hnsw = std::make_shared<hnswlib::HierarchicalNSW<float>>(space, npts, hnswM, hnswefC);
     index_hnsw->addPoint(pdata, pids[0]);
 #pragma omp parallel for
     for (auto i = 1; i < npts; i ++) {
@@ -235,18 +235,9 @@ void create_graph_index(const std::string& index_path, std::vector<std::string>&
 
 template<typename DATAT, typename DISTT>
 bool build_disk_index(const std::string& raw_data_file, const std::string& index_output_path,
-                      const std::string& index_build_parameters,
+                      const int hnswM, const int hnswefC, const int PQM, const int PQnbits,
                       MetricType metric_type = MetricType::L2) {
 
-    std::stringstream parser;
-    parser << std::string(index_build_parameters);
-    std::string              cur_param;
-    std::vector<std::string> param_list;
-    while (parser >> cur_param)
-      param_list.push_back(cur_param);
-
-
-    auto data_type = (DataType)std::stoi(param_list[0]);
     uint32_t nb, dim;
     get_bin_metadata(raw_data_file, nb, dim);
     std::cout << "read meta from " << raw_data_file << ", nb = " << nb << "dim = " << dim << std::endl;
@@ -259,12 +250,25 @@ bool build_disk_index(const std::string& raw_data_file, const std::string& index
     delete[] sample_data;
     sample_data = nullptr;
 
-    size_t graph_nb, graph_dim;
-    
-    split_raw_data<DATAT, DISTT>(raw_data_file, index_output_path, centroids, metric_type, data_type);
-    train_clusters<DATAT, DISTT>(index_output_path, graph_nb, graph_dim, metric_type, data_type);
+    // pq.train
+    size_t pq_sample_num = (size_t)(nb * PQ_SAMPLE_RATE);
+    DATAT* pq_sample_data = new DATAT[pq_sample_num * dim];
+    reservoir_sampling(raw_data_file, pq_sample_num, pq_sample_data);
+    PQ<CMin<DISTT, uint32_t>, DATAT, uint8_t> pq_quantizer
+        (pq_sample_num, dim, PQM, PQnbits);
+    pq_quantizer.train(pq_sample_num, pq_sample_data);
+    delete[] pq_sample_data;
+    pq_sample_data = nullptr;
+    pq_quantizer.encode_vectors(raw_data_file, nb);
+    std::string pq_centroids_file = index_output_path + PQ + PQ_CENTROIDS + BIN;
+    std::string pq_codebook_file = index_output_path + PQ + CODEBOOK + BIN;
+    pq_quantizer.save(pq_centroids_file, pq_codebook_file);
 
-    create_graph_index(index_output_path, param_list, metric_type); // hard code hnsw
+    size_t graph_nb, graph_dim;
+    split_raw_data<DATAT, DISTT>(raw_data_file, index_output_path, centroids, metric_type);
+    train_clusters<DATAT, DISTT>(index_output_path, graph_nb, graph_dim, metric_type);
+
+    create_graph_index(index_output_path, hnswM, hnswefC, metric_type); // hard code hnsw
 
     delete[] centroids;
     centroids = nullptr;
