@@ -1,8 +1,13 @@
 #include <iostream>
+#include <sstream>
 #include <vector>
 #include <mutex>
+#include <algorithm>
 #include "util/defines.h"
 #include "util/constants.h"
+#include "util/utils.h"
+#include "util/heap.h"
+#include "hnswlib/hnswlib.h"
 
 
 // parameters: 
@@ -11,7 +16,7 @@
 //      string      answer_bin_file
 //      int         topk
 //      int         nprobe
-template<typename T>
+template<typename DATAT, typename DISTT>
 void search_disk_index_simple(const std::string& index_path, const std::string& search_parameters,
                        MetricType metric_type = MetricType::L2) {
 
@@ -23,7 +28,7 @@ void search_disk_index_simple(const std::string& index_path, const std::string& 
         param_list.push_back(cur_param);
 
     // parameters
-    DataType data_type = std::stoi(param_list[0];
+    DataType data_type = std::stoi(param_list[0]);
     int topk = std::stoi(param_list[3]);
     int nprobe = std::stoi(param_list[4]);
     int refine_topk = topk;
@@ -40,24 +45,32 @@ void search_disk_index_simple(const std::string& index_path, const std::string& 
     uint32_t dim_queries, dim_base, dim_pq_centroids, dim_pq_codebook;
     num_base = 0;
 
+    get_bin_metadata(query_bin_file, num_queries, dim_queries);
     hnswlib::SpaceInterface<float>* space;
     if (MetricType::L2 == metric_type) {
-        space = new hnswlib::L2Space(dim);
+        space = new hnswlib::L2Space(dim_queries);
     } else if (MetricType::IP == metric_type) {
-        space = new hnswlib::InnerProductSpace(dim);
+        space = new hnswlib::InnerProductSpace(dim_queries);
     } else {
-        std::cout << "invalid metric_type = " << metric_type << std::endl;
+        std::cout << "invalid metric_type = " << (int)metric_type << std::endl;
         return;
     }
 
-    T* pquery = nullptr;
+    DATAT* pquery = nullptr;
     float* pq_centroids = nullptr;
     // read bin files
-    read_bin_file<T>(query_bin_file, pquery, num_queries, dim_queries);
+    read_bin_file<DATAT>(query_bin_file, pquery, num_queries, dim_queries);
     // dim_pq_centroids = dim_base / PQM, num_pq_centroids = PQM * 256
     read_bin_file<float>(pq_centroids_file, pq_centroids, num_pq_centroids, dim_pq_centroids);
 
-    // if T is uint8_t, distance type is uint32_t, force transfer to uint32_t from float, size is the same
+    // if DATAT is uint8_t, distance type is uint32_t, force transfer to uint32_t from float, size is the same
+    DISTT* pq_distance = new DISTT[num_queries * refine_topk];
+    DISTT* answer_dists = new DISTT[num_queries * topk];
+    uint32_t* answer_ids = new uint32_t[num_queries * topk];
+    using heap_comare_class = CMin<DISTT, uint32_t>;
+    auto dis_computer = select_computer<DATAT, DATAT, DISTT>(metric_type);
+    // todo: too ugly
+    /*
     if (DataType::FLOAT == data_type) {
         // std::vector<std::vector<std::pair<float, uint32_t>>> 
         //    answers(num_queries, std::vector<std::pair<float, uint32_t>>(topk, std::pair<float, uint32_t>(0.0, 0)));
@@ -75,9 +88,10 @@ void search_disk_index_simple(const std::string& index_path, const std::string& 
         CMin<uint32_t, uint32_t> heap_comare_class;
         auto dis_computer = select_computer<T, T, int32_t>(metric_type);
     } else {
-        std::cout << "error! invalid data_type = " << data_type << std::endl;
+        std::cout << "error! invalid data_type = " << (int)data_type << std::endl;
         return;
     }
+    */
     uint64_t* pq_offsets = new uint64_t[num_queries * refine_topk];
 
     // in-memory data
@@ -141,17 +155,17 @@ void search_disk_index_simple(const std::string& index_path, const std::string& 
     std::sort(pq_offsets, pq_offsets + refine_topk * num_queries);
     std::vector<std::vector<std::pair<uint32_t, uint32_t>>> refine_records(K1);
     for (auto j = 0; j < refine_topk * num_queries; j ++) {
-        auto cid, off, qid;
+        uint32_t cid, off, qid;
         parse_refine_id(pq_offsets[j], cid, off, qid);
-        refine_records[cid].push_back(off, qid);
+        refine_records[cid].emplace_back(off, qid);
     }
     std::vector<std::ifstream> raw_data_file_handlers(K1);
     std::vector<std::ifstream> ids_data_file_handlers(K1);
     for (auto i = 0; i < K1; i ++) {
-        std::string data_filei = index_output_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
-        std::string ids_filei  = index_output_path + CLUSTER + std::to_string(i) + GLOBAL_IDS + BIN;
-        raw_data_file_handlers[i] = std::ifstream(data_filei, std::binary);
-        ids_data_file_handlers[i] = std::ifstream(ids_filei , std::binary);
+        std::string data_filei = index_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
+        std::string ids_filei  = index_path + CLUSTER + std::to_string(i) + GLOBAL_IDS + BIN;
+        raw_data_file_handlers[i] = std::ifstream(data_filei, std::ios::binary);
+        ids_data_file_handlers[i] = std::ifstream(ids_filei , std::ios::binary);
     }
 
     // init answer heap
@@ -168,20 +182,20 @@ void search_disk_index_simple(const std::string& index_path, const std::string& 
             continue;
         uint32_t pre_qid = num_queries + 1;
         uint32_t meta_bytes = 8; // pass meta
-        T* data_bufi = new T[dim_queries];
+        DATAT* data_bufi = new DATAT[dim_queries];
         uint32_t global_id;
         for (auto j = 0; j < refine_records[i].size(); j ++) {
             if (refine_records[i][j].second != pre_qid) {
                 pre_qid = refine_records[i][j].second;
-                raw_data_file_handlers[i].seekp(meta_bytes + refine_records[i][j].first * dim_queries * sizeof(T));
-                raw_data_file_handlers[i].read((char*)data_bufi, dim_queries * sizeof(T));
-                ids_data_file_handlers[i].seekp(meta_bytes + refine_records[i][j].first * sizeof(uint32_t));
+                raw_data_file_handlers[i].seekg(meta_bytes + refine_records[i][j].first * dim_queries * sizeof(DATAT));
+                raw_data_file_handlers[i].read((char*)data_bufi, dim_queries * sizeof(DATAT));
+                ids_data_file_handlers[i].seekg(meta_bytes + refine_records[i][j].first * sizeof(uint32_t));
                 ids_data_file_handlers[i].read((char*)&global_id, sizeof(uint32_t));
                 assert(global_id >= 0);
                 assert(global_id < num_base);
             }
             auto dis = dis_computer(data_bufi, pquery + pre_qid, dim_queries);
-            std::unique<std::mutex> lk(mtx[pre_qid]);
+            std::unique_ptr<std::mutex> lk(mtx[pre_qid]);
             if (heap_comare_class::cmp(answer_dists + topk * pre_qid, dis)) {
                 heap_swap_top<heap_comare_class>(topk, answer_dists + topk * pre_qid, answer_ids + topk * pre_qid, dis, global_id);
             }
@@ -208,8 +222,8 @@ void search_disk_index_simple(const std::string& index_path, const std::string& 
     answer_writer.close();
 
     for (auto i = 0; i < K1; i ++) {
-        std::string data_filei = index_output_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
-        std::string ids_filei  = index_output_path + CLUSTER + std::to_string(i) + GLOBAL_IDS + BIN;
+        std::string data_filei = index_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
+        std::string ids_filei  = index_path + CLUSTER + std::to_string(i) + GLOBAL_IDS + BIN;
         raw_data_file_handlers[i].close();
         ids_data_file_handlers[i].close();
     }

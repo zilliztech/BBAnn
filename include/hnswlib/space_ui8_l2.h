@@ -1,6 +1,6 @@
 #pragma once
-#include "hnswlib.h"
-#include "../util/distance.h"
+#include "hnswlib/hnswlib.h"
+#include "util/distance.h"
 
 #include <stdlib.h>
 

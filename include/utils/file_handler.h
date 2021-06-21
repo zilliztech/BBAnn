@@ -2,24 +2,22 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <cassert>
-#include <cstring>
-#include "util/constants.h"
+
 
 
 class IOReader {
  public:
-     IOReader(const std::string& file_name, const uint64_t cache_size = GIGABYTE)
+     IOReader(const std::string& file_name, const uint64_t cache_size = GB)
          : cache_size_(cache_size), cur_off_(0) {
         reader_.open(file_name, std::ios::binary | std::ios::ate);
-        assert(reader_.is_open() == true);
-        fsize_ = reader_.tellg();
+        assert(reader.is_open());
+        fsize_ = reader.tellg();
         reader_.seekg(0, std::ios::beg);
         assert(cache_size_ > 0);
         cache_size_ = (std::min)(cache_size_, fsize_);
         cache_buf_ = (char*) malloc(cache_size_);
         assert(cache_buf_ != nullptr);
-        reader_.read(cache_buf_, cache_size_);
+        reader.read(cache_buf_, cache_size_);
      }
 
      ~IOReader() {
@@ -63,10 +61,10 @@ class IOReader {
 
 class IOWriter {
  public:
-    IOWriter(const std::string& file_name, const uint64_t cache_size = GIGABYTE)
+    IOWriter(const std::string& file_name, const uint64_t cache_size = GB)
     : cache_size_(cache_size), cur_off_(0) {
-        writer_.open(file_name, std::ios::binary);
-        assert(writer_.is_open() == true);
+        writer.open(file_name, std::ios::binary);
+        assert(writer.is_open());
         assert(cache_size_ > 0);
         cache_buf_ = (char*) malloc(cache_size_);
         assert(cache_buf_ != nullptr);

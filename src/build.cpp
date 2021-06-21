@@ -5,10 +5,10 @@
 #include "ivf/clusting.h"
 #include "hnswlib/hnswlib.h"
 #include "util/constants.h"
-#include "util/utils.h""
+#include "util/utils.h"
 #include "flat/flat.h"
 
-template<typename T>
+template<typename DATAT, typename DISTT>
 void split_raw_data(const std::string& raw_data_file, const std::string& index_output_path,
                     const float* centroids, MetricType metric_type, DataType data_type) {
     IOReader reader(raw_data_file);
@@ -34,12 +34,16 @@ void split_raw_data(const std::string& raw_data_file, const std::string& index_o
     size_t block_size = 1000000;
     size_t block_num = (nb - 1) / block_size + 1;
     std::vector<size_t> cluster_id(block_size);
-    std::vector<T> dists(block_size);
-    T* block_buf = new T[block_size * dim];
+    std::vector<DISTT> dists(block_size);
+    DATAT* block_buf = new DATAT[block_size * dim];
     for (auto i = 0; i < block_num; i ++) {
         auto sp = i * block_size;
-        auto ep = std::min(nb, sp + block_size);
-        reader.read((char*)block_buf, (ep - sp) * dim * sizeof(T));
+        auto ep = std::min((size_t)nb, sp + block_size);
+        reader.read((char*)block_buf, (ep - sp) * dim * sizeof(DATAT));
+        knn_2<CMin<DISTT, size_t>, DATAT, DATAT> (
+            centroids, block_buf, K1, ep - sp, dim, 1, 
+            dists.data(), cluster_id.data(), select_computer<DATAT, DATAT, DISTT>(metric_type));
+        /*
         if (DataType::FLOAT == data_type) {
             knn_2<CMin<T, size_t>, float, T> (
                 centroids, block_buf, K1, ep - sp, dim, 1, 
@@ -49,10 +53,11 @@ void split_raw_data(const std::string& raw_data_file, const std::string& index_o
                 centroids, block_buf, K1, ep - sp, dim, 1, 
                 dists.data(), cluster_id.data(), select_computer<T, T, int32_t>(metric_type));
         }
+        */
         for (auto j = 0; j < ep - sp; j ++) {
             auto cid = cluster_id[j];
             auto uid = (uint32_t)(j + sp);
-            cluster_dat_writer[cid].write((char*)(block_buf + j * dim), sizeof(T) * dim);
+            cluster_dat_writer[cid].write((char*)(block_buf + j * dim), sizeof(DATAT) * dim);
             cluster_ids_writer[cid].write((char*)&uid, sizeof(uint32_t));
             cluster_size[cid] ++;
         }
@@ -76,10 +81,10 @@ void split_raw_data(const std::string& raw_data_file, const std::string& index_o
     block_buf = nullptr;
 }
 
-template<typename T>
+template<typename DATAT, typename DISTT>
 void train_clusters(const std::string& cluster_path, uint32_t& graph_nb, uint32_t& graph_dim, MetricType metric_type, DataType data_type) {
     std::vector<uint32_t> cluster_id;
-    std::vector<T> dists;
+    std::vector<DISTT> dists;
     uint32_t placeholder = 0;
     // centroids file of each buckets
     std::string bucket_centroids_file = cluster_path + CLUSTER + CENTROIDS + BIN;
@@ -110,28 +115,31 @@ void train_clusters(const std::string& cluster_path, uint32_t& graph_nb, uint32_
         ids_reader.read((char*)&ids_dim, sizeof(uint32_t));
         assert(cluster_size == ids_size);
         assert(ids_dim == 1);
-        T* datai = new T[cluster_size * cluster_dim];
-        data_reader.read((char*)datai, cluster_size * cluster_dim * sizeof(T));
+        DATAT* datai = new DATAT[cluster_size * cluster_dim];
+        data_reader.read((char*)datai, cluster_size * cluster_dim * sizeof(DATAT));
         uint32_t* idsi = new uint32_t[ids_size * ids_dim];
         ids_reader.read((char*)idsi, ids_size * ids_dim * sizeof(uint32_t));
-        data_reader.close();
-        ids_reader.close();
 
         auto K2 = cluster_size / SPLIT_THRESHOLD;
         std::cout << "cluster-" << i << " will split into " << K2 << " buckets." << std::endl;
         float* centroids_i = new float[K2 * cluster_dim];
-        kmeans<T>(cluster_size, datai, (int32_t)cluster_dim, K2, centroids_i);
+        kmeans<DATAT>(cluster_size, datai, (int32_t)cluster_dim, K2, centroids_i);
         cluster_id.resize(cluster_size);
         dists.resize(cluster_size);
+        knn_2<CMin<DISTT, uint32_t>, DATAT, DATAT> (
+            centroids_i, datai, K2, cluster_size, cluster_dim, 1, 
+            dists.data(), cluster_id.data(), select_computer<DATAT, DATAT, DISTT>(metric_type));
+        /*
         if (DataType::FLOAT == data_type) {
             knn_2<CMin<T, uint32_t>, float, T> (
-                centroids, block_buf, K1, ep - sp, dim, 1, 
+                centroids_i, datai, K2, cluster_size, cluster_dim, 1, 
                 dists.data(), cluster_id.data(), select_computer<T, T, T>(metric_type));
         } else if (DataType::INT8 == data_type) {
             knn_2<CMin<int32_t, uint32_t>, float, T> (
-                centroids, block_buf, K1, ep - sp, dim, 1, 
+                centroids_i, datai, K2, cluster_size, cluster_dim, 1, 
                 dists.data(), cluster_id.data(), select_computer<T, T, int32_t>(metric_type));
         }
+        */
         std::vector<uint32_t> buckets_size(K2 + 1, 0);
         std::vector<std::pair<uint32_t, uint32_t>> cluster_off;
         cluster_off.resize(cluster_size);
@@ -162,11 +170,9 @@ void train_clusters(const std::string& cluster_path, uint32_t& graph_nb, uint32_
         ids_writer.write((char*)&ids_dim, sizeof(uint32_t));
         for (auto j = 0; j < cluster_size; j ++) {
             auto ori_pos = cluster_off[j].second;
-            data_writer.write((char*)(datai + ori_pos * cluster_dim), sizeof(T) * cluster_dim);
+            data_writer.write((char*)(datai + ori_pos * cluster_dim), sizeof(DATAT) * cluster_dim);
             ids_writer.write((char*)(idsi + ori_pos * ids_dim), sizeof(uint32_t) * ids_dim);
         }
-        data_writer.close();
-        ids_writer.close();
 
         // write buckets's centroids and combine ids
         // write_bin_file<float>(bucket_centroids_file, centroids_i, K2, cluster_dim);
@@ -183,33 +189,32 @@ void train_clusters(const std::string& cluster_path, uint32_t& graph_nb, uint32_
         delete[] idsi;
         delete[] centroids_i;
     }
-    bucket_ctd_writer.close();
-    bucket_ids_writer.close();
+
     std::cout << "total bucket num = " << graph_nb << std::endl;
     set_bin_metadata(bucket_centroids_file, graph_nb, graph_dim);
     set_bin_metadata(bucket_ids_file, graph_nb, bucket_id_dim);
 }
 
 void create_graph_index(const std::string& index_path, std::vector<std::string>& params, MetricType metric_type) {
-    hnswlib::SpaceInterface<float>* space;
-    if (MetricType::L2 == metric_type) {
-        space = new hnswlib::L2Space(dim);
-    } else if (MetricType::IP == metric_type) {
-        space = new hnswlib::InnerProductSpace(dim);
-    } else {
-        std::cout << "invalid metric_type = " << metric_type << std::endl;
-        return;
-    }
     auto M = std::stoi(params[1]);
     auto efConstruction = std::stoi(params[2]);
     std::cout << "parameters of create hnsw: M = " << M << ", efConstruction = " << efConstruction << std::endl;
 
     float* pdata = nullptr;
-    uint64_t pids = nullptr;
+    uint64_t* pids = nullptr;
     uint32_t npts, ndim, nids, nidsdim;
     read_bin_file(index_path + CLUSTER + CENTROIDS + BIN, pdata, npts, ndim);
     std::cout << "there are " << npts << " of dimension " << ndim << " points of hnsw" << std::endl;
     assert(pdata != nullptr);
+    hnswlib::SpaceInterface<float>* space;
+    if (MetricType::L2 == metric_type) {
+        space = new hnswlib::L2Space(ndim);
+    } else if (MetricType::IP == metric_type) {
+        space = new hnswlib::InnerProductSpace(ndim);
+    } else {
+        std::cout << "invalid metric_type = " << (int)metric_type << std::endl;
+        return;
+    }
     read_bin_file(index_path + CLUSTER + COMBINE_IDS + BIN, pids, nids, nidsdim);
     std::cout << "there are " << nids << " of dimension " << nidsdim << " combine ids of hnsw" << std::endl;
     assert(pids != nullptr);
@@ -228,7 +233,7 @@ void create_graph_index(const std::string& index_path, std::vector<std::string>&
     pids = nullptr;
 }
 
-template<typename T>
+template<typename DATAT, typename DISTT>
 bool build_disk_index(const std::string& raw_data_file, const std::string& index_output_path,
                       const std::string& index_build_parameters,
                       MetricType metric_type = MetricType::L2) {
@@ -242,24 +247,24 @@ bool build_disk_index(const std::string& raw_data_file, const std::string& index
 
 
     auto data_type = (DataType)std::stoi(param_list[0]);
-    size_t nb, dim;
-    get_bin_metadata(raw_data_file, size_t &nb, size_t &dim);
+    uint32_t nb, dim;
+    get_bin_metadata(raw_data_file, nb, dim);
     std::cout << "read meta from " << raw_data_file << ", nb = " << nb << "dim = " << dim << std::endl;
     size_t sample_num = (size_t)(nb * K1_SAMPLE_RATE);
-    T* sample_data;
-    sample_data = new T[sample_num * dim];
+    DATAT* sample_data;
+    sample_data = new DATAT[sample_num * dim];
     reservoir_sampling(raw_data_file, sample_num, sample_data);
     float* centroids = new float[dim * K1];
-    kmeans<T>(sample_num, sample_data, (int32_t)dim, K1, centroids);
+    kmeans<DATAT>(sample_num, sample_data, (int32_t)dim, K1, centroids);
     delete[] sample_data;
     sample_data = nullptr;
 
-    split_raw_data<T>(raw_data_file, index_output_path, centroids, metric_type, data_type);
-
     size_t graph_nb, graph_dim;
-    train_clusters<T>(index_output_path, graph_nb, graph_dim, metric_type, data_type);
+    
+    split_raw_data<DATAT, DISTT>(raw_data_file, index_output_path, centroids, metric_type, data_type);
+    train_clusters<DATAT, DISTT>(index_output_path, graph_nb, graph_dim, metric_type, data_type);
 
-    create_graph_index<T>(index_output_path, param_list, metric_type); // hard code hnsw
+    create_graph_index(index_output_path, param_list, metric_type); // hard code hnsw
 
     delete[] centroids;
     centroids = nullptr;

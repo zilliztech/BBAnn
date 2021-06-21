@@ -1,7 +1,5 @@
 #include "util/read_file.h"
-#include "util/distance.h"
 #include "util/merge.h"
-
 #include "flat/flat.h"
 #include "ivf/ivf_flat.h"
 
@@ -73,7 +71,7 @@ void Flat(int batch_from, int batch_num) {
         xq, xb, nq, batch_num, dim, topk, tmp_dis, tmp_lab, Dis_Computer);
 
     gettimeofday(&t2, 0);
-    printf("flat seg %d cost %dms\n", batch_from/Base_Batch, getTime(t2,t1));
+    printf("flat seg %d cost %ldms\n", batch_from/Base_Batch, getTime(t2,t1));
 
     char file_name[64];
     sprintf(file_name, "%s_flat_segment_%d.txt",OUT_PUT, batch_from/Base_Batch);
@@ -96,7 +94,7 @@ void IVF_Train(int batch_from, int batch_num) {
     kmeans(batch_num, xb, dim, nlist, centroids);
 
     gettimeofday(&t2, 0);
-    printf("kmeans cost %dms\n", getTime(t2,t1));
+    printf("kmeans cost %ldms\n", getTime(t2,t1));
 
     FILE *fi=fopen(OUT_PUT "_centroids_2048.bin", "w");
     fwrite(centroids, sizeof(float), nlist * dim, fi);
@@ -109,7 +107,7 @@ void IVF_Insert(int batch_from, int batch_num) {
     ivf_flat_insert(batch_num, xb, dim, nlist, centroids, codes, ids);
 
     gettimeofday(&t2, 0);
-    printf("insert seg %d cost %dms\n", batch_from/Base_Batch, getTime(t2,t1));
+    printf("insert seg %d cost %ldms\n", batch_from/Base_Batch, getTime(t2,t1));
 
     char file_name[64];
     sprintf(file_name, "%s_ivf_segment_%d.bin",OUT_PUT, batch_from/Base_Batch);
@@ -125,7 +123,7 @@ void IVF_Insert(int batch_from, int batch_num) {
     fclose(fi);
 
     for(int i=0;i<nlist;i++){
-        printf("%f\t%d\n",
+        printf("%f\t%ld\n",
             sqrt(IP<float,float,float>(centroids+i*dim, centroids+i*dim, dim)),
             ids[i].size());
     }
@@ -138,7 +136,7 @@ void IVF_Search(int batch_from, int batch_num) {
         nq, xq, dim, nlist, centroids, codes, ids, nprobe, topk, tmp_dis, tmp_lab, Dis_Computer);
 
     gettimeofday(&t2, 0);
-    printf("query seg %d cost %dms\n", batch_from/Base_Batch, getTime(t2,t1));
+    printf("query seg %d cost %ldms\n", batch_from/Base_Batch, getTime(t2,t1));
 
     char file_name[64];
     sprintf(file_name, "%s_ivf_%d_segment_%d.txt",OUT_PUT, nprobe, batch_from/Base_Batch);

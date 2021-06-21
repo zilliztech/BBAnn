@@ -1,9 +1,19 @@
+#pragma once
 #include <iostream>
 #include <fstream>
 #include <string>
 #include <vector>
 #include <random>
+#include <functional>
+#include <memory>
 #include "file_handler.h" 
+#include "distance.h"
+#include "defines.h"
+
+
+template <typename T1, typename T2, typename R>
+using Computer = std::function<R(const T1*, const T2*, int n)>;
+
 
 template<typename T1, typename T2, typename R>
 Computer<T1, T2, R> select_computer(MetricType metric_type) {
@@ -17,13 +27,10 @@ Computer<T1, T2, R> select_computer(MetricType metric_type) {
     }
 }
 
-inline void get_bin_metadata(const std::string& bin_file, size_t& nrows, size_t& ncols) {
+inline void get_bin_metadata(const std::string& bin_file, uint32_t& nrows, uint32_t& ncols) {
     std::ifstream reader(bin_file.c_str(), std::ios::binary);
-    uint32_t nrows_32, ncols_32;
-    reader.read((char*) &nrows_32, sizeof(uint32_t));
-    reader.read((char*) &ncols_32, sizeof(uint32_t));
-    nrows = nrows_32;
-    ncols = ncols_32;
+    reader.read((char*) &nrows, sizeof(uint32_t));
+    reader.read((char*) &ncols, sizeof(uint32_t));
     reader.close();
     std::cout << "get meta from " << bin_file << ", nrows = " << nrows << ", ncols = " << ncols << std::endl;
 }
@@ -56,7 +63,7 @@ void reservoir_sampling(const std::string& data_file, const size_t sample_num, T
     }
     for (auto i = sample_num; i < ntotal; i ++) {
         reader.read((char*)tmp_buf.get(), ndims * sizeof(T));
-        std::uniform_int_distritution<long> distribution(1, i);
+        std::uniform_int_distribution<size_t> distribution(1, i);
         size_t rand = (size_t)distribution(generator);
         if (rand <= sample_num) {
             memcpy((char*)sample_data, tmp_buf.get(), ndims * sizeof(T));
@@ -65,7 +72,7 @@ void reservoir_sampling(const std::string& data_file, const size_t sample_num, T
 }
 
 template<typename T>
-void write_bin_file(const std::string& file_name, T* data, uint32_t n,
+inline void write_bin_file(const std::string& file_name, T* data, uint32_t n,
                     uint32_t dim) {
     assert(data != nullptr);
     std::ofstream writer(file_name, std::ios::binary);
@@ -80,7 +87,7 @@ void write_bin_file(const std::string& file_name, T* data, uint32_t n,
 }
 
 template<typename T>
-void read_bin_file(const std::string& file_name, T* data, uint32_t& n,
+inline void read_bin_file(const std::string& file_name, T* data, uint32_t& n,
                     uint32_t& dim) {
     std::ifstream reader(file_name, std::ios::binary);
 
@@ -91,12 +98,12 @@ void read_bin_file(const std::string& file_name, T* data, uint32_t& n,
     }
     reader.read((char*)data, sizeof(T) * n * dim);
 
-    writer.close();
+    reader.close();
     std::cout << "write binary file to " << file_name << " done in ... seconds, n = "
               << n << ", dim = " << dim << std::endl;
 }
 
-uint64_t gen_id(const uint32_t cid, const uint32_t bid, const uint32_t off) {
+inline uint64_t gen_id(const uint32_t cid, const uint32_t bid, const uint32_t off) {
     uint64_t ret = 0;
     ret |= (cid & 0xff);
     ret <<= 24;
@@ -106,7 +113,7 @@ uint64_t gen_id(const uint32_t cid, const uint32_t bid, const uint32_t off) {
     return ret;
 }
 
-void parse_id(uint64_t id, uint32_t& cid, uint32_t& bid, uint32_t& off) {
+inline void parse_id(uint64_t id, uint32_t& cid, uint32_t& bid, uint32_t& off) {
     off = (id & 0xffffffff);
     id >>= 32;
     bid = (id & 0xffffff);
@@ -114,7 +121,7 @@ void parse_id(uint64_t id, uint32_t& cid, uint32_t& bid, uint32_t& off) {
     cid = (id & 0xff);
 }
 
-uint64_t gen_refine_id(const uint32_t cid, const uint32_t offset, const uint32_t queryid) {
+inline uint64_t gen_refine_id(const uint32_t cid, const uint32_t offset, const uint32_t queryid) {
     uint64_t ret = 0;
     ret |= (cid & 0xff);
     ret <<= 32;
@@ -124,7 +131,7 @@ uint64_t gen_refine_id(const uint32_t cid, const uint32_t offset, const uint32_t
     return ret;
 }
 
-void parse_refine_id(uint64_t id, uint32_t& cid, uint32_t& offset, uint32_t& queryid) {
+inline void parse_refine_id(uint64_t id, uint32_t& cid, uint32_t& offset, uint32_t& queryid) {
     queryid = (id & 0xffffff);
     queryid >>= 24;
     offset = (id & 0xffffffff);

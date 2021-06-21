@@ -1,8 +1,7 @@
 #pragma once
 
-#include "clusting.h"
-#include "distance.h"
-#include "flat.h"
+#include "ivf/clustering.h"
+#include "flat/flat.h"
 
 #include <vector>
 #include <algorithm>
