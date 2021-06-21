@@ -1,15 +1,12 @@
 #pragma once
 
-#include "utils/distance.h"
-#include "utils/heap.h"
-#include "utils/system.h"
+#include "util/distance.h"
+#include "util/heap.h"
+#include "util/system.h"
+#include "util/utils.h"
 
 #include <algorithm>
-#include <functional>
 #include <omp.h>
-
-template <typename T1, typename T2, typename R>
-using Computer = std::function<R(const T1*, const T2*, int n)>;
 
 // Data type: T1, T2
 // Distance type: C::T

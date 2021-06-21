@@ -1,7 +1,5 @@
-#include "utils/read_file.h"
-#include "utils/distance.h"
-#include "utils/merge.h"
-
+#include "util/read_file.h"
+#include "util/merge.h"
 #include "flat/flat.h"
 #include "ivf/ivf_flat.h"
 

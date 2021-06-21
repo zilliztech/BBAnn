@@ -2,7 +2,6 @@
 
 #include "ivf/clustering.h"
 #include "flat/flat.h"
-#include "utils/distance.h"
 
 #include <vector>
 #include <algorithm>
