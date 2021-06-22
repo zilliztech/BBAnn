@@ -1,4 +1,8 @@
 #include <iostream>
+<<<<<<< HEAD
+#include "diskann.h"
+=======
+>>>>>>> source/master
 
 // this file test the disk-based bigann
 // strategy is hnsw + ivf + pq + refine
@@ -49,7 +53,11 @@ int main(int argc, char** argv) {
     int topk = std::stoi(argv[10]);
     int nprobe = std::stoi(argv[11]);
     std::string metric_type_str(argv[12]);
+<<<<<<< HEAD
+    auto metric_type = get_metric_type_by_name(metric_type_str);
+=======
     int metric_type = get_metric_type_by_name(metric_type_str);
+>>>>>>> source/master
     if (MetricType::None == metric_type) {
         std::cout << "invalid metric_type = " << metric_type_str << std::endl;
         return 1;
@@ -61,13 +69,21 @@ int main(int argc, char** argv) {
             (raw_data_file, output_path, hnswM, hnswefC, PQM, PQnbits, metric_type);
 
         search_disk_index_simple<float, float>
+<<<<<<< HEAD
+            (output_path, query_data_file, answer_file, topk, nprobe, PQM, PQnbits, metric_type);
+=======
             (output_path, query_data_file, answer_file, topk, nprobe, metric_type);
+>>>>>>> source/master
     } else if (argv[1] == std::string("uint8")) {
         build_disk_index<uint8_t, uint32_t>
             (raw_data_file, output_path, hnswM, hnswefC, PQM, PQnbits, metric_type);
 
         search_disk_index_simple<uint8_t, uint32_t>
+<<<<<<< HEAD
+            (output_path, query_data_file, answer_file, topk, nprobe, PQM, PQnbits, metric_type);
+=======
             (output_path, query_data_file, answer_file, topk, nprobe, metric_type);
+>>>>>>> source/master
     }
     return 0;
 }

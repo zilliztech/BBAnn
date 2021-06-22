@@ -1,4 +1,6 @@
 #pragma once
+#include <chrono>
+#include <string>
 
 class TimeRecorder {
     using stdclock = std::chrono::high_resolution_clock;
