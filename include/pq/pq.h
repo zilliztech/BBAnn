@@ -1,6 +1,5 @@
 #pragma once
 
-#include "ivf/clustering.h"
 #include "util/heap.h"
 #include "util/distance.h"
 
@@ -23,7 +22,7 @@ using PQ_Computer = std::function<float(const T*, const float*, int n)>;
 // T: type of the database vector
 // U: type of codes ID (PQ representation)
 template<class C, typename T, typename U>
-class PQ {
+class ProductQuantizer {
 private:
     int32_t d, dsub, K, ntotal, npos;
     uint8_t m, nbits;
@@ -37,7 +36,7 @@ private:
     void compute_dis_tab(const T* q, float* dis_tab, PQ_Computer<T> computer);
 public:
     // in-memory
-    PQ(int32_t _ntotal, int32_t _d, uint8_t _m, uint8_t _nbits)
+    ProductQuantizer(int32_t _ntotal, int32_t _d, uint8_t _m, uint8_t _nbits)
     : ntotal(_ntotal), d(_d), m(_m), nbits(_nbits), npos(0) {
         assert(d % m == 0);
 
@@ -49,7 +48,7 @@ public:
         precompute_table = nullptr;
     };
 
-    PQ(int32_t _d, uint8_t _m, uint8_t _nbits)
+    ProductQuantizer(int32_t _d, uint8_t _m, uint8_t _nbits)
     : ntotal(0), d(_d), m(_m), nbits(_nbits), npos(0) {
         assert(d % m == 0);
 
@@ -61,7 +60,7 @@ public:
         precompute_table = nullptr;
     };
 
-    PQ(const PQ& pq) {
+    ProductQuantizer(const ProductQuantizer& pq) {
         d = pq.d;
         dsub = pq.dsub;
         K = pq.K;
@@ -74,7 +73,7 @@ public:
 //        compute_dis_tab(q, precompute_table, computer);
     }
 
-    ~PQ() {
+    ~ProductQuantizer() {
         if (centroids != nullptr) {
             delete[] centroids;
         }
@@ -111,7 +110,7 @@ public:
                    typename C::T* values, typename C::TI* labels,
                    PQ_Computer<T> computer);
 
-    void search(const T* q, int32_t topk,
+    void search(const T* q, const U* pcodes, int32_t len, int32_t topk,
                 typename C::T* values, typename C::TI* labels,
                 PQ_Computer<T> computer, bool reorder, bool heapify,
                 const uint32_t& cid, const uint32_t& off, const uint32_t& qid);
@@ -132,12 +131,12 @@ public:
         centroids_reader.read((char*)&num_centroids, sizeof(uint32_t));
         centroids_reader.read((char*)&dim_centroids, sizeof(uint32_t));
         centroids_reader.read((char*)centroids, sizeof(float) * K * d);
-        centroids_.close();
+        centroids_reader.close();
     }
 };
 
 template<class C, typename T, typename U>
-void PQ<C, T, U>::compute_code(const T* x, U* c) {
+void ProductQuantizer<C, T, U>::compute_code(const T* x, U* c) {
     for (uint8_t i = 0; i < m; ++i, x += dsub) {
         float min_dist = std::numeric_limits<float>::max();
         int32_t best_id = 0;
@@ -158,7 +157,7 @@ void PQ<C, T, U>::compute_code(const T* x, U* c) {
 }
 
 template<class C, typename T, typename U>
-void PQ<C, T, U>::compute_dis_tab(const T* q, float* dis_tab,
+void ProductQuantizer<C, T, U>::compute_dis_tab(const T* q, float* dis_tab,
                                      PQ_Computer<T> computer)
 {
     const float* c = centroids;
@@ -170,7 +169,7 @@ void PQ<C, T, U>::compute_dis_tab(const T* q, float* dis_tab,
 }
 
 template<class C, typename T, typename U>
-void PQ<C, T, U>::train(int32_t n, const T* x) {
+void ProductQuantizer<C, T, U>::train(int32_t n, const T* x) {
     T* xs = new T[n * dsub];
 
     for (uint8_t i = 0; i < m; ++i) {
@@ -189,7 +188,7 @@ void PQ<C, T, U>::train(int32_t n, const T* x) {
 };
 
 template<class C, typename T, typename U>
-void PQ<C, T, U>::encode_vectors(int32_t n, const T *x) {
+void ProductQuantizer<C, T, U>::encode_vectors(int32_t n, const T *x) {
     assert(npos + n <= ntotal);
 
     U* c = codes + npos * m;
@@ -203,7 +202,7 @@ void PQ<C, T, U>::encode_vectors(int32_t n, const T *x) {
 }
 
 template<class C, typename T, typename U>
-void PQ<C, T, U>::encode_vectors_and_save(int32_t n, const T *x, const std::string& save_file) {
+void ProductQuantizer<C, T, U>::encode_vectors_and_save(int32_t n, const T *x, const std::string& save_file) {
     U* c = new U[n * m];
 
 #pragma omp parallel for
@@ -211,7 +210,7 @@ void PQ<C, T, U>::encode_vectors_and_save(int32_t n, const T *x, const std::stri
         compute_code(x + i * d, c + i * m);
     }
 
-    std::ofstream code_writer(save_file, std::binary);
+    std::ofstream code_writer(save_file, std::ios::binary);
     code_writer.write((char*)&n, sizeof(uint32_t));
     code_writer.write((char*)&m, sizeof(uint32_t));
     code_writer.write((char*)c, sizeof(U) * n * m);
@@ -221,7 +220,7 @@ void PQ<C, T, U>::encode_vectors_and_save(int32_t n, const T *x, const std::stri
 }
 
 template<class C, typename T, typename U>
-void PQ<C, T, U>::search(int32_t nq, const T* q, int32_t topk,
+void ProductQuantizer<C, T, U>::search(int32_t nq, const T* q, int32_t topk,
             typename C::T* values, typename C::TI* labels,
             PQ_Computer<T> computer) {
     
@@ -261,7 +260,7 @@ void PQ<C, T, U>::search(int32_t nq, const T* q, int32_t topk,
 }
 
 template<class C, typename T, typename U>
-void PQ<C, T, U>::search(const T* q, const U* pcodes, 
+void ProductQuantizer<C, T, U>::search(const T* q, const U* pcodes, 
                          int32_t codebook_len, int32_t topk,
                          typename C::T* values, typename C::TI* labels,
                          PQ_Computer<T> computer, bool reorder, 

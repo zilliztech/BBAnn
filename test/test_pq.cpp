@@ -102,7 +102,7 @@ int main() {
     // Flat(0, batch_num);
 
     // pq
-    PQ<Dis_Compare, CODE_T, uint8_t> pq(batch_num, dim, m, nbits);
+    ProductQuantizer<Dis_Compare, CODE_T, uint8_t> pq(batch_num, dim, m, nbits);
 
 
     int32_t train_size = 65536;

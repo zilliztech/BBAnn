@@ -1,13 +1,14 @@
 #pragma once
 
-#include "util/random.h"
-#include "util/distance.h"
-
 #include <omp.h>
 
 #include <string.h>
 #include <assert.h>
 #include <memory>
+#include "util/distance.h"
+#include "util/utils.h"
+#include "util/random.h"
+
 
 // Data type: T1, T2
 // Distance type: R
