@@ -8,6 +8,7 @@
 #include "util/utils.h"
 #include "util/heap.h"
 #include "hnswlib/hnswlib.h"
+#include "pq/pq.h"
 
 
 // parameters: 
@@ -30,7 +31,6 @@ void search_disk_index_simple(const std::string& index_path,
     // files
     std::string hnsw_index_file = index_path + HNSW + INDEX + BIN;
     std::string pq_centroids_file = index_path + PQ + PQ_CENTROIDS + BIN;
-    std::string pq_codebook_file = index_path + PQ + CODEBOOK + BIN;
 
     // variables
     uint32_t num_queries, num_base, num_pq_centroids, num_pq_codebook;
@@ -61,29 +61,14 @@ void search_disk_index_simple(const std::string& index_path,
     uint32_t* answer_ids = new uint32_t[num_queries * topk];
     using heap_comare_class = CMin<DISTT, uint32_t>;
     auto dis_computer = select_computer<DATAT, DATAT, DISTT>(metric_type);
-    // todo: too ugly
-    /*
-    if (DataType::FLOAT == data_type) {
-        // std::vector<std::vector<std::pair<float, uint32_t>>> 
-        //    answers(num_queries, std::vector<std::pair<float, uint32_t>>(topk, std::pair<float, uint32_t>(0.0, 0)));
-        float* answer_dists = new float[num_queries * topk];
-        uint32_t* answer_ids = new uint32_t[num_queries * topk];
-        float* pq_distance = new float[num_queries * refine_topk];
-        CMin<float, uint32_t> heap_comare_class;
-        auto dis_computer = select_computer<T, T, T>(metric_type);
-    } else if (DataType::INT8 == data_type) {
-        // std::vector<std::vector<std::pair<uint32_t, uint32_t>>> 
-        //    answers(num_queries, std::vector<std::pair<uint32_t, uint32_t>>(topk, std::pair<uint32_t, uint32_t>(0, 0)));
-        uint32_t* answer_dists = new uint32_t[num_queries * topk];
-        uint32_t* answer_ids = new uint32_t[num_queries * topk];
-        uint32_t* pq_distance = new uint32_t[num_queries * refine_topk];
-        CMin<uint32_t, uint32_t> heap_comare_class;
-        auto dis_computer = select_computer<T, T, int32_t>(metric_type);
+    PQ_Computer pq_cmp;
+    if (MetricType::L2 == metric_type) {
+        pq_cmp = L2sqr<DATAT, float, float>;
+    } else if (MetricType::IP == metric_type) {
+        pq_cmp = IP<DATAT, float, float>;
     } else {
-        std::cout << "error! invalid data_type = " << (int)data_type << std::endl;
-        return;
+        std::cout << "invalid metric_type = " << int(metric_type) << std::endl;
     }
-    */
     uint64_t* pq_offsets = new uint64_t[num_queries * refine_topk];
 
     // in-memory data
@@ -112,7 +97,7 @@ void search_disk_index_simple(const std::string& index_path,
         pq_codebook_reader.read((char*)pq_codebook[i].data(), cluster_sizei * pqmi * sizeof(uint8_t));
         num_base += pq_codebook_sizei;
     }
-    std::cout << "num_base = " << num_base << std::endl;
+    std::cout << "load meta and pq_codebook done, num_base = " << num_base << std::endl;
 
     // do query
     // step1: select nprobe buckets
@@ -132,18 +117,27 @@ void search_disk_index_simple(const std::string& index_path,
         }
     }
 
-    PQ<CMin<DISTT, uint32_t>, DATAT, uint8_t> pq_quantizer
-        (pq_sample_num, dim, PQM, PQnbits);
+    PQ<CMin<DISTT, uint64_t>, DATAT, uint8_t> pq_quantizer(dim, PQM, PQnbits);
+    pq_quantizer.load_centroids(pq_centroids_file);
 
     // step2: pq search
 #pragma omp parallel for
     for (auto i = 0; i < num_queries; i ++) {
+        PQ<CMin<DISTT, uint64_t>, DATAT, uint8_t> pq_quantizer_copiesi(pq_quantizer);
+        pq_quantizer_copiesi.cal_precompute_table(pquery + i * dim_queries, pq_cmp);
         auto p_labeli = p_labels + i * nprobe;
         auto pq_offseti = pq_offsets + i * refine_topk;
         auto pq_distancei = pq_distance + i * refine_topk;
         uint32_t cid, bid, off;
-        // todo: invoke xuweizi's pq interface
-        ;
+        for (auto j = 0; j < nprobe; j ++) {
+            parse_id(p_labeli[j], cid, bid, off);
+            pq_quantizer_copiesi.search(pquery + i * dim_queries,
+                    pq_codebook[cid].data() + off * PQM, meta[cid][bid],
+                    refine_topk, pq_distancei, pq_offseti, pq_cmp, 
+                    j + 1 == nprobe, j == 0,
+                    cid, off, i);
+        }
+        pq_quantizer_copiesi.reset();
     }
 
     // refine

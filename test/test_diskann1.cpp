@@ -55,6 +55,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    // todo: split search into two functions: load and query
     if (argv[1] == std::string("float")) {
         build_disk_index<float, float>
             (raw_data_file, output_path, hnswM, hnswefC, PQM, PQnbits, metric_type);
