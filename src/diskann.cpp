@@ -32,9 +32,9 @@ void split_raw_data(const std::string& raw_data_file, const std::string& index_o
         auto sp = i * block_size;
         auto ep = std::min((size_t)nb, sp + block_size);
         reader.read((char*)block_buf, (ep - sp) * dim * sizeof(DATAT));
-        knn_2<CMin<DISTT, size_t>, float, DATAT> (
-            centroids, block_buf, K1, ep - sp, dim, 1, 
-            dists.data(), cluster_id.data(), select_computer<float, DATAT, DISTT>(metric_type));
+        knn_1<CMin<DISTT, size_t>, DATAT, float> (
+            block_buf, centroids, ep - sp, K1, dim, 1, 
+            dists.data(), cluster_id.data(), select_computer<DATAT, float, DISTT>(metric_type));
         for (auto j = 0; j < ep - sp; j ++) {
             auto cid = cluster_id[j];
             auto uid = (uint32_t)(j + sp);
@@ -117,9 +117,9 @@ void train_clusters(const std::string& cluster_path, uint32_t& graph_nb, uint32_
         kmeans<DATAT>(cluster_size, datai, (int32_t)cluster_dim, K2, centroids_i);
         cluster_id.resize(cluster_size);
         dists.resize(cluster_size);
-        knn_2<CMin<DISTT, uint32_t>, float, DATAT> (
-            centroids_i, datai, K2, cluster_size, cluster_dim, 1, 
-            dists.data(), cluster_id.data(), select_computer<float, DATAT, DISTT>(metric_type));
+        knn_1<CMin<DISTT, uint32_t>, DATAT, float> (
+            datai, centroids_i, cluster_size, K2, cluster_dim, 1, 
+            dists.data(), cluster_id.data(), select_computer<DATAT, float, DISTT>(metric_type));
         std::vector<uint32_t> buckets_size(K2 + 1, 0);
         std::vector<std::pair<uint32_t, uint32_t>> cluster_off;
         cluster_off.resize(cluster_size);
