@@ -51,6 +51,3 @@ void create_graph_index(const std::string& index_path,
 
 
 
-
-
-

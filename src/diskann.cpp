@@ -35,7 +35,6 @@ void split_raw_data(const std::string& raw_data_file, const std::string& index_o
         knn_2<CMin<DISTT, size_t>, float, DATAT> (
             centroids, block_buf, K1, ep - sp, dim, 1, 
             dists.data(), cluster_id.data(), select_computer<float, DATAT, DISTT>(metric_type));
-
         for (auto j = 0; j < ep - sp; j ++) {
             auto cid = cluster_id[j];
             auto uid = (uint32_t)(j + sp);
@@ -121,7 +120,6 @@ void train_clusters(const std::string& cluster_path, uint32_t& graph_nb, uint32_
         knn_2<CMin<DISTT, uint32_t>, float, DATAT> (
             centroids_i, datai, K2, cluster_size, cluster_dim, 1, 
             dists.data(), cluster_id.data(), select_computer<float, DATAT, DISTT>(metric_type));
-        
         std::vector<uint32_t> buckets_size(K2 + 1, 0);
         std::vector<std::pair<uint32_t, uint32_t>> cluster_off;
         cluster_off.resize(cluster_size);
@@ -490,6 +488,7 @@ void search_disk_index_simple(const std::string& index_path,
     answer_dists = nullptr;
 }
 
+
 template
 void search_disk_index_simple<float, float>(const std::string& index_path, 
                               const std::string& query_bin_file,
@@ -497,7 +496,7 @@ void search_disk_index_simple<float, float>(const std::string& index_path,
                               const int topk,
                               const int nprobe,
                               const int PQM, const int PQnbits,
-                              MetricType metric_type);
+                              MetricType metric_type = MetricType::L2);
 
 
 template
@@ -507,18 +506,18 @@ void search_disk_index_simple<uint8_t, uint32_t>(const std::string& index_path,
                               const int topk,
                               const int nprobe,
                               const int PQM, const int PQnbits,
-                              MetricType metric_type);
+                              MetricType metric_type = MetricType::L2);
 
 
 template
 void build_disk_index<float, float>(const std::string& raw_data_file, const std::string& index_output_path,
                       const int hnswM, const int hnswefC, const int PQM, const int PQnbits,
-                      MetricType metric_type);
+                      MetricType metric_type = MetricType::L2);
 
 template
 void build_disk_index<uint8_t, uint32_t>(const std::string& raw_data_file, const std::string& index_output_path,
                       const int hnswM, const int hnswefC, const int PQM, const int PQnbits,
-                      MetricType metric_type);
+                      MetricType metric_type = MetricType::L2);
 
 
 template
@@ -539,6 +538,7 @@ template
 void train_clusters<uint8_t, uint32_t>(const std::string& cluster_path, uint32_t& graph_nb, uint32_t& graph_dim, 
                     ProductQuantizer<CMin<uint32_t, uint32_t>, uint8_t, uint8_t>* pq_quantizer,
                     MetricType metric_type);
+
 
 
 
