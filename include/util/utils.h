@@ -19,10 +19,10 @@ template<typename T1, typename T2, typename R>
 Computer<T1, T2, R> select_computer(MetricType metric_type) {
     switch (metric_type) {
         case MetricType::L2:
-            return L2sqr<T1, T2, R>;
+            return L2sqr<const T1, const T2, R>;
             break;
         case MetricType::IP:
-            return IP<T1, T2, R>;
+            return IP<const T1, const T2, R>;
             break;
     }
 }

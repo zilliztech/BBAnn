@@ -15,6 +15,7 @@
 #include <limits>
 #include <functional>
 #include "util/utils.h"
+#include "ivf/clustering.h"
 
 template<typename T>
 using PQ_Computer = std::function<float(const T*, const float*, int n)>;
@@ -181,7 +182,7 @@ void ProductQuantizer<C, T, U>::train(int32_t n, const T* x) {
         }
 
         // compute centroids
-        kmeans(n, xs, dsub, K, centroids + i * K * dsub);
+        kmeans<T>(n, xs, dsub, K, centroids + i * K * dsub);
     }
 
     delete[] xs;

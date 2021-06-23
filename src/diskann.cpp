@@ -2,7 +2,7 @@
 
 template<typename DATAT, typename DISTT>
 void split_raw_data(const std::string& raw_data_file, const std::string& index_output_path,
-                    const float* centroids, MetricType metric_type) {
+                    float* centroids, MetricType metric_type) {
     IOReader reader(raw_data_file);
     uint32_t nb, dim;
     reader.read((char*)&nb, sizeof(uint32_t));
@@ -32,9 +32,9 @@ void split_raw_data(const std::string& raw_data_file, const std::string& index_o
         auto sp = i * block_size;
         auto ep = std::min((size_t)nb, sp + block_size);
         reader.read((char*)block_buf, (ep - sp) * dim * sizeof(DATAT));
-        knn_2<CMin<DISTT, size_t>, DATAT, DATAT> (
+        knn_2<CMin<DISTT, size_t>, float, DATAT> (
             centroids, block_buf, K1, ep - sp, dim, 1, 
-            dists.data(), cluster_id.data(), select_computer<DATAT, DATAT, DISTT>(metric_type));
+            dists.data(), cluster_id.data(), select_computer<float, DATAT, DISTT>(metric_type));
 
         for (auto j = 0; j < ep - sp; j ++) {
             auto cid = cluster_id[j];
@@ -118,9 +118,9 @@ void train_clusters(const std::string& cluster_path, uint32_t& graph_nb, uint32_
         kmeans<DATAT>(cluster_size, datai, (int32_t)cluster_dim, K2, centroids_i);
         cluster_id.resize(cluster_size);
         dists.resize(cluster_size);
-        knn_2<CMin<DISTT, uint32_t>, DATAT, DATAT> (
+        knn_2<CMin<DISTT, uint32_t>, float, DATAT> (
             centroids_i, datai, K2, cluster_size, cluster_dim, 1, 
-            dists.data(), cluster_id.data(), select_computer<DATAT, DATAT, DISTT>(metric_type));
+            dists.data(), cluster_id.data(), select_computer<float, DATAT, DISTT>(metric_type));
         
         std::vector<uint32_t> buckets_size(K2 + 1, 0);
         std::vector<std::pair<uint32_t, uint32_t>> cluster_off;
@@ -255,7 +255,7 @@ void build_disk_index(const std::string& raw_data_file, const std::string& index
     delete[] pq_sample_data;
     pq_sample_data = nullptr;
 
-    size_t graph_nb, graph_dim;
+    uint32_t graph_nb, graph_dim;
     split_raw_data<DATAT, DISTT>(raw_data_file, index_output_path, centroids, metric_type);
     train_clusters<DATAT, DISTT>(index_output_path, graph_nb, graph_dim, &pq_quantizer, metric_type);
 
@@ -318,9 +318,9 @@ void search_disk_index_simple(const std::string& index_path,
     auto dis_computer = select_computer<DATAT, DATAT, DISTT>(metric_type);
     PQ_Computer<DATAT> pq_cmp;
     if (MetricType::L2 == metric_type) {
-        pq_cmp = L2sqr<DATAT, float, float>;
+        pq_cmp = L2sqr<const DATAT, const float, float>;
     } else if (MetricType::IP == metric_type) {
-        pq_cmp = IP<DATAT, float, float>;
+        pq_cmp = IP<const DATAT, const float, float>;
     } else {
         std::cout << "invalid metric_type = " << int(metric_type) << std::endl;
     }
@@ -439,8 +439,8 @@ void search_disk_index_simple(const std::string& index_path,
                 assert(global_id < num_base);
             }
             auto dis = dis_computer(data_bufi, pquery + pre_qid, dim_queries);
-            std::unique_ptr<std::mutex> lk(mtx[pre_qid]);
-            if (heap_comare_class::cmp(answer_dists + topk * pre_qid, dis)) {
+            std::unique_lock<std::mutex> lk(mtx[pre_qid]);
+            if (heap_comare_class::cmp(answer_dists[topk * pre_qid], dis)) {
                 heap_swap_top<heap_comare_class>(topk, answer_dists + topk * pre_qid, answer_ids + topk * pre_qid, dis, global_id);
             }
         }
@@ -489,6 +489,56 @@ void search_disk_index_simple(const std::string& index_path,
     delete[] answer_dists;
     answer_dists = nullptr;
 }
+
+template
+void search_disk_index_simple<float, float>(const std::string& index_path, 
+                              const std::string& query_bin_file,
+                              const std::string& answer_bin_file,
+                              const int topk,
+                              const int nprobe,
+                              const int PQM, const int PQnbits,
+                              MetricType metric_type);
+
+
+template
+void search_disk_index_simple<uint8_t, uint32_t>(const std::string& index_path, 
+                              const std::string& query_bin_file,
+                              const std::string& answer_bin_file,
+                              const int topk,
+                              const int nprobe,
+                              const int PQM, const int PQnbits,
+                              MetricType metric_type);
+
+
+template
+void build_disk_index<float, float>(const std::string& raw_data_file, const std::string& index_output_path,
+                      const int hnswM, const int hnswefC, const int PQM, const int PQnbits,
+                      MetricType metric_type);
+
+template
+void build_disk_index<uint8_t, uint32_t>(const std::string& raw_data_file, const std::string& index_output_path,
+                      const int hnswM, const int hnswefC, const int PQM, const int PQnbits,
+                      MetricType metric_type);
+
+
+template
+void split_raw_data<float, float>(const std::string& raw_data_file, const std::string& index_output_path,
+                    float* centroids, MetricType metric_type);
+
+template
+void split_raw_data<uint8_t, uint32_t>(const std::string& raw_data_file, const std::string& index_output_path,
+                    float* centroids, MetricType metric_type);
+
+
+template
+void train_clusters<float, float>(const std::string& cluster_path, uint32_t& graph_nb, uint32_t& graph_dim, 
+                    ProductQuantizer<CMin<float, uint32_t>, float, uint8_t>* pq_quantizer,
+                    MetricType metric_type);
+
+template
+void train_clusters<uint8_t, uint32_t>(const std::string& cluster_path, uint32_t& graph_nb, uint32_t& graph_dim, 
+                    ProductQuantizer<CMin<uint32_t, uint32_t>, uint8_t, uint8_t>* pq_quantizer,
+                    MetricType metric_type);
 
 
 

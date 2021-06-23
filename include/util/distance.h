@@ -46,3 +46,9 @@ R IP(T1 *a, T2 *b, size_t n) {
 }
 
 
+
+template float L2sqr(float* a, float* b, size_t n);
+template uint32_t L2sqr(uint8_t* a, uint8_t* b, size_t n);
+template float IP(float* a, float* b, size_t n);
+template uint32_t IP(uint8_t* a, uint8_t* b, size_t n);
+
