@@ -28,7 +28,7 @@ Computer<T1, T2, R> select_computer(MetricType metric_type) {
 }
 
 inline void get_bin_metadata(const std::string& bin_file, uint32_t& nrows, uint32_t& ncols) {
-    std::ifstream reader(bin_file.c_str(), std::ios::binary);
+    std::ifstream reader(bin_file, std::ios::binary);
     reader.read((char*) &nrows, sizeof(uint32_t));
     reader.read((char*) &ncols, sizeof(uint32_t));
     reader.close();
@@ -36,7 +36,7 @@ inline void get_bin_metadata(const std::string& bin_file, uint32_t& nrows, uint3
 }
 
 inline void set_bin_metadata(const std::string& bin_file, const uint32_t& nrows, const uint32_t& ncols) {
-    std::ofstream writer(bin_file.c_str(), std::ios::binary);
+    std::ofstream writer(bin_file, std::ios::binary | std::ios::in);
     writer.seekp(0);
     writer.write((char*) &nrows, sizeof(uint32_t));
     writer.write((char*) &ncols, sizeof(uint32_t));
@@ -82,12 +82,12 @@ inline void write_bin_file(const std::string& file_name, T* data, uint32_t n,
     writer.write((char*)data, sizeof(T) * n * dim);
 
     writer.close();
-    std::cout << "read binary file from " << file_name << " done in ... seconds, n = "
+    std::cout << "write binary file to " << file_name << " done in ... seconds, n = "
               << n << ", dim = " << dim << std::endl;
 }
 
 template<typename T>
-inline void read_bin_file(const std::string& file_name, T* data, uint32_t& n,
+inline void read_bin_file(const std::string& file_name, T*& data, uint32_t& n,
                     uint32_t& dim) {
     std::ifstream reader(file_name, std::ios::binary);
 
@@ -99,7 +99,7 @@ inline void read_bin_file(const std::string& file_name, T* data, uint32_t& n,
     reader.read((char*)data, sizeof(T) * n * dim);
 
     reader.close();
-    std::cout << "write binary file to " << file_name << " done in ... seconds, n = "
+    std::cout << "read binary file from " << file_name << " done in ... seconds, n = "
               << n << ", dim = " << dim << std::endl;
 }
 
@@ -123,20 +123,20 @@ inline void parse_id(uint64_t id, uint32_t& cid, uint32_t& bid, uint32_t& off) {
 
 inline uint64_t gen_refine_id(const uint32_t cid, const uint32_t offset, const uint32_t queryid) {
     uint64_t ret = 0;
-    ret |= (cid & 0xff);
+    ret |= (cid & 0x000000ff);
     ret <<= 32;
     ret |= (offset & 0xffffffff);
     ret <<= 24;
-    ret |= (queryid & 0xffffff);
+    ret |= (queryid & 0x00ffffff);
     return ret;
 }
 
 inline void parse_refine_id(uint64_t id, uint32_t& cid, uint32_t& offset, uint32_t& queryid) {
-    queryid = (id & 0xffffff);
-    queryid >>= 24;
+    queryid = (id & 0x00ffffff);
+    id >>= 24;
     offset = (id & 0xffffffff);
     id >>= 32;
-    cid = (id & 0xff);
+    cid = (id & 0x000000ff);
 }
 
 inline MetricType get_metric_type_by_name(const std::string& mt_name) {
