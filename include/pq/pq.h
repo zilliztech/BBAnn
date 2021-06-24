@@ -70,7 +70,7 @@ public:
         centroids = pq.centroids;
         codes = nullptr;
         // precompute distance tables
-        precompute_table = new float[m * K];
+        precompute_table = new float[K * m];
 //        compute_dis_tab(q, precompute_table, computer);
     }
 
@@ -85,6 +85,7 @@ public:
 
         if (precompute_table != nullptr) {
             delete[] precompute_table;
+            precompute_table = nullptr;
         }
     }
 
@@ -94,9 +95,11 @@ public:
 
     void cal_precompute_table(const T* q, PQ_Computer<T> computer) {
         const float* c = centroids;
+        assert(precompute_table != nullptr);
+        float* dis_tab = precompute_table;
         for (uint8_t i = 0; i < m; ++i, q += dsub) {
             for (int32_t j = 0; j < K; ++j, c += dsub) {
-                *precompute_table++ = computer(q, c, dsub);
+                *dis_tab++ = computer(q, c, dsub);
             }
         }
     }
@@ -211,11 +214,14 @@ void ProductQuantizer<C, T, U>::encode_vectors_and_save(int32_t n, const T *x, c
         compute_code(x + i * d, c + i * m);
     }
 
+    uint32_t wm = m;
     std::ofstream code_writer(save_file, std::ios::binary);
     code_writer.write((char*)&n, sizeof(uint32_t));
-    code_writer.write((char*)&m, sizeof(uint32_t));
+    code_writer.write((char*)&wm, sizeof(uint32_t));
     code_writer.write((char*)c, sizeof(U) * n * m);
     code_writer.close();
+    std::cout << "ProductQuantizer encode " << n << " vectors with m = " << wm << " into file "
+              << save_file << std::endl;
     delete[] c;
     c = nullptr;
 }

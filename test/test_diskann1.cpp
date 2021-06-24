@@ -56,10 +56,13 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    TimeRecorder rc("main");
     // todo: split search into two functions: load and query
     if (argv[1] == std::string("float")) {
         build_disk_index<float, float>
             (raw_data_file, output_path, hnswM, hnswefC, PQM, PQnbits, metric_type);
+
+        rc.RecordSection("build_disk_index with data type float done");
 
         search_disk_index_simple<float, float>
             (output_path, query_data_file, answer_file, topk, nprobe, PQM, PQnbits, metric_type);
@@ -67,8 +70,10 @@ int main(int argc, char** argv) {
         build_disk_index<uint8_t, uint32_t>
             (raw_data_file, output_path, hnswM, hnswefC, PQM, PQnbits, metric_type);
 
+        rc.RecordSection("build_disk_index with data type uint8 done");
         search_disk_index_simple<uint8_t, uint32_t>
             (output_path, query_data_file, answer_file, topk, nprobe, PQM, PQnbits, metric_type);
     }
+    rc.ElapseFromBegin("main done");
     return 0;
 }

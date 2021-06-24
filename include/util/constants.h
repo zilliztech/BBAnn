@@ -10,7 +10,7 @@ constexpr static int MEGABYTE = 1024 * 1024;
 constexpr static int GIGABYTE = 1024 * 1024 * 1024;
 
 // num of clusters in the first round k-means
-constexpr static int K1 = 64;
+constexpr static int K1 = 10;
 // sample rate of the first round k-means
 constexpr static float K1_SAMPLE_RATE = 0.01;
 // sample rate of the pq train set

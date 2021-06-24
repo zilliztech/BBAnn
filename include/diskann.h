@@ -14,6 +14,7 @@
 #include <string>
 #include "flat/flat.h"
 #include "ivf/clustering.h"
+#include "util/TimeRecorder.h"
 
 template<typename DATAT, typename DISTT>
 void search_disk_index_simple(const std::string& index_path, 
