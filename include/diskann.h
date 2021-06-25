@@ -40,7 +40,7 @@ void split_raw_data(const std::string& raw_data_file, const std::string& index_o
 
 template<typename DATAT, typename DISTT>
 void train_clusters(const std::string& cluster_path, uint32_t& graph_nb, uint32_t& graph_dim, 
-                    ProductQuantizer<CMin<DISTT, uint32_t>, DATAT, uint8_t>* pq_quantizer,
+                    ProductQuantizer<CMax<DISTT, uint32_t>, DATAT, uint8_t>* pq_quantizer,
                     MetricType metric_type);
 
 

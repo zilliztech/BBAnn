@@ -242,4 +242,21 @@ void kmeans (int32_t nx, const T* x_in, int32_t dim, int32_t k, float* centroids
             printf("split %d\n", split);
         }
     }
+
+    int empty_cnt = 0;
+    int mx, mn;
+    mx = mn = hassign[0];
+    for (auto i = 0; i < k; i ++) {
+        if (hassign[i] == 0)
+            empty_cnt ++;
+        if (hassign[i] > mx)
+            mx = hassign[i];
+        if (hassign[i] < mn)
+            mn = hassign[i];
+    }
+    std::cout << "after the kmeans with nx = " << nx << ", k = " << k 
+              << ", has " << empty_cnt << " empty clusters," 
+              << " max cluster: " << mx
+              << " mn cluster: " << mn
+              << std::endl;
 }

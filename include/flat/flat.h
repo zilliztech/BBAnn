@@ -21,6 +21,8 @@ void knn_1 (const T1 * x, // query
             typename C::TI * labels,
             Computer<T1, T2, typename C::T> comptuer)
 {
+    std::cout << "do knn_1 with nx = " << nx << ", ny = " << ny
+              << ", k = " << k << std::endl;
 #pragma omp parallel for
     for (int32_t i = 0; i < nx; i++) {
         auto *x_i = x + i * dim;
