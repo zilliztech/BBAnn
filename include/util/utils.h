@@ -63,10 +63,10 @@ void reservoir_sampling(const std::string& data_file, const size_t sample_num, T
     }
     for (auto i = sample_num; i < ntotal; i ++) {
         reader.read((char*)tmp_buf.get(), ndims * sizeof(T));
-        std::uniform_int_distribution<size_t> distribution(1, i);
+        std::uniform_int_distribution<size_t> distribution(0, i);
         size_t rand = (size_t)distribution(generator);
-        if (rand <= sample_num) {
-            memcpy((char*)sample_data, tmp_buf.get(), ndims * sizeof(T));
+        if (rand < sample_num) {
+            memcpy((char*)(sample_data + ndims * rand), tmp_buf.get(), ndims * sizeof(T));
         }
     }
 }
@@ -146,4 +146,78 @@ inline MetricType get_metric_type_by_name(const std::string& mt_name) {
         return MetricType::IP;
     return MetricType::None;
 }
+
+
+template<typename DISTT, typename IDT>
+void recall(const std::string& groundtruth_file, const std::string& answer_file, size_t nq, size_t topk) {
+    std::vector<std::vector<std::pair<IDT, DISTT>>> groundtruth;
+    groundtruth.resize(nq);
+    std::ifstream gin(groundtruth_file, std::ios::binary);
+    for (auto i = 0; i < nq; i ++) {
+        uint32_t sz;
+        gin.read((char*)&sz, sizeof(sz));
+        groundtruth[i].resize(sz);
+        for (auto j = 0; j < sz; j ++) {
+            gin.read((char*)&groundtruth[i][j].first, sizeof(IDT));
+            gin.read((char*)&groundtruth[i][j].second, sizeof(DISTT));
+        }
+    }
+    gin.close();
+
+    {// show groundtruth
+        std::cout << "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<" << std::endl;
+        std::cout << "show groundtruth:" << std::endl;
+        for (auto i = 0; i < groundtruth.size(); i ++) {
+            for (auto j = 0; j < groundtruth[i].size(); j ++) {
+                std::cout << "(" << groundtruth[i][j].first << ", " << groundtruth[i][j].second << ") ";
+            }
+            std::cout << std::endl;
+        }
+        std::cout << "<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<" << std::endl;
+    }
+
+
+    std::vector<std::vector<std::pair<IDT, DISTT>>> resultset;
+    resultset.resize(nq);
+    std::ifstream ain(answer_file, std::ios::binary);
+    for (auto i = 0; i < nq; i ++) {
+        uint32_t sz;
+        ain.read((char*)&sz, sizeof(sz));
+        resultset[i].resize(sz);
+        for (auto j = 0; j < sz; j ++) {
+            ain.read((char*)&resultset[i][j].first, sizeof(IDT));
+            ain.read((char*)&resultset[i][j].second, sizeof(DISTT));
+        }
+    }
+    ain.close();
+
+    {// show resultset
+        std::cout << ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>" << std::endl;
+        std::cout << "show resultset:" << std::endl;
+        for (auto i = 0; i < resultset.size(); i ++) {
+            for (auto j = 0; j < resultset[i].size(); j ++) {
+                std::cout << "(" << resultset[i][j].first << ", " << resultset[i][j].second << ") ";
+            }
+            std::cout << std::endl;
+        }
+        std::cout << ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>" << std::endl;
+    }
+
+    int tot_cnt = 0;
+    std::cout << "recall@" << topk << " between groundtruth file:"
+              << groundtruth_file << " and answer file:"
+              << answer_file << " is:" << std::endl;
+    for (auto i = 0; i < nq; i ++) {
+        int cnti = 0;
+        for (auto j = 0; j < resultset[i].size(); j ++) {
+            if (resultset[i][j].second <= groundtruth[i][groundtruth[i].size() - 1].second)
+                cnti ++;
+        }
+        tot_cnt += cnti;
+        std::cout << "query " << i << " recall@" << topk << " is: " << ((double)(cnti)) / topk * 100 << "%." << std::endl;
+    }
+    std::cout << "avg recall@" << topk << " = " << ((double)(tot_cnt)) / topk / nq * 100 << "%." << std::endl;
+}
+
+
 

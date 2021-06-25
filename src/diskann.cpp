@@ -38,7 +38,7 @@ void split_raw_data(const std::string& raw_data_file, const std::string& index_o
         std::cout << "split the " << i << "th block, start position = " << sp << ", end position = " << ep << std::endl;
         reader.read((char*)block_buf, (ep - sp) * dim * sizeof(DATAT));
         rci.RecordSection("read block data done");
-        knn_1<CMin<DISTT, size_t>, DATAT, float> (
+        knn_1<CMax<DISTT, size_t>, DATAT, float> (
             block_buf, centroids, ep - sp, K1, dim, 1, 
             dists.data(), cluster_id.data(), select_computer<DATAT, float, DISTT>(metric_type));
         rci.RecordSection("select file done");
@@ -73,6 +73,7 @@ void split_raw_data(const std::string& raw_data_file, const std::string& index_o
     block_buf = nullptr;
 
 
+    /*
     {// validate files
         for (auto i = 0; i < K1; i ++) {
             std::string cluster_raw_data_file_name = index_output_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
@@ -96,12 +97,13 @@ void split_raw_data(const std::string& raw_data_file, const std::string& index_o
             ir.close();
         }
     }
+    */
     rc.ElapseFromBegin("split_raw_data totally done");
 }
 
 template<typename DATAT, typename DISTT>
 void train_clusters(const std::string& cluster_path, uint32_t& graph_nb, uint32_t& graph_dim, 
-                    ProductQuantizer<CMin<DISTT, uint32_t>, DATAT, uint8_t>* pq_quantizer,
+                    ProductQuantizer<CMax<DISTT, uint32_t>, DATAT, uint8_t>* pq_quantizer,
                     MetricType metric_type) {
     TimeRecorder rc("train_clusters");
     std::vector<uint32_t> cluster_id;
@@ -160,7 +162,7 @@ void train_clusters(const std::string& cluster_path, uint32_t& graph_nb, uint32_
         rci.RecordSection("kmeans done");
         cluster_id.resize(cluster_size);
         dists.resize(cluster_size);
-        knn_1<CMin<DISTT, uint32_t>, DATAT, float> (
+        knn_1<CMax<DISTT, uint32_t>, DATAT, float> (
             datai, centroids_i, cluster_size, K2, cluster_dim, 1, 
             dists.data(), cluster_id.data(), select_computer<DATAT, float, DISTT>(metric_type));
         rci.RecordSection("assign done");
@@ -258,6 +260,7 @@ void train_clusters(const std::string& cluster_path, uint32_t& graph_nb, uint32_
     std::cout << "total bucket num = " << graph_nb << std::endl;
     set_bin_metadata(bucket_centroids_file, graph_nb, graph_dim);
     set_bin_metadata(bucket_ids_file, graph_nb, bucket_id_dim);
+    /*
     {// validate set meta
         uint32_t gn, gd, bid;
         get_bin_metadata(bucket_centroids_file, gn, gd);
@@ -271,6 +274,7 @@ void train_clusters(const std::string& cluster_path, uint32_t& graph_nb, uint32_
         IOReader v2(bucket_ids_file, MEGABYTE * 100);
         std::cout << "the size of file " << bucket_ids_file << " is " << v2.get_file_size() << std::endl;
     }
+    */
 
     rc.ElapseFromBegin("train_clusters totally done");
 }
@@ -284,6 +288,7 @@ void create_graph_index(const std::string& index_path,
     float* pdata = nullptr;
     uint64_t* pids = nullptr;
     uint32_t npts, ndim, nids, nidsdim;
+    /*
     {// validate set meta
         uint32_t gn, gd, bid;
         get_bin_metadata(index_path + BUCKET + CENTROIDS + BIN, gn, gd);
@@ -295,6 +300,7 @@ void create_graph_index(const std::string& index_path,
         IOReader v2(index_path + CLUSTER + COMBINE_IDS + BIN, MEGABYTE * 100);
         std::cout << "the size of file " << index_path + CLUSTER + COMBINE_IDS + BIN << " is " << v2.get_file_size() << std::endl;
     }
+    */
     read_bin_file<float>(index_path + BUCKET + CENTROIDS + BIN, pdata, npts, ndim);
     rc.RecordSection("load centroids of buckets done");
     std::cout << "there are " << npts << " of dimension " << ndim << " points of hnsw" << std::endl;
@@ -314,6 +320,7 @@ void create_graph_index(const std::string& index_path,
     assert(pids != nullptr);
     assert(npts == nids);
     assert(nidsdim == 1);
+    /*
     { // validate gen id
         std::vector<uint32_t> cluster_size(K1);
         uint32_t cluster_dim;
@@ -330,6 +337,7 @@ void create_graph_index(const std::string& index_path,
         }
         std::cout << "validate gen id ok in create_graph_index" << std::endl;
     }
+    */
     auto index_hnsw = std::make_shared<hnswlib::HierarchicalNSW<float>>(space, npts, hnswM, hnswefC);
     index_hnsw->addPoint(pdata, pids[0]);
 #pragma omp parallel for
@@ -372,7 +380,7 @@ void build_disk_index(const std::string& raw_data_file, const std::string& index
     DATAT* pq_sample_data = new DATAT[pq_sample_num * dim];
     reservoir_sampling(raw_data_file, pq_sample_num, pq_sample_data);
     rc.RecordSection("reservoir_sampling 4 pq train set done");
-    ProductQuantizer<CMin<DISTT, uint32_t>, DATAT, uint8_t> pq_quantizer(dim, PQM, PQnbits);
+    ProductQuantizer<CMax<DISTT, uint32_t>, DATAT, uint8_t> pq_quantizer(dim, PQM, PQnbits);
     pq_quantizer.train(pq_sample_num, pq_sample_data);
     rc.RecordSection("pq.train done");
     delete[] pq_sample_data;
@@ -452,7 +460,7 @@ void search_disk_index_simple(const std::string& index_path,
     DISTT* pq_distance = new DISTT[num_queries * refine_topk];
     DISTT* answer_dists = new DISTT[num_queries * topk];
     uint32_t* answer_ids = new uint32_t[num_queries * topk];
-    using heap_comare_class = CMin<DISTT, uint32_t>;
+    using heap_comare_class = CMax<DISTT, uint32_t>;
     auto dis_computer = select_computer<DATAT, DATAT, DISTT>(metric_type);
     PQ_Computer<DATAT> pq_cmp;
     if (MetricType::L2 == metric_type) {
@@ -517,6 +525,7 @@ void search_disk_index_simple(const std::string& index_path,
     }
     rc.RecordSection("search nprobe on hnsw done");
 
+    /*
     { // validate gen id
         std::vector<uint32_t> cluster_size(K1);
         uint32_t cluster_dim;
@@ -537,15 +546,16 @@ void search_disk_index_simple(const std::string& index_path,
         }
         std::cout << "validate labels form hnsw ok in search_disk_index_simple " << std::endl;
     }
+    */
 
-    ProductQuantizer<CMin<DISTT, uint64_t>, DATAT, uint8_t> pq_quantizer(dim_queries, PQM, PQnbits);
+    ProductQuantizer<CMax<DISTT, uint64_t>, DATAT, uint8_t> pq_quantizer(dim_queries, PQM, PQnbits);
     pq_quantizer.load_centroids(pq_centroids_file);
     rc.RecordSection("pq quantizer load centroids done");
 
     // step2: pq search
 // #pragma omp parallel for
     for (auto i = 0; i < num_queries; i ++) {
-        ProductQuantizer<CMin<DISTT, uint64_t>, DATAT, uint8_t> pq_quantizer_copiesi(pq_quantizer);
+        ProductQuantizer<CMax<DISTT, uint64_t>, DATAT, uint8_t> pq_quantizer_copiesi(pq_quantizer);
         pq_quantizer_copiesi.cal_precompute_table(pquery + i * dim_queries, pq_cmp);
         int valid_bucket_cnt = 0;
         int valid_vector_cnt = 0;
@@ -645,14 +655,15 @@ void search_disk_index_simple(const std::string& index_path,
     uint32_t ans_num = num_queries * topk;
     uint32_t ans_dim = 2;
     std::ofstream answer_writer(answer_bin_file, std::ios::binary);
-    answer_writer.write((char*)&ans_num, sizeof(uint32_t));
-    answer_writer.write((char*)&ans_dim, sizeof(uint32_t));
+    // answer_writer.write((char*)&ans_num, sizeof(uint32_t));
+    // answer_writer.write((char*)&ans_dim, sizeof(uint32_t));
     for (auto i = 0; i < num_queries; i ++) {
         auto ans_disi = answer_dists + topk * i;
         auto ans_idsi = answer_ids + topk * i;
+        answer_writer.write((char*)&topk, sizeof(uint32_t));
         for (int j = topk; j > 0; j --) {
-            answer_writer.write((char*)ans_disi, 4);
-            answer_writer.write((char*)ans_idsi, 4);
+            answer_writer.write((char*)ans_disi, sizeof(DISTT));
+            answer_writer.write((char*)ans_idsi, sizeof(uint32_t));
             heap_pop<heap_comare_class>(j, ans_disi, ans_idsi);
         }
     }
@@ -666,6 +677,7 @@ void search_disk_index_simple(const std::string& index_path,
         ids_data_file_handlers[i].close();
     }
     rc.RecordSection("close files handlers of rawdata and idsdata done");
+
 
     delete[] pquery;
     pquery = nullptr;
@@ -729,12 +741,12 @@ void split_raw_data<uint8_t, uint32_t>(const std::string& raw_data_file, const s
 
 template
 void train_clusters<float, float>(const std::string& cluster_path, uint32_t& graph_nb, uint32_t& graph_dim, 
-                    ProductQuantizer<CMin<float, uint32_t>, float, uint8_t>* pq_quantizer,
+                    ProductQuantizer<CMax<float, uint32_t>, float, uint8_t>* pq_quantizer,
                     MetricType metric_type);
 
 template
 void train_clusters<uint8_t, uint32_t>(const std::string& cluster_path, uint32_t& graph_nb, uint32_t& graph_dim, 
-                    ProductQuantizer<CMin<uint32_t, uint32_t>, uint8_t, uint8_t>* pq_quantizer,
+                    ProductQuantizer<CMax<uint32_t, uint32_t>, uint8_t, uint8_t>* pq_quantizer,
                     MetricType metric_type);
 
 
