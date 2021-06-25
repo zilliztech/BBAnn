@@ -678,7 +678,6 @@ void search_disk_index_simple(const std::string& index_path,
     }
     rc.RecordSection("close files handlers of rawdata and idsdata done");
 
-
     delete[] pquery;
     pquery = nullptr;
     // delete[] pq_centroids;
