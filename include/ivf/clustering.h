@@ -257,6 +257,6 @@ void kmeans (int32_t nx, const T* x_in, int32_t dim, int32_t k, float* centroids
     std::cout << "after the kmeans with nx = " << nx << ", k = " << k 
               << ", has " << empty_cnt << " empty clusters," 
               << " max cluster: " << mx
-              << " mn cluster: " << mn
+              << " min cluster: " << mn
               << std::endl;
 }
