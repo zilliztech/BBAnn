@@ -195,12 +195,12 @@ void ProductQuantizer<C, T, U>::train(int32_t n, const T* x, bool remove_dup) {
                     val = *reinterpret_cast<const uint32_t* >(xd);
                 } else {
                     // dsub < 4
-                    memcpy(&val, xd);
+                    memcpy(&val, xd, dsub);
                 }
 
                 if (st.find(val) == st.end()) {
                     st.insert(val);
-                    memcpy(xs + idx * dsub, xd);
+                    memcpy(xs + idx * dsub, xd, dsub * sizeof(T));
                     ++idx;
                 }
             }
