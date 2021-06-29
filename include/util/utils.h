@@ -46,6 +46,7 @@ inline void set_bin_metadata(const std::string& bin_file, const uint32_t& nrows,
 
 template<typename T>
 void reservoir_sampling(const std::string& data_file, const size_t sample_num, T* sample_data) {
+    assert(sample_data != nullptr);
     std::random_device rd;
     auto x = rd();
     std::mt19937 generator((unsigned) x);

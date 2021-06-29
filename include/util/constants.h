@@ -10,7 +10,7 @@ constexpr static int MEGABYTE = 1024 * 1024;
 constexpr static int GIGABYTE = 1024 * 1024 * 1024;
 
 // num of clusters in the first round k-means
-constexpr static int K1 = 10;
+// constexpr static int K1 = 10;
 // sample rate of the first round k-means
 constexpr static float K1_SAMPLE_RATE = 0.01;
 // sample rate of the pq train set
@@ -25,23 +25,24 @@ constexpr static int SPLIT_THRESHOLD = 500;
 // file name rule: prefix + file_name + file_type + suffix
 
 // prefix
+constexpr const char* GLOBAL = "global-";
 constexpr const char* CLUSTER = "cluster-";
 constexpr const char* BUCKET = "bucket-";
 
 // file_name
-constexpr const char* HNSW = "hnsw";
-constexpr const char* PQ = "pq";
+constexpr const char* HNSW = "hnsw-";
+constexpr const char* PQ = "pq-";
 
 // file type
-constexpr const char* CENTROIDS = "_centroids";
-constexpr const char* PQ_CENTROIDS = "_pq_centroids";
-constexpr const char* COMBINE_IDS = "_combine_ids";
-constexpr const char* GLOBAL_IDS = "_global_ids";
-constexpr const char* CODEBOOK = "_codebook";
-constexpr const char* RAWDATA = "_raw_data";
-constexpr const char* SAMPLEDATA = "_sampledata";
-constexpr const char* META = "_meta";
-constexpr const char* INDEX = "_index";
+constexpr const char* CENTROIDS = "centroids";
+constexpr const char* PQ_CENTROIDS = "pq_centroids";
+constexpr const char* COMBINE_IDS = "combine_ids";
+constexpr const char* GLOBAL_IDS = "global_ids";
+constexpr const char* CODEBOOK = "codebook";
+constexpr const char* RAWDATA = "raw_data";
+constexpr const char* SAMPLEDATA = "sampledata";
+constexpr const char* META = "meta";
+constexpr const char* INDEX = "index";
 
 // suffix
 constexpr const char* BIN = ".bin";
