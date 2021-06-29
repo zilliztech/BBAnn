@@ -18,11 +18,12 @@
  * 10. groundtruth binary file(string): file name of groundtruth, include file path and file name
  * 11. topk(int): the number of answers 4 each query
  * 12. nprobe(int): the number of buckets 4 index to search
- * 13. metric type(string): metric type
+ * 13. refine topk(int): the number of answers from pq.search of each query
+ * 14. metric type(string): metric type
  */
 
 int main(int argc, char** argv) {
-    if (argc != 14) {
+    if (argc != 15) {
         std::cout << "Usage: << " << argv[0]
                   << " data_type(float or uint8)"
                   << " binary raw data file"
@@ -36,6 +37,7 @@ int main(int argc, char** argv) {
                   << " groundtruth data file"
                   << " topk"
                   << " nprobe"
+                  << " refine topk"
                   << " metric type(L2 or IP)"
                   << std::endl;
         return 1;
@@ -52,7 +54,8 @@ int main(int argc, char** argv) {
     std::string groundtruth_file(argv[10]);
     int topk = std::stoi(argv[11]);
     int nprobe = std::stoi(argv[12]);
-    std::string metric_type_str(argv[13]);
+    int refine_topk = std::stoi(argv[13]);
+    std::string metric_type_str(argv[14]);
     auto metric_type = get_metric_type_by_name(metric_type_str);
     if (MetricType::None == metric_type) {
         std::cout << "invalid metric_type = " << metric_type_str << std::endl;
@@ -70,7 +73,7 @@ int main(int argc, char** argv) {
         rc.RecordSection("build_disk_index with data type float done");
 
         search_disk_index_simple<float, float>
-            (output_path, query_data_file, answer_file, topk, nprobe, PQM, PQnbits, metric_type);
+            (output_path, query_data_file, answer_file, topk, refine_topk, nprobe, PQM, PQnbits, metric_type);
 
         recall<float, uint32_t>(groundtruth_file, answer_file, nq, topk);
     } else if (argv[1] == std::string("uint8")) {
@@ -79,7 +82,7 @@ int main(int argc, char** argv) {
 
         rc.RecordSection("build_disk_index with data type uint8 done");
         search_disk_index_simple<uint8_t, uint32_t>
-            (output_path, query_data_file, answer_file, topk, nprobe, PQM, PQnbits, metric_type);
+            (output_path, query_data_file, answer_file, topk, refine_topk, nprobe, PQM, PQnbits, metric_type);
 
         recall<uint32_t, uint32_t>(groundtruth_file, answer_file, nq, topk);
     }

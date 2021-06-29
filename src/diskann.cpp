@@ -366,6 +366,7 @@ void search_disk_index_simple(const std::string& index_path,
                               const std::string& query_bin_file,
                               const std::string& answer_bin_file,
                               const int topk,
+                              const int refine_topk,
                               const int nprobe,
                               const int PQM, const int PQnbits,
                               MetricType metric_type) {
@@ -378,13 +379,11 @@ void search_disk_index_simple(const std::string& index_path,
               << " query_bin_file: " << query_bin_file
               << " answer_bin_file: " << answer_bin_file
               << " topk: " << topk
+              << " refine topk: " << refine_topk
               << " nprobe: " << nprobe
               << " PQM: " << PQM
               << " PQnbits: " << PQnbits
               << std::endl;
-
-    // parameters
-    int refine_topk = topk * 5;
 
     // files
     std::string hnsw_index_file = index_path + HNSW + INDEX + BIN;
@@ -668,6 +667,7 @@ void search_disk_index_simple<float, float>(const std::string& index_path,
                               const std::string& query_bin_file,
                               const std::string& answer_bin_file,
                               const int topk,
+                              const int refine_topk,
                               const int nprobe,
                               const int PQM, const int PQnbits,
                               MetricType metric_type = MetricType::L2);
@@ -678,6 +678,7 @@ void search_disk_index_simple<uint8_t, uint32_t>(const std::string& index_path,
                               const std::string& query_bin_file,
                               const std::string& answer_bin_file,
                               const int topk,
+                              const int refine_topk,
                               const int nprobe,
                               const int PQM, const int PQnbits,
                               MetricType metric_type = MetricType::L2);

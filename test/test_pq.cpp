@@ -1,8 +1,8 @@
 #include "pq/pq.h"
-#include "utils/heap.h"
+#include "util/heap.h"
 #include "flat/flat.h"
-#include "utils/read_file.h"
-#include "utils/merge.h"
+#include "util/read_file.h"
+#include "util/merge.h"
 
 #include <sys/time.h>
 
