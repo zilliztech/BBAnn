@@ -12,6 +12,7 @@
 #include <iostream>
 #include <memory>
 #include <vector>
+#include <algorithm>
 #include <limits>
 #include <functional>
 #include "util/utils.h"
@@ -89,6 +90,33 @@ public:
         }
     }
 
+    void show_centroids() {
+        std::cout << "show pq.centroids:" << std::endl;
+        auto pc = centroids;
+        for (auto i = 0; i < m; i ++) {
+            std::cout << "m = " << i << std::endl;
+            for (auto j = 0; j < K; j ++) {
+                std::cout << j << ": (";
+                for (auto k = 0; k < dsub; k ++)
+                    std::cout << *pc ++ << " ";
+                std::cout << ")" << std::endl;
+            }
+            std::cout << std::endl;
+        }
+    }
+
+    void show_pretab() {
+        assert(precompute_table != nullptr);
+        std::cout << "show pq.precompute_table:" << std::endl;
+        auto pp = precompute_table;
+        for (auto i = 0; i < m; i ++) {
+            std::cout << "m = " << std::endl;
+            for (auto j = 0; j < K; j ++)
+                std::cout << "(" << j << ", " << *pp++ << ") ";
+            std::cout << std::endl;
+        }
+    }
+
     void reset() {
         centroids = nullptr;
     }
@@ -141,7 +169,7 @@ public:
 
 template<class C, typename T, typename U>
 void ProductQuantizer<C, T, U>::compute_code(const T* x, U* c) {
-    for (uint8_t i = 0; i < m; ++i, x += dsub) {
+    for (int i = 0; i < m; ++i, x += dsub) {
         float min_dist = std::numeric_limits<float>::max();
         int32_t best_id = 0;
 
@@ -215,10 +243,10 @@ void ProductQuantizer<C, T, U>::encode_vectors_and_save(int32_t n, const T *x, c
     }
 
     uint32_t wm = m;
-    std::ofstream code_writer(save_file, std::ios::binary);
+    std::ofstream code_writer(save_file, std::ios::binary | std::ios::out);
     code_writer.write((char*)&n, sizeof(uint32_t));
     code_writer.write((char*)&wm, sizeof(uint32_t));
-    code_writer.write((char*)c, sizeof(U) * n * m);
+    code_writer.write((char*)c, n * m * sizeof(U));
     code_writer.close();
     std::cout << "ProductQuantizer encode " << n << " vectors with m = " << wm << " into file "
               << save_file << std::endl;
