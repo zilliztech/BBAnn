@@ -292,7 +292,7 @@ void create_graph_index(const std::string& index_path,
     assert(pids != nullptr);
     assert(npts == nids);
     assert(nidsdim == 1);
-    
+
     auto index_hnsw = std::make_shared<hnswlib::HierarchicalNSW<float>>(space, npts, hnswM, hnswefC);
     index_hnsw->addPoint(pdata, pids[0]);
 #pragma omp parallel for
@@ -489,7 +489,6 @@ void search_disk_index_simple(const std::string& index_path,
     }
     rc.RecordSection("search nprobe on hnsw done");
 
-
     ProductQuantizer<CMax<DISTT, uint64_t>, DATAT, uint8_t> pq_quantizer(dim_queries, PQM, PQnbits);
     pq_quantizer.load_centroids(pq_centroids_file);
     rc.RecordSection("pq quantizer load centroids done");
@@ -622,7 +621,7 @@ void search_disk_index_simple(const std::string& index_path,
     std::ofstream answer_writer(answer_bin_file, std::ios::binary);
     // answer_writer.write((char*)&ans_num, sizeof(uint32_t));
     // answer_writer.write((char*)&ans_dim, sizeof(uint32_t));
-    // for debug
+
     for (auto i = 0; i < num_queries; i ++) {
         auto ans_disi = answer_dists + topk * i;
         auto ans_idsi = answer_ids + topk * i;

@@ -90,7 +90,8 @@ void compute_centroids (int32_t dim, int32_t k, int32_t n,
                        const T * x,
                        const int32_t * assign,
                        int32_t * hassign,
-                       float * centroids)
+                       float * centroids,
+                       bool normalize)
 {
     memset(hassign, 0, sizeof(int32_t) * k);
     memset(centroids, 0, sizeof(float) * dim * k);
@@ -124,17 +125,16 @@ void compute_centroids (int32_t dim, int32_t k, int32_t n,
         }
 
         float *c = centroids + ci * dim;
-/*
-        float len = 1.0 / sqrt(IP<float, float, float>(c, c, dim));
-        for (int32_t j = 0; j < dim; j++){
-            c[j] *= len;
-        }
-*/
-
-        float norm = 1.0 / hassign[ci];
-
-        for (int32_t j = 0; j < dim; j++) {
-            c[j] *= norm;
+        if (normalize) {
+            float len = 1.0 / sqrt(IP<float, float, float>(c, c, dim));
+            for (int32_t j = 0; j < dim; j++){
+                c[j] *= len;
+            }
+        } else {
+            float norm = 1.0 / hassign[ci];
+            for (int32_t j = 0; j < dim; j++) {
+                c[j] *= norm;
+            }
         }
     }
 }
@@ -186,7 +186,7 @@ int32_t split_clusters (int32_t dim, int32_t k, int32_t n,
 
 template <typename T>
 void kmeans (int32_t nx, const T* x_in, int32_t dim, int32_t k, float* centroids,
-             int32_t niter = 10, int32_t seed = 1234) {
+             bool normalize = false, int32_t niter = 10, int32_t seed = 1234) {
     const int32_t max_points_per_centroid = 256;
     const int32_t min_points_per_centroid = 39;
 
@@ -222,20 +222,12 @@ void kmeans (int32_t nx, const T* x_in, int32_t dim, int32_t k, float* centroids
         }
     }
 
-    float err = 0;
     for (int32_t i = 0; i < niter; i++) {
         // printf("iter %d ", i);
 
         elkan_L2_assign<T, float, float>(x_in, centroids, dim, nx, k, assign.get(), dis.get());
 
-        // accumulate error
-        double err = 0;
-        for (int j = 0; j < nx; j++) {
-            err += dis[j];
-        }
-        // printf("err %lf\n", err);
-
-        compute_centroids<T>(dim, k, nx, x_in, assign.get(), hassign.get(), centroids);
+        compute_centroids<T>(dim, k, nx, x_in, assign.get(), hassign.get(), centroids, normalize);
 
         int32_t split = split_clusters(dim, k, nx, hassign.get(), centroids);
         if (split != 0) {
@@ -257,6 +249,6 @@ void kmeans (int32_t nx, const T* x_in, int32_t dim, int32_t k, float* centroids
     std::cout << "after the kmeans with nx = " << nx << ", k = " << k 
               << ", has " << empty_cnt << " empty clusters," 
               << " max cluster: " << mx
-              << " mn cluster: " << mn
+              << " min cluster: " << mn
               << std::endl;
 }

@@ -11,6 +11,7 @@
 
 #include <iostream>
 #include <memory>
+#include <unordered_set>
 #include <vector>
 #include <algorithm>
 #include <limits>
@@ -132,7 +133,7 @@ public:
         }
     }
 
-    void train(int32_t n, const T* x);
+    void train(int32_t n, const T* x, bool remove_dup = false);
 
     void encode_vectors(int32_t n, const T* x);
 
@@ -201,19 +202,46 @@ void ProductQuantizer<C, T, U>::compute_dis_tab(const T* q, float* dis_tab,
 }
 
 template<class C, typename T, typename U>
-void ProductQuantizer<C, T, U>::train(int32_t n, const T* x) {
+void ProductQuantizer<C, T, U>::train(int32_t n, const T* x, bool remove_dup) {
     T* xs = new T[n * dsub];
+    if (remove_dup && dsub > 4) {
+        printf("Remove duplicates when dsub > 4 is currently not supported. Fallback to not remove any duplicates.\n");
+        remove_dup = false;
+    }
 
     for (uint8_t i = 0; i < m; ++i) {
         const int32_t tmp_d = i * dsub;
 
         // get slice of x in subspace m_i
-        for (int32_t j = 0; j < n; ++j) {
-            memcpy(xs + j * dsub, x + j * d + tmp_d, dsub * sizeof(T));
-        }
+        if (remove_dup) {
+            uint32_t idx = 0;
+            std::unordered_set<uint32_t> st;
+            for (int32_t j = 0; j < n; ++j) {
+                uint32_t val = 0; 
+                auto xd = x + j * d + tmp_d;
+                if (dsub == 4) {
+                    val = *reinterpret_cast<const uint32_t* >(xd);
+                } else {
+                    // dsub < 4
+                    memcpy(&val, xd, dsub);
+                }
 
-        // compute centroids
-        kmeans<T>(n, xs, dsub, K, centroids + i * K * dsub);
+                if (st.find(val) == st.end()) {
+                    st.insert(val);
+                    memcpy(xs + idx * dsub, xd, dsub * sizeof(T));
+                    ++idx;
+                }
+            }
+            if (idx < K) {
+                printf("Unable to find %d points from %d training data, found %d.\n", K, n, idx);
+            }
+            kmeans<T>(idx, xs, dsub, K, centroids + i * K * dsub);
+        } else {
+            for (int32_t j = 0; j < n; ++j) {
+                memcpy(xs + j * dsub, x + j * d + tmp_d, dsub * sizeof(T));
+            }
+            kmeans<T>(n, xs, dsub, K, centroids + i * K * dsub);
+        }
     }
 
     delete[] xs;
