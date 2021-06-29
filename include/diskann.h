@@ -21,6 +21,7 @@ void search_disk_index_simple(const std::string& index_path,
                               const std::string& query_bin_file,
                               const std::string& answer_bin_file,
                               const int topk,
+                              const int refine_topk,
                               const int nprobe,
                               const int PQM, const int PQnbits,
                               MetricType metric_type = MetricType::L2);
