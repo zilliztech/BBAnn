@@ -44,6 +44,7 @@ int main(int argc, char** argv) {
     auto metric_type = get_metric_type_by_name(std::string(argv[8]));
     int K1 = std::stoi(argv[9]);
     int threshold = std::stoi(argv[10]);
+    assert(PQnbits == 8);
 
     if ('/' != *output_path.rbegin())
         output_path += '/';
