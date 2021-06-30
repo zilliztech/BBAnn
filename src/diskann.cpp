@@ -493,32 +493,36 @@ void search_disk_index_simple(const std::string& index_path,
     rc.RecordSection("pq quantizer load centroids done");
     
     // step2: pq search
-#pragma omp parallel for
-    for (auto i = 0; i < num_queries; i ++) {
-        ProductQuantizer<CMax<DISTT, uint64_t>, DATAT, uint8_t> pq_quantizer_copiesi(pq_quantizer);
-        pq_quantizer_copiesi.cal_precompute_table(pquery + i * dim_queries, pq_cmp);
-        // pq_quantizer_copiesi.show_pretab();
-        int valid_bucket_cnt = 0;
-        int valid_vector_cnt = 0;
-        auto p_labeli = p_labels + i * nprobe;
-        auto pq_offseti = pq_offsets + i * refine_topk;
-        auto pq_distancei = pq_distance + i * refine_topk;
-        uint32_t cid, bid, off;
-        // for debug
-        for (auto j = 0; j < nprobe; j ++) {
-            parse_id(p_labeli[j], cid, bid, off);
-            if (cid >= K1)
-                continue;
-            valid_bucket_cnt ++;
-            valid_vector_cnt += metas[cid][bid];
-            pq_quantizer_copiesi.search(pquery + i * dim_queries,
-                    pq_codebook[cid].data() + off * PQM, metas[cid][bid],
-                    refine_topk, pq_distancei, pq_offseti, pq_cmp, 
-                    j + 1 == nprobe, j == 0,
-                    cid, off, i);
+
+#pragma omp parallel
+    {
+        float* precompute_table = nullptr;
+#pragma omp for
+        for (auto i = 0; i < num_queries; i ++) {
+            pq_quantizer.calc_precompute_table(precompute_table, pquery + i * dim_queries, pq_cmp);
+            // pq_quantizer.show_pretab(precompute_table);
+            int valid_bucket_cnt = 0;
+            int valid_vector_cnt = 0;
+            auto p_labeli = p_labels + i * nprobe;
+            auto pq_offseti = pq_offsets + i * refine_topk;
+            auto pq_distancei = pq_distance + i * refine_topk;
+            uint32_t cid, bid, off;
+            // for debug
+            for (auto j = 0; j < nprobe; j ++) {
+                parse_id(p_labeli[j], cid, bid, off);
+                if (cid >= K1)
+                    continue;
+                valid_bucket_cnt ++;
+                valid_vector_cnt += metas[cid][bid];
+                pq_quantizer.search(precompute_table, pquery + i * dim_queries,
+                        pq_codebook[cid].data() + off * PQM, metas[cid][bid],
+                        refine_topk, pq_distancei, pq_offseti, pq_cmp, 
+                        j + 1 == nprobe, j == 0,
+                        cid, off, i);
+            }
+            // std::cout << "query " << i << " has checked " << valid_bucket_cnt << " buckets, checked " << valid_vector_cnt << " vectors." << std::endl;
         }
-        pq_quantizer_copiesi.reset();
-        // std::cout << "query " << i << " has checked " << valid_bucket_cnt << " buckets, checked " << valid_vector_cnt << " vectors." << std::endl;
+        delete[] precompute_table;
     }
     rc.RecordSection("pq search done");
     

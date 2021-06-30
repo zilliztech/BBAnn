@@ -121,23 +121,26 @@ void search_disk_index_simple(const std::string& index_path,
     pq_quantizer.load_centroids(pq_centroids_file);
 
     // step2: pq search
-#pragma omp parallel for
-    for (auto i = 0; i < num_queries; i ++) {
-        PQ<CMin<DISTT, uint64_t>, DATAT, uint8_t> pq_quantizer_copiesi(pq_quantizer);
-        pq_quantizer_copiesi.cal_precompute_table(pquery + i * dim_queries, pq_cmp);
-        auto p_labeli = p_labels + i * nprobe;
-        auto pq_offseti = pq_offsets + i * refine_topk;
-        auto pq_distancei = pq_distance + i * refine_topk;
-        uint32_t cid, bid, off;
-        for (auto j = 0; j < nprobe; j ++) {
-            parse_id(p_labeli[j], cid, bid, off);
-            pq_quantizer_copiesi.search(pquery + i * dim_queries,
-                    pq_codebook[cid].data() + off * PQM, meta[cid][bid],
-                    refine_topk, pq_distancei, pq_offseti, pq_cmp, 
-                    j + 1 == nprobe, j == 0,
-                    cid, off, i);
+#pragma omp parallel
+    {
+        float* precompute_table = nullptr;
+#pragma omp for
+        for (auto i = 0; i < num_queries; i ++) {
+            pq_quantizer.calc_precompute_table(pquery + i * dim_queries, pq_cmp);
+            auto p_labeli = p_labels + i * nprobe;
+            auto pq_offseti = pq_offsets + i * refine_topk;
+            auto pq_distancei = pq_distance + i * refine_topk;
+            uint32_t cid, bid, off;
+            for (auto j = 0; j < nprobe; j ++) {
+                parse_id(p_labeli[j], cid, bid, off);
+                pq_quantizer.search(precompute_table, pquery + i * dim_queries,
+                        pq_codebook[cid].data() + off * PQM, meta[cid][bid],
+                        refine_topk, pq_distancei, pq_offseti, pq_cmp, 
+                        j + 1 == nprobe, j == 0,
+                        cid, off, i);
+            }
         }
-        pq_quantizer_copiesi.reset();
+        delete[] precompute_table;
     }
 
     // refine
