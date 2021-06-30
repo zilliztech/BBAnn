@@ -17,3 +17,8 @@ float rand_float() {
     static std::mt19937 generator(1234);
     return generator() / (float)generator.max();
 }
+
+int rand_int() {
+    static std::mt19937 generator(3456);
+    return generator() & 0x7fffffff;
+}
