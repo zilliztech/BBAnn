@@ -70,6 +70,14 @@ public:
         }
     }
 
+    float* get_centroids() {
+        return centroids;
+    }
+
+    U* get_codes() {
+        return codes;
+    }
+
     void show_centroids() {
         std::cout << "show pq.centroids:" << std::endl;
         auto pc = centroids;
@@ -111,7 +119,7 @@ public:
         }
     }
 
-    void train(int32_t n, const T* x, bool remove_dup = false);
+    void train(int32_t n, const T* x);
 
     void encode_vectors(int32_t n, const T* x);
 
@@ -180,44 +188,61 @@ void ProductQuantizer<C, T, U>::compute_dis_tab(const T* q, float* dis_tab,
 }
 
 template<class C, typename T, typename U>
-void ProductQuantizer<C, T, U>::train(int32_t n, const T* x, bool remove_dup) {
+void ProductQuantizer<C, T, U>::train(int32_t n, const T* x) {
+    const size_t sub_code_size = dsub * sizeof(T);
     T* xs = new T[n * dsub];
-    if (remove_dup && dsub > 4) {
-        printf("Remove duplicates when dsub > 4 is currently not supported. Fallback to not remove any duplicates.\n");
-        remove_dup = false;
+
+    bool remove_dup = false;
+    if (sub_code_size <= 4) {
+        printf("Remove duplicates dsub %d * sizeof(Type) %d\n", dsub, sizeof(T));
+        remove_dup = true;
     }
 
     for (uint8_t i = 0; i < m; ++i) {
-        const int32_t tmp_d = i * dsub;
-
-        // get slice of x in subspace m_i
         if (remove_dup) {
             uint32_t idx = 0;
             std::unordered_set<uint32_t> st;
-            for (int32_t j = 0; j < n; ++j) {
-                uint32_t val = 0; 
-                auto xd = x + j * d + tmp_d;
-                if (dsub == 4) {
-                    val = *reinterpret_cast<const uint32_t* >(xd);
-                } else {
-                    // dsub < 4
-                    memcpy(&val, xd, dsub);
-                }
 
-                if (st.find(val) == st.end()) {
-                    st.insert(val);
-                    memcpy(xs + idx * dsub, xd, dsub * sizeof(T));
-                    ++idx;
+            if (sub_code_size == 4) {
+                auto u_xd = reinterpret_cast<const uint32_t*>(x) + i;
+                auto u_xs = reinterpret_cast<uint32_t*>(xs);
+                for (int32_t j = 0; j < n; j++) {
+                    if (st.find(*u_xd) == st.end()) {
+                        st.insert(*u_xd);
+                        u_xs[idx++] = *u_xd;
+                    }
+                    u_xd += m;
+                }
+            } else {
+                uint32_t val = 0;
+                auto xd = x + i * dsub;
+                for (int32_t j = 0; j < n; j++){
+                    memcpy(&val, xd, sub_code_size);
+                    if (st.find(val) == st.end()) {
+                        st.insert(val);
+                        memcpy(xs + idx * dsub, xd, sub_code_size);
+                        idx++;
+                    }
+                    xd += d;
                 }
             }
+
             if (idx < K) {
                 printf("Unable to find %d points from %d training data, found %d.\n", K, n, idx);
+                // todo: add some random data into xs
+            } else {
+                printf("Duplicate points removed, n from %d to %d\n", n , idx);
             }
+
             kmeans<T>(idx, xs, dsub, K, centroids + i * K * dsub);
+
         } else {
+            auto xd = x + i * dsub;
             for (int32_t j = 0; j < n; ++j) {
-                memcpy(xs + j * dsub, x + j * d + tmp_d, dsub * sizeof(T));
+                memcpy(xs + j * dsub, xd, sub_code_size);
+                xd += d;
             }
+
             kmeans<T>(n, xs, dsub, K, centroids + i * K * dsub);
         }
     }
