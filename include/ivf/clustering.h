@@ -182,9 +182,9 @@ int32_t split_clusters (int32_t dim, int32_t k, int32_t n,
 
 
 template <typename DATAT>
-void kmeanspp(const T* pdata, const uint32_t nb, const uint32_t dim,
+void kmeanspp(const DATAT* pdata, const uint32_t nb, const uint32_t dim,
               const uint32_t num_clusters, float*& centroids) {
-    using disf = L2sqr<T, T, float>;
+    auto disf = L2sqr<const DATAT, float, float>;
     std::random_device rd;
     auto x = rd();
     std::mt19937 generator(x);

@@ -122,6 +122,10 @@ public:
         centroids = nullptr;
     }
 
+    int getM() {
+        return int(m);
+    }
+
     void cal_precompute_table(const T* q, PQ_Computer<T> computer) {
         const float* c = centroids;
         assert(precompute_table != nullptr);
