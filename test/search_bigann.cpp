@@ -102,6 +102,7 @@ int main(int argc, char** argv) {
                 (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
         }
         // calculate_recall<float>(ground_truth_file, answer_file, topk);
+        recall<float, uint32_t>(ground_truth_file, answer_file, 100, topk);
     } else if (argv[1] == std::string("uint8")) {
         PQ_Computer<uint8_t> pq_cmp; // pq computer
         Computer<uint8_t, uint8_t, uint32_t> dis_computer; // refine computer
@@ -126,6 +127,7 @@ int main(int argc, char** argv) {
                 (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
         }
         // calculate_recall<uint32_t>(ground_truth_file, answer_file, topk);
+        recall<uint32_t, uint32_t>(ground_truth_file, answer_file, 100, topk);
     }
 
     return 0;

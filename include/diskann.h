@@ -62,7 +62,7 @@ template<typename DATAT>
 void train_cluster(const std::string& raw_data_bin_file,
                    const std::string& output_path,
                    const int K1,
-                   const float** centroids);
+                   float** centroids);
 
 
 template<typename DATAT, typename DISTT, typename HEAPT>

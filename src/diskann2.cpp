@@ -6,6 +6,7 @@ void train_cluster(const std::string& raw_data_bin_file,
                    const std::string& output_path,
                    const int K1,
                    float** centroids) {
+    TimeRecorder rc("train cluster");
     std::cout << "train_cluster parameters:" << std::endl;
     std::cout << " raw_data_bin_file: " << raw_data_bin_file
               << " output path: " << output_path
@@ -22,9 +23,13 @@ void train_cluster(const std::string& raw_data_bin_file,
     *centroids = new float[K1 * dim];
     sample_data = new DATAT[sample_num * dim];
     reservoir_sampling(raw_data_bin_file, sample_num, sample_data);
+    rc.RecordSection("reservoir sample with sample rate: " + std::to_string(K1_SAMPLE_RATE) + " done");
     kmeans<DATAT>(sample_num, sample_data, (int32_t)dim, K1, *centroids, true);
+    rc.RecordSection("kmeans done");
+    assert((*centroids) != nullptr);
 
     delete[] sample_data;
+    rc.ElapseFromBegin("train cluster done.");
 }
 
 template<typename DATAT, typename DISTT, typename HEAPT>
@@ -33,6 +38,12 @@ void divide_raw_data(const std::string& raw_data_bin_file,
                      const float* centroids,
                      const uint32_t K1) {
     TimeRecorder rc("split_raw_data");
+    std::cout << "divide_raw_data parameters:" << std::endl;
+    std::cout << " raw_data_bin_file: " << raw_data_bin_file
+              << " output_path: " << output_path
+              << " centroids: " << centroids
+              << " K1: " << K1 
+              << std::endl;
     IOReader reader(raw_data_bin_file);
     uint32_t nb, dim;
     reader.read((char*)&nb, sizeof(uint32_t));
@@ -451,6 +462,16 @@ void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
                   const DATAT* pquery,
                   uint64_t* buckets_label) {
 
+    TimeRecorder rc("search graph");
+    std::cout << "search graph parameters:" << std::endl;
+    std::cout << " index_hnsw: " << index_hnsw
+              << " nq: " << nq
+              << " dq: " << dq
+              << " nprobe: " << nprobe
+              << " refine_nprobe: " << refine_nprobe
+              << " pquery: " << pquery
+              << " buckets_label: " << buckets_label
+              << std::endl;
     index_hnsw->setEf(refine_nprobe);
 #pragma omp parallel for
     for (auto i = 0; i < nq; i ++) {
@@ -462,6 +483,7 @@ void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
             reti.pop();
         }
     }
+    rc.ElapseFromBegin("search graph done.");
 }
 
 template<typename DATAT, typename DISTT, typename HEAPTT>
@@ -478,7 +500,21 @@ void search_quantizer(ProductQuantizer<HEAPTT, DATAT, uint8_t>& pq_quantizer,
                       DISTT*& pq_distance,
                       uint64_t*& pq_offsets,
                       PQ_Computer<DATAT>& pq_cmp) {
+    TimeRecorder rc("search graph");
+    std::cout << "search quantizer parameters:" << std::endl;
+    std::cout << " pq_quantizer:" << &pq_quantizer
+              << " nq: " << nq
+              << " dq: " << dq
+              << " buckets_label: " << buckets_label
+              << " nprobe: " << nprobe
+              << " refine_topk: " << refine_topk
+              << " K1: " << K1
+              << " pquery: " << pquery
+              << " pq_distance: " << pq_distance
+              << " pq_offsets: " << pq_offsets
+              << std::endl;
     auto pqm = pq_quantizer.getM();
+    rc.RecordSection("pqm = " + std::to_string(pqm));
 #pragma omp parallel for
     for (auto i = 0; i < nq; i ++) {
         ProductQuantizer<HEAPTT, DATAT, uint8_t> pq_quantizer_copiesi(pq_quantizer);
@@ -497,6 +533,7 @@ void search_quantizer(ProductQuantizer<HEAPTT, DATAT, uint8_t>& pq_quantizer,
         }
         pq_quantizer_copiesi.reset();
     }
+    rc.ElapseFromBegin("search quantizer done.");
 }
 
 template<typename DATAT, typename DISTT, typename HEAPT>
