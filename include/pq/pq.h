@@ -121,9 +121,13 @@ public:
 
     void train(int32_t n, const T* x);
 
-    void encode_vectors(int32_t n, const T* x);
+    void encode_vectors(float*& precomputer_table,
+                        int32_t n, const T* x,
+                        bool append = false);
 
-    void encode_vectors_and_save(int32_t n, const T* x, const std::string& save_file);
+    void encode_vectors_and_save(float*& precomputer_table,
+                                 int32_t n, const T *x,
+                                 const std::string& save_file);
 
     void search(int32_t nq, const T* q, int32_t topk,
                    typename C::T* values, typename C::TI* labels,
@@ -251,38 +255,98 @@ void ProductQuantizer<C, T, U>::train(int32_t n, const T* x) {
 };
 
 template<class C, typename T, typename U>
-void ProductQuantizer<C, T, U>::encode_vectors(int32_t n, const T *x) {
-    assert(npos + n <= ntotal);
+void ProductQuantizer<C, T, U>::encode_vectors(float*& precomputer_table,
+                                               int32_t n, const T *x,
+                                               bool append) {
+    if (!append) {
+        npos = 0;
+    }
+
+    if (npos + n < ntotal) {
+        ntotal = npos + n;
+        U* new_codes = new U[ntotal * m];
+        if (npos != 0) {
+            memcpy(new_codes, codes, npos * m * sizeof(U));
+        }
+        if (codes != nullptr) {
+            delete[] codes;
+        }
+        codes = new_codes;
+    }
 
     U* c = codes + npos * m;
 
+    bool new_precomputer_table = false;
+    if (precomputer_table == nullptr) {
+        precomputer_table = new float[m * K * (K - 1) / 2];
+        new_precomputer_table = true;
+    }
+
+    for (int32_t loop = 0; loop < m; loop++) {
+        float *data = precomputer_table + loop * K * (K - 1) / 2;
+        float* cen = centroids + loop * K * dsub;
+
+        auto Y = [&](int32_t i, int32_t j) -> float& {
+            assert(i != j);
+            return (i > j) ? data[j + i * (i - 1) / 2] : data[i + j * (j - 1) / 2];
+        };
+
+        if (new_precomputer_table) {
+#pragma omp parallel
+            {
+                int nt = omp_get_num_threads();
+                int rank = omp_get_thread_num();
+                for (int32_t i = 1 + rank; i < K; i += nt) {
+                    float* y_i = cen + i * dsub;
+                    for (int32_t j = 0; j < i; j++) {
+                        float* y_j = cen + j * dsub;
+                        Y(i, j) = L2sqr<float,float,float>(y_i, y_j, dsub);
+                    }
+                }
+            }
+        }
+
 #pragma omp parallel for
-    for (int32_t i = 0; i < n; ++i) {
-        compute_code(x + i * d, c + i * m);
+        for (int32_t i = 0; i < n; i++) {
+            const T* x_i = x + i * d + loop * dsub;
+
+            int32_t ids_i = 0;
+            float val_i = L2sqr<const T,const float,float>(x_i, cen, dsub);
+            float val_i_time_4 = val_i * 4;
+            for (int32_t j = 1; j < K; j++) {
+                if (val_i_time_4 <= Y(ids_i, j)) {
+                    continue;
+                }
+                const float *y_j = cen + j * dsub;
+                float disij = L2sqr<const T,const float,float>(x_i, y_j, dsub);
+                if (disij < val_i) {
+                    ids_i = j;
+                    val_i = disij;
+                    val_i_time_4 = val_i * 4;
+                }
+            }
+
+            c[i * m + loop] = ids_i;
+        }
     }
 
     npos += n;
 }
 
 template<class C, typename T, typename U>
-void ProductQuantizer<C, T, U>::encode_vectors_and_save(int32_t n, const T *x, const std::string& save_file) {
-    U* c = new U[n * m];
-
-#pragma omp parallel for
-    for (int32_t i = 0; i < n; ++i) {
-        compute_code(x + i * d, c + i * m);
-    }
+void ProductQuantizer<C, T, U>::encode_vectors_and_save(float*& precomputer_table,
+                                                        int32_t n, const T *x,
+                                                        const std::string& save_file) {
+    encode_vectors(precomputer_table, n, x, false);
 
     uint32_t wm = m;
     std::ofstream code_writer(save_file, std::ios::binary | std::ios::out);
     code_writer.write((char*)&n, sizeof(uint32_t));
     code_writer.write((char*)&wm, sizeof(uint32_t));
-    code_writer.write((char*)c, n * m * sizeof(U));
+    code_writer.write((char*)codes, n * m * sizeof(U));
     code_writer.close();
     std::cout << "ProductQuantizer encode " << n << " vectors with m = " << wm << " into file "
               << save_file << std::endl;
-    delete[] c;
-    c = nullptr;
 }
 
 template<class C, typename T, typename U>

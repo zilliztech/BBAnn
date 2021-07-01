@@ -100,6 +100,7 @@ int main() {
     int batch_num = read_file_data(fi, Base_Batch, dim, xb);
 
     // Flat(0, batch_num);
+    // return 0;
 
     // pq
     ProductQuantizer<Dis_Compare, CODE_T, uint8_t> pq(batch_num, dim, m, nbits);
@@ -112,12 +113,32 @@ int main() {
     printf("Train %d cost %ldms\n", train_size, getTime(t2,t1));
 
     gettimeofday(&t1, 0);
-    pq.encode_vectors(batch_num, xb);
+    float* precompute_table = nullptr;
+    pq.encode_vectors(precompute_table, batch_num, xb, false);
+    delete[] precompute_table;
     gettimeofday(&t2, 0);
     printf("Encode %d cost %ldms\n", batch_num, getTime(t2,t1));
 
     gettimeofday(&t1, 0);
-    pq.search(nq, xq, topk, global_dis, global_lab, PQ_DIS_Computer);
+//    pq.search(nq, xq, topk, global_dis, global_lab, PQ_DIS_Computer);
+#pragma omp parallel
+    {
+        float* precompute_table = nullptr;
+#pragma omp for
+        for (auto i = 0; i < nq; i ++) {
+            pq.calc_precompute_table(precompute_table, xq + i * dim, PQ_DIS_Computer);
+            // pq_quantizer.show_pretab(precompute_table);
+            for (int j=0;j<Base_Batch;j++){
+                pq.search(precompute_table, xq + i * dim,
+                        pq.get_codes() + j * m, 1, topk,
+                        global_dis + i * topk, global_lab +  + i * topk,
+                        PQ_DIS_Computer,
+                        false, j==0, 0, 0, j);
+            }
+        }
+        delete[] precompute_table;
+    }
+
     gettimeofday(&t2, 0);
     printf("Search nq %d, topk %d,cost %ldms\n", nq, topk, getTime(t2,t1));
 

@@ -97,6 +97,8 @@ void train_clusters(const std::string& cluster_path, uint32_t& graph_nb, uint32_
     bucket_ids_writer.write((char*)&placeholder, sizeof(uint32_t));
     graph_nb = 0;
     uint32_t bucket_id_dim = 1;
+
+    float* precomputer_table = nullptr;
     for (auto i = 0; i < K1; i ++) {
         // raw_data_file, read by split order, write by buckets
         std::string data_file = cluster_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
@@ -188,12 +190,13 @@ void train_clusters(const std::string& cluster_path, uint32_t& graph_nb, uint32_
         data_reader2.read((char*)&cluster_size, sizeof(uint32_t));
         data_reader2.read((char*)&cluster_dim, sizeof(uint32_t));
         data_reader2.read((char*)datai, cluster_size * cluster_dim * sizeof(DATAT));
-        pq_quantizer->encode_vectors_and_save(cluster_size, datai, pq_codebook_file);
+        pq_quantizer->encode_vectors_and_save(precomputer_table, cluster_size, datai, pq_codebook_file);
 
         delete[] datai;
         delete[] idsi;
         delete[] centroids_i;
     }
+    delete[] precomputer_table;
 
     std::cout << "total bucket num = " << graph_nb << std::endl;
     set_bin_metadata(bucket_centroids_file, graph_nb, graph_dim);

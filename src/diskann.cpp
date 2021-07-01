@@ -127,6 +127,7 @@ void train_clusters(const std::string& cluster_path, uint32_t& graph_nb, uint32_
     bucket_ids_writer.write((char*)&placeholder, sizeof(uint32_t));
     graph_nb = 0;
     uint32_t bucket_id_dim = 1;
+    float* precomputer_table = nullptr;
     for (auto i = 0; i < K1; i ++) {
         std::cout << "-------------------------------------------------------------------------------------" << std::endl;
         std::cout << "start train the " << i << "th cluster" << std::endl;
@@ -243,7 +244,7 @@ void train_clusters(const std::string& cluster_path, uint32_t& graph_nb, uint32_
         data_reader2.read((char*)&cluster_size, sizeof(uint32_t));
         data_reader2.read((char*)&cluster_dim, sizeof(uint32_t));
         data_reader2.read((char*)datai, cluster_size * cluster_dim * sizeof(DATAT));
-        pq_quantizer->encode_vectors_and_save(cluster_size, datai, pq_codebook_file);
+        pq_quantizer->encode_vectors_and_save(precomputer_table, cluster_size, datai, pq_codebook_file);
         rci.RecordSection("pq encoding and save done");
 
         delete[] datai;
@@ -253,6 +254,7 @@ void train_clusters(const std::string& cluster_path, uint32_t& graph_nb, uint32_
         rci.ElapseFromBegin("done");
         std::cout << "-------------------------------------------------------------------------------------" << std::endl;
     }
+    delete[] precomputer_table;
     bucket_ids_writer.close();
     bucket_ctd_writer.close();
 
