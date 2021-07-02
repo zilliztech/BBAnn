@@ -59,12 +59,47 @@ int main(int argc, char** argv) {
         index_path += '/';
 
     std::string hnsw_index_file = index_path + HNSW + INDEX + BIN;
-    std::string pq_centroids_file = index_path + PQ + PQ_CENTROIDS + BIN;
+    std::string pq_centroids_file = index_path + PQ_CENTROIDS + BIN;
     std::string bucket_centroids_file = index_path + BUCKET + CENTROIDS + BIN;
 
     std::vector<std::vector<uint8_t>> pq_codebook(K1);
     std::vector<std::vector<uint32_t>> meta(K1);
     load_pq_codebook(index_path, pq_codebook, K1);
+
+    // for debug
+    /*
+    {
+        int cid = -1, pos = -1;
+        for (auto i = 0; i < K1 && cid < 0; i ++) {
+            std::string ids_filei  = index_path + CLUSTER + std::to_string(i) + GLOBAL_IDS + BIN;
+            std::ifstream ids_data_file_handlers = std::ifstream(ids_filei , std::ios::binary);
+            uint32_t clu_id_size, clu_id_dim;
+            ids_data_file_handlers.read((char*)&clu_id_size, sizeof(clu_id_size));
+            ids_data_file_handlers.read((char*)&clu_id_dim, sizeof(clu_id_dim));
+            uint32_t gid;
+            for (auto j = 0; j < clu_id_size; j ++) {
+                ids_data_file_handlers.read((char*)&gid, sizeof(uint32_t));
+                if (0 == gid) {
+                    cid = i;
+                    pos = j;
+                    break;
+                }
+            }
+            ids_data_file_handlers.close();
+        }
+        std::cout << "find vector0 in cid: " << cid << " pos: " << pos << std::endl;
+        std::cout << "pq.m = " << PQM << std::endl;
+        std::cout << "show pq code of vector0:" << std::endl;
+        for (auto si = 0; si < PQM; si ++) {
+            std::cout << (int)pq_codebook[cid][pos * PQM + si] << " ";
+        }
+        std::cout << std::endl;
+    }
+    */
+
+
+
+
     load_meta(index_path, meta, K1);
     uint32_t bucket_num, dim;
     get_bin_metadata(bucket_centroids_file, bucket_num, dim);

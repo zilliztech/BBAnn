@@ -1,6 +1,5 @@
 #include "diskann.h"
 
-
 template<typename DATAT>
 void train_cluster(const std::string& raw_data_bin_file,
                    const std::string& output_path,
@@ -84,6 +83,17 @@ void divide_raw_data(const std::string& raw_data_bin_file,
         for (auto j = 0; j < ep - sp; j ++) {
             auto cid = cluster_id[j];
             auto uid = (uint32_t)(j + sp);
+            // for debug
+            /*
+            if (0 == uid) {
+                std::cout << "vector0 was split into cluster " << cid << std::endl;
+                std::cout << " show vector0:" << std::endl;
+                for (auto si = 0; si < dim; si ++) {
+                    std::cout << *(block_buf + j * dim + si) << " ";
+                }
+                std::cout << std::endl;
+            }
+            */
             cluster_dat_writer[cid].write((char*)(block_buf + j * dim), sizeof(DATAT) * dim);
             cluster_ids_writer[cid].write((char*)&uid, sizeof(uint32_t));
             cluster_size[cid] ++;
@@ -225,6 +235,19 @@ void conquer_clusters(const std::string& output_path,
                 auto ori_pos = cluster_off[j].second;
                 data_writer.write((char*)(datai + ori_pos * cluster_dim), sizeof(DATAT) * cluster_dim);
                 ids_writer.write((char*)(idsi + ori_pos * ids_dim), sizeof(uint32_t) * ids_dim);
+                // for debug
+                /*
+                if (*(idsi + ori_pos * ids_dim) == 0) {
+                    std::cout << "vector0 is arranged to new pos: " << j << " in cluster " << i << std::endl;
+                    std::cout << " show vector0:" << std::endl;
+                    for (auto si = 0; si < cluster_dim; si ++) {
+                        std::cout << *(datai + ori_pos * cluster_dim + si) << " ";
+                    }
+                    std::cout << std::endl;
+                    v0cid = i;
+                    v0pos = j;
+                }
+                */
             }
         }
         rci.RecordSection("rearrange raw_data and global ids done");
@@ -363,6 +386,7 @@ void train_quantizer(const std::string& raw_data_bin_file,
         data_reader.read((char*)&cluster_size, sizeof(uint32_t));
         data_reader.read((char*)&cluster_dim, sizeof(uint32_t));
         DATAT* datai = new DATAT[cluster_size * cluster_dim];
+        data_reader.read((char*)datai, cluster_size * cluster_dim * sizeof(DATAT));
         pq_quantizer.encode_vectors_and_save(cluster_size, datai, pq_codebook_file);
         delete[] datai;
     }
@@ -513,6 +537,8 @@ void search_quantizer(ProductQuantizer<HEAPTT, DATAT, uint8_t>& pq_quantizer,
               << " pq_distance: " << pq_distance
               << " pq_offsets: " << pq_offsets
               << std::endl;
+
+
     auto pqm = pq_quantizer.getM();
     rc.RecordSection("pqm = " + std::to_string(pqm));
 #pragma omp parallel for
@@ -697,6 +723,8 @@ void search_bigann(const std::string& index_path,
                    std::vector<std::vector<uint8_t>>& pq_codebook,
                    std::vector<std::vector<uint32_t>>& meta,
                    Computer<DATAT, DATAT, DISTT>& dis_computer) {
+    // std::cout << "show pq centroids at the begining:" << std::endl;
+    // pq_quantizer.show_centroids();
     TimeRecorder rc("search bigann");
     std::cout << "search bigann parameters:" << std::endl;
     std::cout << " index_path: " << index_path
@@ -721,6 +749,13 @@ void search_bigann(const std::string& index_path,
 
     read_bin_file<DATAT>(query_bin_file, pquery, nq, dq);
     rc.RecordSection("load query done.");
+    // for debug
+    // nq = 1;
+    // int topk = 10;
+    // int refine_topk = 20;
+    // int nprobe = 5;
+    // int refine_nprobe = 10;
+
     std::cout << "query numbers: " << nq << " query dims: " << dq << std::endl;
 
     pq_distance = new DISTT[nq * refine_topk];
@@ -731,11 +766,46 @@ void search_bigann(const std::string& index_path,
 
     search_graph<DATAT>(index_hnsw, nq, dq, nprobe, refine_nprobe, pquery, p_labels);
     rc.RecordSection("search buckets done.");
+    /*
+    {// for debug
+        std::cout << "show details after search_graph:" << std::endl;
+        for (auto i = 0; i < nq; i ++) {
+            auto p_labeli = p_labels + i * nprobe;
+            uint32_t cid, bid, off;
+            std::cout << "cluster info of the " << i << "th query:";
+            for (auto j = 0; j < nprobe; j ++) {
+                parse_id(p_labeli[j], cid, bid, off);
+                assert(cid < K1);
+                std::cout << "(" << cid << ", " << bid << ", " << off << ") ";
+            }
+            std::cout << std::endl;
+        }
+
+    }
+    */
 
     search_quantizer<DATAT, DISTT, HEAPTT>(pq_quantizer, nq, dq, p_labels, nprobe, 
                      refine_topk, K1, pquery, pq_codebook, 
                      meta, pq_distance, pq_offsets, pq_cmp);
     rc.RecordSection("pq search done.");
+    /*
+    {// for debug
+        std::cout << "show details after search quantizer:" << std::endl;
+        for (auto i = 0; i < nq; i ++) {
+            auto pq_offseti = pq_offsets + i * refine_topk;
+            auto pq_distancei = pq_distance + i * refine_topk;
+            std::cout << "refine info of the " << i << "th query:";
+            for (auto j = 0; j < refine_topk; j ++) {
+                if (pq_offseti[j] == (uint64_t)(-1))
+                    continue;
+                uint32_t cid, off, qid;
+                parse_refine_id(pq_offseti[j], cid, off, qid);
+                std::cout << "(" << cid << ", " << off << ", " << qid << ", pqdis: " << pq_distancei[j] << ") " << std::endl;
+            }
+            std::cout << std::endl;
+        }
+    }
+    */
 
 
     refine<DATAT, DISTT, HEAPT>(index_path, K1, nq, dq, topk, refine_topk, pq_offsets, pquery, answer_dists, answer_ids, dis_computer);
