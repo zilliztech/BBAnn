@@ -12,6 +12,10 @@
 #include <sys/time.h>
 #include <unistd.h>
 
+
+
+// test ivfflat
+
 #define Yandex_Text_to_Image
 
 #ifdef BigAnn

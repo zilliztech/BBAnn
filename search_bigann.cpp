@@ -6,7 +6,7 @@
 
 /*
  * args:
- * 1. data type(string): float or uint8
+ * 1. data type(string): float or uint8 or int8
  * 2. index path(string): a string end with '/' denotes the directory that where the index related file locates
  * 3. query data file(string): binary file of query data
  * 4. answer file(string): file name to store answer
@@ -24,7 +24,7 @@
 int main(int argc, char** argv) {
     if (argc != 14) {
         std::cout << "Usage: << " << argv[0]
-                  << " data_type(float or uint8)"
+                  << " data_type(float or uint8 or int8)"
                   << " index path"
                   << " query data file"
                   << " answer file"
@@ -163,6 +163,31 @@ int main(int argc, char** argv) {
         }
         // calculate_recall<uint32_t>(ground_truth_file, answer_file, topk);
         recall<uint32_t, uint32_t>(ground_truth_file, answer_file, 100, topk);
+    } else if (argv[1] == std::string("int8")) {
+        PQ_Computer<int8_t> pq_cmp; // pq computer
+        Computer<int8_t, int8_t, int32_t> dis_computer; // refine computer
+
+        if (MetricType::L2 == metric_type) {
+            pq_cmp = L2sqr<const int8_t, const float, float>;
+            dis_computer = L2sqr<const int8_t, const int8_t, int32_t>;
+
+            ProductQuantizer<CMax<int32_t, uint64_t>, int8_t, uint8_t> pq_quantizer(dim, PQM, PQnbits);
+            pq_quantizer.load_centroids(pq_centroids_file);
+
+            search_bigann<int8_t, int32_t, CMax<int32_t, uint32_t>, CMax<int32_t, uint64_t>>
+                (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
+        } else if (MetricType::IP == metric_type) {
+            pq_cmp = IP<const int8_t, const float, float>;
+            dis_computer = IP<const int8_t, const int8_t, int32_t>;
+
+            ProductQuantizer<CMin<int32_t, uint64_t>, int8_t, uint8_t> pq_quantizer(dim, PQM, PQnbits);
+            pq_quantizer.load_centroids(pq_centroids_file);
+
+            search_bigann<int8_t, int32_t, CMin<int32_t, uint32_t>, CMin<int32_t, uint64_t>>
+                (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
+        }
+        // calculate_recall<uint32_t>(ground_truth_file, answer_file, topk);
+        recall<int32_t, uint32_t>(ground_truth_file, answer_file, 100, topk);
     }
 
     return 0;

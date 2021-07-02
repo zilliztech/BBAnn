@@ -916,6 +916,38 @@ void search_bigann<uint8_t, uint32_t, CMin<uint32_t, uint32_t>, CMin<uint32_t, u
                    std::vector<std::vector<uint32_t>>& meta,
                    Computer<uint8_t, uint8_t, uint32_t>& dis_computer);
 
+template 
+void search_bigann<int8_t, int32_t, CMax<int32_t, uint32_t>, CMax<int32_t, uint64_t>>(const std::string& index_path,
+                   const std::string& query_bin_file,
+                   const std::string& answer_bin_file,
+                   const int nprobe,
+                   const int refine_nprobe,
+                   const int topk,
+                   const int refine_topk,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   ProductQuantizer<CMax<int32_t, uint64_t>, int8_t, uint8_t>& pq_quantizer,
+                   const int K1,
+                   PQ_Computer<int8_t>& pq_cmp,
+                   std::vector<std::vector<uint8_t>>& pq_codebook,
+                   std::vector<std::vector<uint32_t>>& meta,
+                   Computer<int8_t, int8_t, int32_t>& dis_computer);
+
+template 
+void search_bigann<int8_t, int32_t, CMin<int32_t, uint32_t>, CMin<int32_t, uint64_t>>(const std::string& index_path,
+                   const std::string& query_bin_file,
+                   const std::string& answer_bin_file,
+                   const int nprobe,
+                   const int refine_nprobe,
+                   const int topk,
+                   const int refine_topk,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   ProductQuantizer<CMin<int32_t, uint64_t>, int8_t, uint8_t>& pq_quantizer,
+                   const int K1,
+                   PQ_Computer<int8_t>& pq_cmp,
+                   std::vector<std::vector<uint8_t>>& pq_codebook,
+                   std::vector<std::vector<uint32_t>>& meta,
+                   Computer<int8_t, int8_t, int32_t>& dis_computer);
+
 template
 void save_answers<float, CMax<float, uint32_t>>(const std::string& answer_bin_file,
                   const int topk,
@@ -945,6 +977,20 @@ void save_answers<uint32_t, CMin<uint32_t, uint32_t>>(const std::string& answer_
                   uint32_t*& answer_ids);
 
 template
+void save_answers<int32_t, CMax<int32_t, uint32_t>>(const std::string& answer_bin_file,
+                  const int topk,
+                  const uint32_t nq,
+                  int32_t*& answer_dists,
+                  uint32_t*& answer_ids);
+
+template
+void save_answers<int32_t, CMin<int32_t, uint32_t>>(const std::string& answer_bin_file,
+                  const int topk,
+                  const uint32_t nq,
+                  int32_t*& answer_dists,
+                  uint32_t*& answer_ids);
+
+template
 void search_graph<float>(std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
                   const int nq,
                   const int dq,
@@ -961,6 +1007,15 @@ void search_graph<uint8_t>(std::shared_ptr<hnswlib::HierarchicalNSW<float>> inde
                   const int nprobe,
                   const int refine_nprobe,
                   const uint8_t* pquery,
+                  uint64_t* buckets_label);
+
+template
+void search_graph<int8_t>(std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                  const int nq,
+                  const int dq,
+                  const int nprobe,
+                  const int refine_nprobe,
+                  const int8_t* pquery,
                   uint64_t* buckets_label);
 
 
@@ -1000,6 +1055,24 @@ void build_bigann<uint8_t, uint32_t, CMin<uint32_t, uint32_t>>
                   const int K1, const int threshold,
                   MetricType metric_type);
 
+template
+void build_bigann<int8_t, int32_t, CMax<int32_t, uint32_t>>
+                 (const std::string& raw_data_bin_file,
+                  const std::string& output_path,
+                  const int hnswM, const int hnswefC,
+                  const int PQM, const int PQnbits,
+                  const int K1, const int threshold,
+                  MetricType metric_type);
+
+template
+void build_bigann<int8_t, int32_t, CMin<int32_t, uint32_t>>
+                 (const std::string& raw_data_bin_file,
+                  const std::string& output_path,
+                  const int hnswM, const int hnswefC,
+                  const int PQM, const int PQnbits,
+                  const int K1, const int threshold,
+                  MetricType metric_type);
+
 
 template
 void train_cluster<float>(const std::string& raw_data_bin_file,
@@ -1009,6 +1082,12 @@ void train_cluster<float>(const std::string& raw_data_bin_file,
 
 template
 void train_cluster<uint8_t>(const std::string& raw_data_bin_file,
+                   const std::string& output_path,
+                   const int K1,
+                   float** centroids);
+
+template
+void train_cluster<int8_t>(const std::string& raw_data_bin_file,
                    const std::string& output_path,
                    const int K1,
                    float** centroids);
