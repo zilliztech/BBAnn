@@ -1,3 +1,5 @@
 add_executable(calc_recall_dis EXCLUDE_FROM_ALL calc_recall_dis.cpp)
 
 add_executable(calc_recall_id EXCLUDE_FROM_ALL calc_recall_id.cpp)
+
+add_executable(read_first_two_uint32 EXCLUDE_FROM_ALL read_first_two_uint32.cpp)
