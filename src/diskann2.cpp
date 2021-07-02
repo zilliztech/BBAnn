@@ -378,6 +378,7 @@ void train_quantizer(const std::string& raw_data_bin_file,
     rc.RecordSection("pq quantizer train done");
     pq_quantizer.save_centroids(output_path + PQ_CENTROIDS + BIN);
     rc.RecordSection("pq quantizer save centroids done");
+    float* precomputer_table = nullptr;
     for (auto i = 0; i < K1; i ++) {
         std::string data_file = output_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
         std::string pq_codebook_file = output_path + CLUSTER + std::to_string(i) + PQ + CODEBOOK + BIN;
@@ -387,10 +388,11 @@ void train_quantizer(const std::string& raw_data_bin_file,
         data_reader.read((char*)&cluster_dim, sizeof(uint32_t));
         DATAT* datai = new DATAT[cluster_size * cluster_dim];
         data_reader.read((char*)datai, cluster_size * cluster_dim * sizeof(DATAT));
-        pq_quantizer.encode_vectors_and_save(cluster_size, datai, pq_codebook_file);
+        pq_quantizer.encode_vectors_and_save(precomputer_table, cluster_size, datai, pq_codebook_file);
         delete[] datai;
     }
 
+    delete[] precomputer_table;
     rc.ElapseFromBegin("train quantizer totally done.");
 }
 
@@ -541,6 +543,31 @@ void search_quantizer(ProductQuantizer<HEAPTT, DATAT, uint8_t>& pq_quantizer,
 
     auto pqm = pq_quantizer.getM();
     rc.RecordSection("pqm = " + std::to_string(pqm));
+
+
+#pragma omp parallel
+    {
+        float* precompute_table = nullptr;
+#pragma omp for
+        for (auto i = 0; i < nq; i ++) {
+            pq_quantizer.calc_precompute_table(precompute_table, pquery + i * dq, pq_cmp);
+            auto p_labeli = buckets_label + i * nprobe;
+            auto pq_offseti = pq_offsets + i * refine_topk;
+            auto pq_distancei = pq_distance + i * refine_topk;
+            uint32_t cid, bid, off;
+            for (auto j = 0; j < nprobe; j ++) {
+                parse_id(p_labeli[j], cid, bid, off);
+                assert(cid < K1);
+                pq_quantizer.search(precompute_table, pquery + i * dq,
+                        pq_codebook[cid].data() + off * pqm, meta[cid][bid],
+                        refine_topk, pq_distancei, pq_offseti, pq_cmp,
+                        j + 1 == nprobe, j == 0, cid, off, i);
+            }
+        }
+        delete[] precompute_table;
+    }
+
+    /*
 #pragma omp parallel for
     for (auto i = 0; i < nq; i ++) {
         ProductQuantizer<HEAPTT, DATAT, uint8_t> pq_quantizer_copiesi(pq_quantizer);
@@ -559,6 +586,7 @@ void search_quantizer(ProductQuantizer<HEAPTT, DATAT, uint8_t>& pq_quantizer,
         }
         pq_quantizer_copiesi.reset();
     }
+    */
     rc.ElapseFromBegin("search quantizer done.");
 }
 

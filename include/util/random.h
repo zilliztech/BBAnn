@@ -9,4 +9,5 @@
 
 void rand_perm (int32_t *perm, int32_t n, int k, int32_t seed);
 float rand_float();
+int rand_int();
 

@@ -32,9 +32,6 @@ private:
 
     float* centroids = nullptr;
     U* codes = nullptr;
-    float*  precompute_table = nullptr;
-
-    void compute_code(const T* x, U* c);
 
     void compute_dis_tab(const T* q, float* dis_tab, PQ_Computer<T> computer);
 public:
@@ -48,7 +45,6 @@ public:
 
         centroids = new float[m * K * dsub];
         codes = new U[ntotal * m];
-        precompute_table = nullptr;
     };
 
     ProductQuantizer(int32_t _d, uint8_t _m, uint8_t _nbits)
@@ -60,21 +56,7 @@ public:
 
         centroids = new float[m * K * dsub];
         codes = nullptr;
-        precompute_table = nullptr;
     };
-
-    ProductQuantizer(const ProductQuantizer& pq) {
-        d = pq.d;
-        dsub = pq.dsub;
-        K = pq.K;
-        m = pq.m;
-        nbits = pq.nbits;
-        centroids = pq.centroids;
-        codes = nullptr;
-        // precompute distance tables
-        precompute_table = new float[K * m];
-//        compute_dis_tab(q, precompute_table, computer);
-    }
 
     ~ProductQuantizer() {
         if (centroids != nullptr) {
@@ -84,11 +66,14 @@ public:
         if (codes != nullptr) {
             delete[] codes;
         }
+    }
 
-        if (precompute_table != nullptr) {
-            delete[] precompute_table;
-            precompute_table = nullptr;
-        }
+    float* get_centroids() {
+        return centroids;
+    }
+
+    U* get_codes() {
+        return codes;
     }
 
     void show_centroids() {
@@ -106,7 +91,7 @@ public:
         }
     }
 
-    void show_pretab() {
+    void show_pretab(const float* precompute_table) {
         assert(precompute_table != nullptr);
         std::cout << "show pq.precompute_table:" << std::endl;
         auto pp = precompute_table;
@@ -118,17 +103,16 @@ public:
         }
     }
 
-    void reset() {
-        centroids = nullptr;
-    }
-
     int getM() {
         return int(m);
     }
 
-    void cal_precompute_table(const T* q, PQ_Computer<T> computer) {
+    void calc_precompute_table(float*& precompute_table, const T* q, PQ_Computer<T> computer) {
+        if (precompute_table == nullptr) {
+            precompute_table = new float[K * m];
+        }
+
         const float* c = centroids;
-        assert(precompute_table != nullptr);
         float* dis_tab = precompute_table;
         for (uint8_t i = 0; i < m; ++i, q += dsub) {
             for (int32_t j = 0; j < K; ++j, c += dsub) {
@@ -137,17 +121,21 @@ public:
         }
     }
 
-    void train(int32_t n, const T* x, bool remove_dup = false);
+    void train(int32_t n, const T* x);
 
-    void encode_vectors(int32_t n, const T* x);
+    void encode_vectors(float*& precomputer_table,
+                        int32_t n, const T* x,
+                        bool append = false);
 
-    void encode_vectors_and_save(int32_t n, const T* x, const std::string& save_file);
+    void encode_vectors_and_save(float*& precomputer_table,
+                                 int32_t n, const T *x,
+                                 const std::string& save_file);
 
     void search(int32_t nq, const T* q, int32_t topk,
                    typename C::T* values, typename C::TI* labels,
                    PQ_Computer<T> computer);
 
-    void search(const T* q, const U* pcodes, int32_t len, int32_t topk,
+    void search(float* precompute_table, const T* q, const U* pcodes, int32_t len, int32_t topk,
                 typename C::T* values, typename C::TI* labels,
                 PQ_Computer<T> computer, bool reorder, bool heapify,
                 const uint32_t& cid, const uint32_t& off, const uint32_t& qid);
@@ -172,6 +160,7 @@ public:
     }
 };
 
+/*
 template<class C, typename T, typename U>
 void ProductQuantizer<C, T, U>::compute_code(const T* x, U* c) {
     for (int i = 0; i < m; ++i, x += dsub) {
@@ -192,6 +181,7 @@ void ProductQuantizer<C, T, U>::compute_code(const T* x, U* c) {
         *c++ = best_id;
     }
 }
+*/
 
 template<class C, typename T, typename U>
 void ProductQuantizer<C, T, U>::compute_dis_tab(const T* q, float* dis_tab,
@@ -206,44 +196,61 @@ void ProductQuantizer<C, T, U>::compute_dis_tab(const T* q, float* dis_tab,
 }
 
 template<class C, typename T, typename U>
-void ProductQuantizer<C, T, U>::train(int32_t n, const T* x, bool remove_dup) {
+void ProductQuantizer<C, T, U>::train(int32_t n, const T* x) {
+    const size_t sub_code_size = dsub * sizeof(T);
     T* xs = new T[n * dsub];
-    if (remove_dup && dsub > 4) {
-        printf("Remove duplicates when dsub > 4 is currently not supported. Fallback to not remove any duplicates.\n");
-        remove_dup = false;
+
+    bool remove_dup = false;
+    if (sub_code_size <= 4) {
+        printf("Remove duplicates dsub %d * sizeof(Type) %d\n", dsub, sizeof(T));
+        remove_dup = true;
     }
 
     for (uint8_t i = 0; i < m; ++i) {
-        const int32_t tmp_d = i * dsub;
-
-        // get slice of x in subspace m_i
         if (remove_dup) {
             uint32_t idx = 0;
             std::unordered_set<uint32_t> st;
-            for (int32_t j = 0; j < n; ++j) {
-                uint32_t val = 0; 
-                auto xd = x + j * d + tmp_d;
-                if (dsub == 4) {
-                    val = *reinterpret_cast<const uint32_t* >(xd);
-                } else {
-                    // dsub < 4
-                    memcpy(&val, xd, dsub);
-                }
 
-                if (st.find(val) == st.end()) {
-                    st.insert(val);
-                    memcpy(xs + idx * dsub, xd, dsub * sizeof(T));
-                    ++idx;
+            if (sub_code_size == 4) {
+                auto u_xd = reinterpret_cast<const uint32_t*>(x) + i;
+                auto u_xs = reinterpret_cast<uint32_t*>(xs);
+                for (int32_t j = 0; j < n; j++) {
+                    if (st.find(*u_xd) == st.end()) {
+                        st.insert(*u_xd);
+                        u_xs[idx++] = *u_xd;
+                    }
+                    u_xd += m;
+                }
+            } else {
+                uint32_t val = 0;
+                auto xd = x + i * dsub;
+                for (int32_t j = 0; j < n; j++){
+                    memcpy(&val, xd, sub_code_size);
+                    if (st.find(val) == st.end()) {
+                        st.insert(val);
+                        memcpy(xs + idx * dsub, xd, sub_code_size);
+                        idx++;
+                    }
+                    xd += d;
                 }
             }
+
             if (idx < K) {
                 printf("Unable to find %d points from %d training data, found %d.\n", K, n, idx);
+                // todo: add some random data into xs
+            } else {
+                printf("Duplicate points removed, n from %d to %d\n", n , idx);
             }
+
             kmeans<T>(idx, xs, dsub, K, centroids + i * K * dsub);
+
         } else {
+            auto xd = x + i * dsub;
             for (int32_t j = 0; j < n; ++j) {
-                memcpy(xs + j * dsub, x + j * d + tmp_d, dsub * sizeof(T));
+                memcpy(xs + j * dsub, xd, sub_code_size);
+                xd += d;
             }
+
             kmeans<T>(n, xs, dsub, K, centroids + i * K * dsub);
         }
     }
@@ -252,38 +259,98 @@ void ProductQuantizer<C, T, U>::train(int32_t n, const T* x, bool remove_dup) {
 };
 
 template<class C, typename T, typename U>
-void ProductQuantizer<C, T, U>::encode_vectors(int32_t n, const T *x) {
-    assert(npos + n <= ntotal);
+void ProductQuantizer<C, T, U>::encode_vectors(float*& precomputer_table,
+                                               int32_t n, const T *x,
+                                               bool append) {
+    if (!append) {
+        npos = 0;
+    }
+
+    if (npos + n > ntotal) {
+        ntotal = npos + n;
+        U* new_codes = new U[ntotal * m];
+        if (npos != 0) {
+            memcpy(new_codes, codes, npos * m * sizeof(U));
+        }
+        if (codes != nullptr) {
+            delete[] codes;
+        }
+        codes = new_codes;
+    }
 
     U* c = codes + npos * m;
 
+    bool new_precomputer_table = false;
+    if (precomputer_table == nullptr) {
+        precomputer_table = new float[m * K * (K - 1) / 2];
+        new_precomputer_table = true;
+    }
+
+    for (int32_t loop = 0; loop < m; loop++) {
+        float *data = precomputer_table + loop * K * (K - 1) / 2;
+        float* cen = centroids + loop * K * dsub;
+
+        auto Y = [&](int32_t i, int32_t j) -> float& {
+            assert(i != j);
+            return (i > j) ? data[j + i * (i - 1) / 2] : data[i + j * (j - 1) / 2];
+        };
+
+        if (new_precomputer_table) {
+#pragma omp parallel
+            {
+                int nt = omp_get_num_threads();
+                int rank = omp_get_thread_num();
+                for (int32_t i = 1 + rank; i < K; i += nt) {
+                    float* y_i = cen + i * dsub;
+                    for (int32_t j = 0; j < i; j++) {
+                        float* y_j = cen + j * dsub;
+                        Y(i, j) = L2sqr<float,float,float>(y_i, y_j, dsub);
+                    }
+                }
+            }
+        }
+
 #pragma omp parallel for
-    for (int32_t i = 0; i < n; ++i) {
-        compute_code(x + i * d, c + i * m);
+        for (int32_t i = 0; i < n; i++) {
+            const T* x_i = x + i * d + loop * dsub;
+
+            int32_t ids_i = 0;
+            float val_i = L2sqr<const T,const float,float>(x_i, cen, dsub);
+            float val_i_time_4 = val_i * 4;
+            for (int32_t j = 1; j < K; j++) {
+                if (val_i_time_4 <= Y(ids_i, j)) {
+                    continue;
+                }
+                const float *y_j = cen + j * dsub;
+                float disij = L2sqr<const T,const float,float>(x_i, y_j, dsub);
+                if (disij < val_i) {
+                    ids_i = j;
+                    val_i = disij;
+                    val_i_time_4 = val_i * 4;
+                }
+            }
+
+            c[i * m + loop] = ids_i;
+        }
     }
 
     npos += n;
 }
 
 template<class C, typename T, typename U>
-void ProductQuantizer<C, T, U>::encode_vectors_and_save(int32_t n, const T *x, const std::string& save_file) {
-    U* c = new U[n * m];
-
-#pragma omp parallel for
-    for (int32_t i = 0; i < n; ++i) {
-        compute_code(x + i * d, c + i * m);
-    }
+void ProductQuantizer<C, T, U>::encode_vectors_and_save(float*& precomputer_table,
+                                                        int32_t n, const T *x,
+                                                        const std::string& save_file) {
+    encode_vectors(precomputer_table, n, x, false);
 
     uint32_t wm = m;
     std::ofstream code_writer(save_file, std::ios::binary | std::ios::out);
     code_writer.write((char*)&n, sizeof(uint32_t));
     code_writer.write((char*)&wm, sizeof(uint32_t));
-    code_writer.write((char*)c, n * m * sizeof(U));
+    code_writer.write((char*)codes, n * m * sizeof(U));
     code_writer.close();
     std::cout << "ProductQuantizer encode " << n << " vectors with m = " << wm << " into file "
               << save_file << std::endl;
-    delete[] c;
-    c = nullptr;
 }
 
 template<class C, typename T, typename U>
@@ -327,7 +394,7 @@ void ProductQuantizer<C, T, U>::search(int32_t nq, const T* q, int32_t topk,
 }
 
 template<class C, typename T, typename U>
-void ProductQuantizer<C, T, U>::search(const T* q, const U* pcodes, 
+void ProductQuantizer<C, T, U>::search(float* precompute_table, const T* q, const U* pcodes,
                          int32_t codebook_len, int32_t topk,
                          typename C::T* values, typename C::TI* labels,
                          PQ_Computer<T> computer, bool reorder, 
