@@ -103,6 +103,10 @@ public:
         }
     }
 
+    int getM() {
+        return int(m);
+    }
+
     void calc_precompute_table(float*& precompute_table, const T* q, PQ_Computer<T> computer) {
         if (precompute_table == nullptr) {
             precompute_table = new float[K * m];
@@ -155,6 +159,29 @@ public:
         centroids_reader.close();
     }
 };
+
+/*
+template<class C, typename T, typename U>
+void ProductQuantizer<C, T, U>::compute_code(const T* x, U* c) {
+    for (int i = 0; i < m; ++i, x += dsub) {
+        float min_dist = std::numeric_limits<float>::max();
+        int32_t best_id = 0;
+
+        const float* cen = centroids + i * K * dsub;
+
+        // find the best centroid
+        for (int32_t j = 0; j < K; ++j, cen += dsub) {
+            float dis = L2sqr<const T, const float, float>(x, cen, dsub);
+            if (dis < min_dist) {
+                min_dist = dis;
+                best_id = j;
+            }
+        }
+
+        *c++ = best_id;
+    }
+}
+*/
 
 template<class C, typename T, typename U>
 void ProductQuantizer<C, T, U>::compute_dis_tab(const T* q, float* dis_tab,
@@ -239,7 +266,7 @@ void ProductQuantizer<C, T, U>::encode_vectors(float*& precomputer_table,
         npos = 0;
     }
 
-    if (npos + n < ntotal) {
+    if (npos + n > ntotal) {
         ntotal = npos + n;
         U* new_codes = new U[ntotal * m];
         if (npos != 0) {

@@ -495,7 +495,6 @@ void search_disk_index_simple(const std::string& index_path,
     rc.RecordSection("pq quantizer load centroids done");
     
     // step2: pq search
-
 #pragma omp parallel
     {
         float* precompute_table = nullptr;

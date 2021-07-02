@@ -180,13 +180,50 @@ int32_t split_clusters (int32_t dim, int32_t k, int32_t n,
     return nsplit;
 }
 
+
+template <typename DATAT>
+void kmeanspp(const DATAT* pdata, const uint32_t nb, const uint32_t dim,
+              const uint32_t num_clusters, float*& centroids) {
+    auto disf = L2sqr<const DATAT, float, float>;
+    std::random_device rd;
+    auto x = rd();
+    std::mt19937 generator(x);
+    std::uniform_int_distribution<uint32_t> distribution(0, nb - 1);
+
+    uint32_t init_id = distribution(generator);
+    std::vector<float> dist(nb, std::numeric_limits<float>::max());
+    for (auto i = 0; i < dim; i ++)
+        centroids[i] = (float)pdata[init_id * dim + i];
+
+    for (auto i = 1; i < num_clusters; i ++) {
+        double sumdx = 0.0;
+#pragma omp parallel for schedule(static, 4096) reduction(+: sumdx)
+        for (auto j = 0; j < nb; j ++) {
+            auto dist_cj = disf(pdata + j * dim, centroids + (i - 1) * dim, dim);
+            dist[j] = std::min(dist[j], dist_cj);
+            sumdx += dist[j];
+        }
+        std::uniform_real_distribution<double> distridb(0, sumdx);
+        auto prob = distridb(generator);
+        for (auto j = 0; j < nb; j ++) {
+            if (prob <= 0) {
+                for (auto k = 0; k < dim; k ++) 
+                    centroids[i * dim + k] = (float)pdata[j * dim + k];
+                break;
+            }
+            prob -= dist[j];
+        }
+    }
+}
+
 // Data Type: T
 // Distance Type: float
 // Centroid Type: float
 
 template <typename T>
 void kmeans (int32_t nx, const T* x_in, int32_t dim, int32_t k, float* centroids,
-             bool normalize = false, int32_t niter = 10, int32_t seed = 1234) {
+             bool kmpp = false, bool normalize = false, int32_t niter = 10, 
+             int32_t seed = 1234) {
     const int32_t max_points_per_centroid = 256;
     const int32_t min_points_per_centroid = 39;
 
@@ -213,12 +250,16 @@ void kmeans (int32_t nx, const T* x_in, int32_t dim, int32_t k, float* centroids
     std::unique_ptr<int32_t []> assign(new int32_t[nx]);
     std::unique_ptr<float []> dis(new float[nx]);
 
-    rand_perm(assign.get(), nx, k, seed);
-    for (int32_t i = 0; i < k; i++) {
-        const T* x = x_in + assign[i] * dim;
-        float* c = centroids + i * dim;
-        for (int32_t d = 0; d < dim; d++){
-            c[d] = x[d];
+    if (kmpp) {
+        kmeanspp<T>(x_in, nx, dim, k, centroids);
+    } else {
+        rand_perm(assign.get(), nx, k, seed);
+        for (int32_t i = 0; i < k; i++) {
+            const T* x = x_in + assign[i] * dim;
+            float* c = centroids + i * dim;
+            for (int32_t d = 0; d < dim; d++){
+                c[d] = x[d];
+            }
         }
     }
 
