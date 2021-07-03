@@ -166,7 +166,7 @@ void conquer_clusters(const std::string& output_path,
         auto K2 = (cluster_size - 1) / threshold + 1;
         std::cout << "cluster-" << i << " will split into " << K2 << " buckets." << std::endl;
         float* centroids_i = new float[K2 * cluster_dim];
-        kmeans<DATAT>(cluster_size, datai, (int32_t)cluster_dim, K2, centroids_i, true);
+        kmeans<DATAT>(cluster_size, datai, (int32_t)cluster_dim, K2, centroids_i);
         rci.RecordSection("kmeans done");
         cluster_id.resize(cluster_size);
         dists.resize(cluster_size);
