@@ -3,3 +3,5 @@ add_executable(calc_recall_dis EXCLUDE_FROM_ALL calc_recall_dis.cpp)
 add_executable(calc_recall_id EXCLUDE_FROM_ALL calc_recall_id.cpp)
 
 add_executable(read_first_two_uint32 EXCLUDE_FROM_ALL read_first_two_uint32.cpp)
+
+add_executable(get_first_n_from_base EXCLUDE_FROM_ALL get_first_n_from_base.cpp)
