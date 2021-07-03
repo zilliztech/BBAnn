@@ -4,6 +4,8 @@
 
 // constant defines
 
+constexpr static int PAGESIZE = 4096
+
 // units
 constexpr static int KILOBYTE = 1024;
 constexpr static int MEGABYTE = 1024 * 1024;

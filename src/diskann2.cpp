@@ -396,6 +396,50 @@ void train_quantizer(const std::string& raw_data_bin_file,
     rc.ElapseFromBegin("train quantizer totally done.");
 }
 
+// page alignment 4 raw data and uid in each cluster 4 better refine performance
+template<typename DATAT>
+void page_align(const std::string& raw_data_bin_file, const std::string& output_path, const int K1) {
+    uint32_t nb, dim;
+    get_bin_metadata(raw_data_bin_file, nb, dim);
+    uint32_t page_size = PAGESIZE;
+    uint32_t vector_size = dim * sizeof(DATAT);
+    uint32_t id_size = sizeof(uint32_t);
+    // number of vectors per page
+    uint32_t nvpp = page_size / vector_size;
+    assert(nvpp > 0);
+    // number of ids per page
+    uint32_t nipp = page_size / id_size;
+
+    DATAT* data_page_buf = new DATA[page_size];
+    uint32_t* ids_page_buf = new uint32_t[page_size];
+
+    for (auto i = 0; i < K1; i ++) {
+        std::string cluster_raw_data_file_name = output_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
+        std::string cluster_ids_data_file_name = output_path + CLUSTER + std::to_string(i) + GLOBAL_IDS + BIN;
+        std::string cluster_raw_data_file_name2 = output_path + CLUSTER + "-" + std::to_string(i) + RAWDATA + BIN;
+        std::string cluster_ids_data_file_name2 = output_path + CLUSTER + "-" + std::to_string(i) + GLOBAL_IDS + BIN;
+        uint32_t cluster_size, cluster_dim, ids_size, ids_dim;
+
+        IOReader data_reader(cluster_raw_data_file_name, (uint64_t)(10) * GIGABYTE);
+        IOReader ids_reader(cluster_ids_data_file_name);
+        IOWriter data_writer(cluster_raw_data_file_name2, (uint64_t)(10) * GIGABYTE);
+        IOWriter ids_writer(cluster_ids_data_file_name2);
+
+        data_reader.read((char*)&cluster_size, sizeof(uint32_t));
+        data_reader.read((char*)&cluster_dim, sizeof(uint32_t));
+        ids_reader.read((char*)&ids_size, sizeof(uint32_t));
+        ids_reader.read((char*)&ids_dim, sizeof(uint32_t));
+        // number of pages 4 vector, the first page is meta page
+        uint32_t npv = (cluster_size - 1) / nvpp + 2;
+        // number of pages 4 id, the first page is meta page
+        uint32_t npi = (ids_size - 1) / nipp + 2;
+
+    }
+
+    delete[] data_page_buf;
+    delete[] ids_page_buf;
+}
+
 template<typename DATAT, typename DISTT, typename HEAPT>
 void build_bigann(const std::string& raw_data_bin_file,
                   const std::string& output_path,
@@ -426,6 +470,8 @@ void build_bigann(const std::string& raw_data_bin_file,
 
     conquer_clusters<DATAT, DISTT, HEAPT>(output_path, K1, threshold);
     rc.RecordSection("conquer each cluster into buckets done");
+
+    // page_align<DATAT>(raw_data_bin_file, output_path, K1);
 
     build_graph(output_path, hnswM, hnswefC, metric_type);
     rc.RecordSection("build hnsw done.");
