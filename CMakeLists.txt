@@ -12,23 +12,26 @@ if (OPENMP_FOUND)
     set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
 endif()
 
-set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -march=native -O0 -g -pthread -fopenmp" )
+set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -march=native -O3 -g -pthread -fopenmp" )
 include_directories(include)
-#include_directories("util")
-#include_directories("index")
-#include_directories("flat")
-#include_directories("ivf")
-#include_directories("hnswlib")
-
-set(bigann
-    bigann.cpp
-)
-
-add_executable(test_bigann ${bigann})
 
 add_subdirectory(src)
+set(build_bigann
+    build_bigann.cpp
+    #src/diskann2.cpp
+)
+
+set(search_bigann
+    search_bigann.cpp
+    #src/diskann2.cpp
+)
+
+add_executable(build_bigann ${build_bigann})
+add_executable(search_bigann ${search_bigann})
+
 add_subdirectory(test)
 add_subdirectory(scripts)
-target_link_libraries(test_bigann BigAnn)
+target_link_libraries(build_bigann BigAnn)
+target_link_libraries(search_bigann BigAnn)
 
 

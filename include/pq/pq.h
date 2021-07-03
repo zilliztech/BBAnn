@@ -33,8 +33,6 @@ private:
     float* centroids = nullptr;
     U* codes = nullptr;
 
-    void compute_code(const T* x, U* c);
-
     void compute_dis_tab(const T* q, float* dis_tab, PQ_Computer<T> computer);
 public:
     // in-memory
@@ -105,6 +103,10 @@ public:
         }
     }
 
+    int getM() {
+        return int(m);
+    }
+
     void calc_precompute_table(float*& precompute_table, const T* q, PQ_Computer<T> computer) {
         if (precompute_table == nullptr) {
             precompute_table = new float[K * m];
@@ -158,6 +160,7 @@ public:
     }
 };
 
+/*
 template<class C, typename T, typename U>
 void ProductQuantizer<C, T, U>::compute_code(const T* x, U* c) {
     for (int i = 0; i < m; ++i, x += dsub) {
@@ -178,6 +181,7 @@ void ProductQuantizer<C, T, U>::compute_code(const T* x, U* c) {
         *c++ = best_id;
     }
 }
+*/
 
 template<class C, typename T, typename U>
 void ProductQuantizer<C, T, U>::compute_dis_tab(const T* q, float* dis_tab,
@@ -262,7 +266,7 @@ void ProductQuantizer<C, T, U>::encode_vectors(float*& precomputer_table,
         npos = 0;
     }
 
-    if (npos + n < ntotal) {
+    if (npos + n > ntotal) {
         ntotal = npos + n;
         U* new_codes = new U[ntotal * m];
         if (npos != 0) {

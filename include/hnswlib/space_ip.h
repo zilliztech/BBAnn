@@ -278,5 +278,4 @@ namespace hnswlib {
     ~InnerProductSpace() {}
     };
 
-
 }
