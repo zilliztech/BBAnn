@@ -162,11 +162,13 @@ void print_vec_id_dis(std::vector<std::vector<std::pair<IDT, DISTT>>>& v, const 
 }
 
 template<typename DISTT, typename IDT>
-void read_sift_gt(std::vector<std::vector<std::pair<IDT, DISTT>>>& v, const std::string& gt_file, size_t nq, size_t topk) {
+void read_sift(std::vector<std::vector<std::pair<IDT, DISTT>>>& v, const std::string& gt_file, size_t& nq, size_t& topk) {
+    nq = 100; // default value 
+
     std::ifstream gin(gt_file, std::ios::binary);
+    uint32_t sz;
     v.resize(nq);
     for (auto i = 0; i < nq; i ++) {
-        uint32_t sz;
         gin.read((char*)&sz, sizeof(sz));
         v[i].resize(sz);
         for (auto j = 0; j < sz; j ++) {
@@ -174,16 +176,16 @@ void read_sift_gt(std::vector<std::vector<std::pair<IDT, DISTT>>>& v, const std:
             gin.read((char*)&v[i][j].second, sizeof(DISTT));
         }
     }
+    topk = sz;
     gin.close();
 }
 
 template<typename DISTT, typename IDT>
-void read_comp_gt(std::vector<std::vector<std::pair<IDT, DISTT>>>& v, const std::string& gt_file, size_t nq, size_t topk) {
+void read_comp(std::vector<std::vector<std::pair<IDT, DISTT>>>& v, const std::string& gt_file, size_t& nq, size_t& topk) {
     std::ifstream gin(gt_file, std::ios::binary);
 
-    uint32_t gt_q, gt_k;
-    gin.read((char*)&gt_q, sizeof(uint32_t));
-    gin.read((char*)&gt_k, sizeof(uint32_t));
+    gin.read((char*)&nq, sizeof(uint32_t));
+    gin.read((char*)&topk, sizeof(uint32_t));
 
     if (gt_q != nq || gt_k != topk) {
         std::cerr << "Grountdtruth parammeters does not match. GT nq " << gt_q
@@ -212,37 +214,19 @@ void read_comp_gt(std::vector<std::vector<std::pair<IDT, DISTT>>>& v, const std:
 }
 
 template<typename DISTT, typename IDT>
-void recall(const std::string& groundtruth_file, const std::string& answer_file, size_t nq, size_t topk, bool gt_comp_format = true) {
+void recall(const std::string& groundtruth_file, const std::string& answer_file, bool use_comp_format = true) {
+    uint32_t gt_nq, gt_topk, answer_nq, answer_topk;
+    auto f_read = gt_comp_format ? read_comp<DISTT, IDT> : read_sift<DISTT, IDT>;
+
     std::vector<std::vector<std::pair<IDT, DISTT>>> groundtruth;
+    f_read(groundtruth, groundtruth_file, gt_nq, gt_topk);
 
-    if (gt_comp_format) {
-        read_comp_gt<DISTT, IDT>(groundtruth, groundtruth_file, nq, topk);
-    } else {
-        read_sift_gt<DISTT, IDT>(groundtruth, groundtruth_file, nq, topk);
-    }
-
-    {
-        // print_vec_id_dis<DISTT, IDT>(groundtruth, "show groundtruth:");
-    }
-
+    // print_vec_id_dis<DISTT, IDT>(groundtruth, "show groundtruth:");
 
     std::vector<std::vector<std::pair<IDT, DISTT>>> resultset;
-    resultset.resize(nq);
-    std::ifstream ain(answer_file, std::ios::binary);
-    for (auto i = 0; i < nq; i ++) {
-        uint32_t sz;
-        ain.read((char*)&sz, sizeof(sz));
-        resultset[i].resize(sz);
-        for (auto j = 0; j < sz; j ++) {
-            ain.read((char*)&resultset[i][j].first, sizeof(IDT));
-            ain.read((char*)&resultset[i][j].second, sizeof(DISTT));
-        }
-    }
-    ain.close();
+    f_read(resultset, answer_file, answer_nq, answer_topk);
 
-    {
-        // print_vec_id_dis<DISTT, IDT>(resultset, "show resultset:");
-    }
+    // print_vec_id_dis<DISTT, IDT>(resultset, "show resultset:");
 
     int tot_cnt = 0;
     std::cout << "recall@" << topk << " between groundtruth file:"
