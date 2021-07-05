@@ -753,7 +753,7 @@ void save_answers(const std::string& answer_bin_file,
                   const uint32_t nq,
                   DISTT*& answer_dists,
                   uint32_t*& answer_ids,
-                  bool use_comp_format = true) {
+                  bool use_comp_format) {
     TimeRecorder rc("save answers");
     std::cout << "save answer parameters:" << std::endl;
     std::cout << " answer_bin_file: " << answer_bin_file
@@ -987,42 +987,48 @@ void save_answers<float, CMax<float, uint32_t>>(const std::string& answer_bin_fi
                   const int topk,
                   const uint32_t nq,
                   float*& answer_dists,
-                  uint32_t*& answer_ids);
+                  uint32_t*& answer_ids,
+                  bool use_comp_format = true);
 
 template
 void save_answers<float, CMin<float, uint32_t>>(const std::string& answer_bin_file,
                   const int topk,
                   const uint32_t nq,
                   float*& answer_dists,
-                  uint32_t*& answer_ids);
+                  uint32_t*& answer_ids,
+                  bool use_comp_format = true);
 
 template
 void save_answers<uint32_t, CMax<uint32_t, uint32_t>>(const std::string& answer_bin_file,
                   const int topk,
                   const uint32_t nq,
                   uint32_t*& answer_dists,
-                  uint32_t*& answer_ids);
+                  uint32_t*& answer_ids,
+                  bool use_comp_format = true);
 
 template
 void save_answers<uint32_t, CMin<uint32_t, uint32_t>>(const std::string& answer_bin_file,
                   const int topk,
                   const uint32_t nq,
                   uint32_t*& answer_dists,
-                  uint32_t*& answer_ids);
+                  uint32_t*& answer_ids,
+                  bool use_comp_format = true);
 
 template
 void save_answers<int32_t, CMax<int32_t, uint32_t>>(const std::string& answer_bin_file,
                   const int topk,
                   const uint32_t nq,
                   int32_t*& answer_dists,
-                  uint32_t*& answer_ids);
+                  uint32_t*& answer_ids,
+                  bool use_comp_format = true);
 
 template
 void save_answers<int32_t, CMin<int32_t, uint32_t>>(const std::string& answer_bin_file,
                   const int topk,
                   const uint32_t nq,
                   int32_t*& answer_dists,
-                  uint32_t*& answer_ids);
+                  uint32_t*& answer_ids,
+                  bool use_comp_format = true);
 
 template
 void search_graph<float>(std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
