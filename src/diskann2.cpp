@@ -66,7 +66,7 @@ void divide_raw_data(const std::string& raw_data_bin_file,
     uint32_t block_size = 1000000;
     assert(nb > 0);
     uint32_t block_num = (nb - 1) / block_size + 1;
-    std::vector<uint32_t> cluster_id(block_size);
+    std::vector<uint64_t> cluster_id(block_size);
     std::vector<DISTT> dists(block_size);
     DATAT* block_buf = new DATAT[block_size * dim];
     for (auto i = 0; i < block_num; i ++) {
@@ -76,9 +76,10 @@ void divide_raw_data(const std::string& raw_data_bin_file,
         std::cout << "split the " << i << "th block, start position = " << sp << ", end position = " << ep << std::endl;
         reader.read((char*)block_buf, (ep - sp) * dim * sizeof(DATAT));
         rci.RecordSection("read block data done");
-        knn_1<HEAPT, DATAT, float> (
-            block_buf, centroids, ep - sp, K1, dim, 1, 
-            dists.data(), cluster_id.data(), L2sqr<const DATAT, const float, DISTT>);
+        elkan_L2_assign<const DATAT, const float, DISTT>(block_buf, centroids, dim, ep -sp, K1, cluster_id.data(), dists.data());
+        //knn_1<HEAPT, DATAT, float> (
+        //    block_buf, centroids, ep - sp, K1, dim, 1, 
+        //    dists.data(), cluster_id.data(), L2sqr<const DATAT, const float, DISTT>);
         rci.RecordSection("select file done");
         for (auto j = 0; j < ep - sp; j ++) {
             auto cid = cluster_id[j];
@@ -130,7 +131,7 @@ void conquer_clusters(const std::string& output_path,
     std::cout << "conquer clusters parameters:" << std::endl;
     std::cout << " output_path: " << output_path
               << std::endl;
-    std::vector<uint32_t> cluster_id;
+    std::vector<uint64_t> cluster_id;
     std::vector<DISTT> dists;
     uint32_t placeholder = 1;
     std::string bucket_centroids_file = output_path + BUCKET + CENTROIDS + BIN;
@@ -170,9 +171,10 @@ void conquer_clusters(const std::string& output_path,
         rci.RecordSection("kmeans done");
         cluster_id.resize(cluster_size);
         dists.resize(cluster_size);
-        knn_1<HEAPT, DATAT, float> (
-            datai, centroids_i, cluster_size, K2, cluster_dim, 1, 
-            dists.data(), cluster_id.data(), L2sqr<const DATAT, const float, DISTT>);
+        elkan_L2_assign<>(datai, centroids_i, cluster_dim, cluster_size, K2, cluster_id.data(), dists.data());
+        // knn_1<HEAPT, DATAT, float> (
+        //     datai, centroids_i, cluster_size, K2, cluster_dim, 1, 
+        //     dists.data(), cluster_id.data(), L2sqr<const DATAT, const float, DISTT>);
         rci.RecordSection("assign done");
         std::vector<uint32_t> buckets_size(K2 + 1, 0);
         std::vector<std::pair<uint32_t, uint32_t>> cluster_off;

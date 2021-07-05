@@ -1,6 +1,6 @@
 #include "util/random.h"
 
-void rand_perm (uint32_t *perm, int32_t n, int k, int32_t seed) {
+void rand_perm (uint64_t *perm, uint64_t n, uint64_t k, int32_t seed) {
     std::mt19937 generator(seed);
 
     for (int32_t i = 0; i < n; i++) {
