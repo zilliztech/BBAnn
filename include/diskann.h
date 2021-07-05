@@ -146,7 +146,8 @@ void save_answers(const std::string& answer_bin_file,
                   const int topk,
                   const uint32_t nq,
                   DISTT*& answer_dists,
-                  uint32_t*& answer_ids);
+                  uint32_t*& answer_ids,
+                  bool use_comp_format = true);
 
 template<typename DATAT, typename DISTT, typename HEAPT, typename HEAPTT>
 void search_bigann(const std::string& index_path,

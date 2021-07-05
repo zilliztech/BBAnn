@@ -162,7 +162,7 @@ void print_vec_id_dis(std::vector<std::vector<std::pair<IDT, DISTT>>>& v, const 
 }
 
 template<typename DISTT, typename IDT>
-void read_sift(std::vector<std::vector<std::pair<IDT, DISTT>>>& v, const std::string& gt_file, size_t& nq, size_t& topk) {
+void read_sift(std::vector<std::vector<std::pair<IDT, DISTT>>>& v, const std::string& gt_file, uint32_t& nq, uint32_t& topk) {
     nq = 100; // default value 
 
     std::ifstream gin(gt_file, std::ios::binary);
@@ -181,31 +181,24 @@ void read_sift(std::vector<std::vector<std::pair<IDT, DISTT>>>& v, const std::st
 }
 
 template<typename DISTT, typename IDT>
-void read_comp(std::vector<std::vector<std::pair<IDT, DISTT>>>& v, const std::string& gt_file, size_t& nq, size_t& topk) {
+void read_comp(std::vector<std::vector<std::pair<IDT, DISTT>>>& v, const std::string& gt_file, uint32_t& nq, uint32_t& topk) {
     std::ifstream gin(gt_file, std::ios::binary);
 
     gin.read((char*)&nq, sizeof(uint32_t));
     gin.read((char*)&topk, sizeof(uint32_t));
 
-    if (gt_q != nq || gt_k != topk) {
-        std::cerr << "Grountdtruth parammeters does not match. GT nq " << gt_q
-        << "(" << nq << "), topk " << gt_k << "(" << topk << ")" << std::endl;
-        gin.close();
-        return ;
-    }
-
-    v.resize(gt_q);
-    for (uint32_t i = 0; i < gt_q; ++i) {
-        v[i].resize(gt_k);
-        for (uint32_t j = 0; j < gt_k; ++j) {
+    v.resize(nq);
+    for (uint32_t i = 0; i < nq; ++i) {
+        v[i].resize(topk);
+        for (uint32_t j = 0; j < topk; ++j) {
             uint32_t t;
             gin.read((char*)&t, sizeof(uint32_t));
             v[i][j].first = static_cast<IDT>(t);
         }
     }
 
-    for (uint32_t i = 0; i < gt_q; ++i) {
-        for (uint32_t j = 0; j < gt_k; ++j) {
+    for (uint32_t i = 0; i < nq; ++i) {
+        for (uint32_t j = 0; j < topk; ++j) {
             float t;
             gin.read((char*)&t, sizeof(float));
             v[i][j].second = static_cast<DISTT>(t);
@@ -216,7 +209,7 @@ void read_comp(std::vector<std::vector<std::pair<IDT, DISTT>>>& v, const std::st
 template<typename DISTT, typename IDT>
 void recall(const std::string& groundtruth_file, const std::string& answer_file, bool use_comp_format = true) {
     uint32_t gt_nq, gt_topk, answer_nq, answer_topk;
-    auto f_read = gt_comp_format ? read_comp<DISTT, IDT> : read_sift<DISTT, IDT>;
+    auto f_read = use_comp_format ? read_comp<DISTT, IDT> : read_sift<DISTT, IDT>;
 
     std::vector<std::vector<std::pair<IDT, DISTT>>> groundtruth;
     f_read(groundtruth, groundtruth_file, gt_nq, gt_topk);
@@ -226,22 +219,29 @@ void recall(const std::string& groundtruth_file, const std::string& answer_file,
     std::vector<std::vector<std::pair<IDT, DISTT>>> resultset;
     f_read(resultset, answer_file, answer_nq, answer_topk);
 
+    if (gt_nq != answer_nq || gt_topk != answer_topk) {
+        std::cerr << "Grountdtruth parammeters does not match. GT nq " << gt_nq
+        << "(" << answer_nq << "), topk " << gt_topk << "(" << answer_topk << ")" << std::endl;
+        return ;
+    }
+
+
     // print_vec_id_dis<DISTT, IDT>(resultset, "show resultset:");
 
     int tot_cnt = 0;
-    std::cout << "recall@" << topk << " between groundtruth file:"
+    std::cout << "recall@" << gt_topk << " between groundtruth file:"
               << groundtruth_file << " and answer file:"
               << answer_file << " is:" << std::endl;
-    for (auto i = 0; i < nq; i ++) {
+    for (auto i = 0; i < gt_nq; i ++) {
         int cnti = 0;
-        for (auto j = 0; j < resultset[i].size(); j ++) {
-            if (resultset[i][j].second <= groundtruth[i][groundtruth[i].size() - 1].second)
+        for (auto j = 0; j < gt_topk; j ++) {
+            if (resultset[i][j].second <= groundtruth[i][gt_topk - 1].second)
                 cnti ++;
         }
         tot_cnt += cnti;
-        std::cout << "query " << i << " recall@" << topk << " is: " << ((double)(cnti)) / topk * 100 << "%." << std::endl;
+        std::cout << "query " << i << " recall@" << gt_topk << " is: " << ((double)(cnti)) / gt_topk * 100 << "%." << std::endl;
     }
-    std::cout << "avg recall@" << topk << " = " << ((double)(tot_cnt)) / topk / nq * 100 << "%." << std::endl;
+    std::cout << "avg recall@" << gt_topk << " = " << ((double)(tot_cnt)) / gt_topk / gt_nq * 100 << "%." << std::endl;
 }
 
 
