@@ -233,6 +233,13 @@ void recall(const std::string& groundtruth_file, const std::string& answer_file,
         return ;
     }
 
+    if (gt_nq != answer_nq || gt_topk != answer_topk) {
+        std::cerr << "Grountdtruth parammeters does not match. GT nq " << gt_nq
+        << "(" << answer_nq << "), topk " << gt_topk << "(" << answer_topk << ")" << std::endl;
+        return ;
+    }
+
+
     // print_vec_id_dis<DISTT, IDT>(resultset, "show resultset:");
 
     int tot_cnt = 0;
