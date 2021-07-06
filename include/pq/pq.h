@@ -202,7 +202,7 @@ void ProductQuantizer<C, T, U>::train(int32_t n, const T* x) {
 
     bool remove_dup = false;
     if (sub_code_size <= 4) {
-        printf("Remove duplicates dsub %d * sizeof(Type) %d\n", dsub, sizeof(T));
+        printf("Remove duplicates dsub %d * sizeof(Type) %d\n", dsub, (int)sizeof(T));
         remove_dup = true;
     }
 

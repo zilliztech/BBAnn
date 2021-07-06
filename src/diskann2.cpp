@@ -36,7 +36,7 @@ void divide_raw_data(const std::string& raw_data_bin_file,
                      const std::string& output_path,
                      const float* centroids,
                      const uint32_t K1) {
-    TimeRecorder rc("split_raw_data");
+    TimeRecorder rc("divide raw data");
     std::cout << "divide_raw_data parameters:" << std::endl;
     std::cout << " raw_data_bin_file: " << raw_data_bin_file
               << " output_path: " << output_path
@@ -503,13 +503,18 @@ void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
     index_hnsw->setEf(refine_nprobe);
 #pragma omp parallel for
     for (auto i = 0; i < nq; i ++) {
-        auto queryi = pquery + i * dq;
+        // auto queryi = pquery + i * dq;
+        // todo: hnsw need to support query data is not float
+        float* queryi = new float[dq];
+        for (auto j = 0; j < dq;j ++) 
+            queryi[j] = (float)(*(pquery + i * dq + j));
         auto reti = index_hnsw->searchKnn(queryi, nprobe);
         auto p_labeli = buckets_label + i * nprobe;
         while (!reti.empty()) {
             *p_labeli++ = reti.top().second;
             reti.pop();
         }
+        delete[] queryi;
     }
     rc.ElapseFromBegin("search graph done.");
 }
@@ -528,7 +533,7 @@ void search_quantizer(ProductQuantizer<HEAPTT, DATAT, uint8_t>& pq_quantizer,
                       DISTT*& pq_distance,
                       uint64_t*& pq_offsets,
                       PQ_Computer<DATAT>& pq_cmp) {
-    TimeRecorder rc("search graph");
+    TimeRecorder rc("search quantizer");
     std::cout << "search quantizer parameters:" << std::endl;
     std::cout << " pq_quantizer:" << &pq_quantizer
               << " nq: " << nq
