@@ -664,11 +664,16 @@ void refine(const std::string& index_path,
     }
     rc.RecordSection("heapify answers heaps");
 
+    // statistics
+    std::vector<int> load_vectors(K1, 0);
     std::vector<std::mutex> mtx(nq);
 #pragma omp parallel for
     for (auto i = 0; i < K1; i ++) {
         if (refine_records[i].size() == 0)
             continue;
+        std::sort(refine_records[i].begin(), refine_records[i].end(), [](const auto &l, const auto &r) {
+                return l.first < r.first;
+                });
         uint32_t pre_off = refine_records[i][0].first;
         uint32_t meta_bytes = 8; // pass meta
         DATAT* data_bufi = new DATAT[dq];
@@ -677,6 +682,7 @@ void refine(const std::string& index_path,
         raw_data_file_handlers[i].read((char*)data_bufi, dq * sizeof(DATAT));
         ids_data_file_handlers[i].seekg(meta_bytes + pre_off * sizeof(uint32_t));
         ids_data_file_handlers[i].read((char*)&global_id, sizeof(uint32_t));
+        load_vectors[i] ++;
         // for debug
         for (auto j = 0; j < refine_records[i].size(); j ++) {
             if (refine_records[i][j].first != pre_off) {
@@ -686,6 +692,7 @@ void refine(const std::string& index_path,
                 ids_data_file_handlers[i].seekg(meta_bytes + pre_off * sizeof(uint32_t));
                 ids_data_file_handlers[i].read((char*)&global_id, sizeof(uint32_t));
                 assert(global_id >= 0);
+                load_vectors[i] ++;
             }
             uint32_t qid = refine_records[i][j].second;
             auto dis = dis_computer(data_bufi, pquery + qid * dq, dq);
@@ -698,6 +705,13 @@ void refine(const std::string& index_path,
         delete[] data_bufi;
     }
     rc.RecordSection("calculate done.");
+    int tot = 0;
+    std::cout << "show load refine vectors of each cluster:" << std::endl;
+    for (auto i = 0; i < K1; i ++) {
+        std::cout << "cluster-" << i << ": " << load_vectors[i] << "/" << refine_topk << std::endl;
+        tot += load_vectors[i];
+    }
+    std::cout << "total load refine vectors: " << tot << "/" << refine_topk * nq << std::endl;
 
     for (auto i = 0; i < K1; i ++) {
         std::string data_filei = index_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
