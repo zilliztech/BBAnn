@@ -18,8 +18,8 @@ template<typename T1, typename T2, typename R>
 void elkan_L2_assign (
         const T1 * x,
         const T2 * y,
-        uint32_t dim, uint32_t nx, uint32_t ny,
-        uint32_t *ids, R *val) {
+        uint64_t dim, uint64_t nx, uint64_t ny,
+        uint64_t *ids, R *val) {
 
     if (nx == 0 || ny == 0) {
         return;
@@ -28,11 +28,11 @@ void elkan_L2_assign (
     const size_t bs_y = 1024;
     R *data = (R *) malloc((bs_y * (bs_y - 1) / 2) * sizeof (R));
 
-    for (uint32_t j0 = 0; j0 < ny; j0 += bs_y) {
-        uint32_t j1 = j0 + bs_y;
+    for (uint64_t j0 = 0; j0 < ny; j0 += bs_y) {
+        uint64_t j1 = j0 + bs_y;
         if (j1 > ny) j1 = ny;
 
-        auto Y = [&](uint32_t i, uint32_t j) -> R& {
+        auto Y = [&](uint64_t i, uint64_t j) -> R& {
             assert(i != j);
             i -= j0, j -= j0;
             return (i > j) ? data[j + i * (i - 1) / 2] : data[i + j * (j - 1) / 2];
@@ -42,9 +42,9 @@ void elkan_L2_assign (
         {
             int nt = omp_get_num_threads();
             int rank = omp_get_thread_num();
-            for (uint32_t i = j0 + 1 + rank; i < j1; i += nt) {
+            for (uint64_t i = j0 + 1 + rank; i < j1; i += nt) {
                 const T2* y_i = y + i * dim;
-                for (uint32_t j = j0; j < i; j++) {
+                for (uint64_t j = j0; j < i; j++) {
                     const T2* y_j = y + j * dim;
                     Y(i, j) = L2sqr<const T2,const T2,R>(y_i, y_j, dim);
                 }
@@ -52,13 +52,13 @@ void elkan_L2_assign (
         }
 
 #pragma omp parallel for
-        for (uint32_t i = 0; i < nx; i++) {
+        for (uint64_t i = 0; i < nx; i++) {
             const T1* x_i = x + i * dim;
 
-            uint32_t ids_i = j0;
+            uint64_t ids_i = j0;
             R val_i = L2sqr<const T1,const T2,R>(x_i, y + j0 * dim, dim);
             R val_i_time_4 = val_i * 4;
-            for (uint32_t j = j0 + 1; j < j1; j++) {
+            for (uint64_t j = j0 + 1; j < j1; j++) {
                 if (val_i_time_4 <= Y(ids_i, j)) {
                     continue;
                 }
@@ -88,7 +88,7 @@ void elkan_L2_assign (
 template <typename T>
 void compute_centroids (int32_t dim, int32_t k, int32_t n,
                        const T * x,
-                       const uint32_t * assign,
+                       const uint64_t * assign,
                        int32_t * hassign,
                        float * centroids,
                        bool normalize)
@@ -106,7 +106,7 @@ void compute_centroids (int32_t dim, int32_t k, int32_t n,
         size_t c1 = (k * (rank + 1)) / nt;
 
         for (int32_t i = 0; i < n; i++) {
-            uint32_t ci = assign[i];
+            uint64_t ci = assign[i];
             if (ci >= c0 && ci < c1)  {
                 float * c = centroids + ci * dim;
                 const T * xi = x + i * dim;
@@ -182,15 +182,15 @@ int32_t split_clusters (int32_t dim, int32_t k, int32_t n,
 
 
 template <typename DATAT>
-void kmeanspp(const DATAT* pdata, const uint32_t nb, const uint32_t dim,
-              const uint32_t num_clusters, float*& centroids) {
+void kmeanspp(const DATAT* pdata, const uint64_t nb, const uint64_t dim,
+              const uint64_t num_clusters, float*& centroids) {
     auto disf = L2sqr<const DATAT, float, float>;
     std::random_device rd;
     auto x = rd();
     std::mt19937 generator(x);
-    std::uniform_int_distribution<uint32_t> distribution(0, nb - 1);
+    std::uniform_int_distribution<uint64_t> distribution(0, nb - 1);
 
-    uint32_t init_id = distribution(generator);
+    uint64_t init_id = distribution(generator);
     std::vector<float> dist(nb, std::numeric_limits<float>::max());
     for (auto i = 0; i < dim; i ++)
         centroids[i] = (float)pdata[init_id * dim + i];
@@ -224,6 +224,10 @@ template <typename T>
 void kmeans (int32_t nx, const T* x_in, int32_t dim, int32_t k, float* centroids,
              bool kmpp = false, bool normalize = false, int32_t niter = 10, 
              int32_t seed = 1234) {
+    std::cout << "start do " << k << "-means on " << nx << " vectors" << std::endl;
+    if (k > 1000)
+        nx = k * 40;
+    std::cout << "new nx = " << nx << std::endl;
     const int32_t max_points_per_centroid = 256;
     const int32_t min_points_per_centroid = 39;
 
@@ -247,7 +251,7 @@ void kmeans (int32_t nx, const T* x_in, int32_t dim, int32_t k, float* centroids
     std::unique_ptr<int32_t []> hassign(new int32_t[k]);
     std::unique_ptr<float []> sum(new float[k * dim]);
 
-    std::unique_ptr<uint32_t []> assign(new uint32_t[nx]);
+    std::unique_ptr<uint64_t []> assign(new uint64_t[nx]);
     std::unique_ptr<float []> dis(new float[nx]);
 
     if (kmpp) {
@@ -263,10 +267,21 @@ void kmeans (int32_t nx, const T* x_in, int32_t dim, int32_t k, float* centroids
         }
     }
 
+    float err = std::numeric_limits<float>::max();
     for (int32_t i = 0; i < niter; i++) {
         // printf("iter %d ", i);
 
         elkan_L2_assign<T, float, float>(x_in, centroids, dim, nx, k, assign.get(), dis.get());
+        
+        float cur_err = 0.0;
+        for (auto j = 0; j < nx; j ++)
+            cur_err += dis[j];
+
+        if (fabs(cur_err - err) < err * 0.03) {
+            std::cout << "exit kmeans iteration after the " << i << "th iteration, err = " << err << ", cur_err = " << cur_err << std::endl;
+            break;
+        }
+        err = cur_err;
 
         compute_centroids<T>(dim, k, nx, x_in, assign.get(), hassign.get(), centroids, normalize);
 
