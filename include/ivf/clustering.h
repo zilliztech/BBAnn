@@ -85,13 +85,16 @@ void elkan_L2_assign (
     free(data);
 }
 
+// avg_sqr_len:
+//    0: not to normalize
+//    else: normalize
 template <typename T>
 void compute_centroids (int32_t dim, int32_t k, int32_t n,
                        const T * x,
                        const uint64_t * assign,
                        int32_t * hassign,
                        float * centroids,
-                       bool normalize)
+                       float avg_sqr_len = 0.0)
 {
     memset(hassign, 0, sizeof(int32_t) * k);
     memset(centroids, 0, sizeof(float) * dim * k);
@@ -125,8 +128,8 @@ void compute_centroids (int32_t dim, int32_t k, int32_t n,
         }
 
         float *c = centroids + ci * dim;
-        if (normalize) {
-            float len = 1.0 / sqrt(IP<float, float, float>(c, c, dim));
+        if (avg_sqr_len != 0.0) {
+            float len = sqrt(avg_sqr_len / IP<float, float, double>(c, c, dim));
             for (int32_t j = 0; j < dim; j++){
                 c[j] *= len;
             }
@@ -254,6 +257,27 @@ void kmeans (int32_t nx, const T* x_in, int32_t dim, int32_t k, float* centroids
     std::unique_ptr<uint64_t []> assign(new uint64_t[nx]);
     std::unique_ptr<float []> dis(new float[nx]);
 
+    float avg_sqr_len = 0;
+    if (normalize) {
+        float max_sqr_len = 0;
+        float min_sqr_len = std::numeric_limits<float>::max();
+        for (int32_t i = 0; i < nx; i++) {
+            const T *p = x_in + i * dim;
+            float sqr_len = IP<const T, const T, float>(p, p, dim);
+            if (sqr_len > max_sqr_len) max_sqr_len = sqr_len;
+            if (sqr_len < min_sqr_len) min_sqr_len = sqr_len;
+            avg_sqr_len += sqr_len;
+        }
+        if (min_sqr_len / max_sqr_len > 0.81) {
+            avg_sqr_len /= nx;
+            printf("min_sqr_len %f max_sqr_len %f avg_sqr_len %lf\n", min_sqr_len, max_sqr_len, avg_sqr_len);
+        } else {
+            // it is inappropriate to normalize
+            avg_sqr_len = 0;
+            printf("min_sqr_len %f max_sqr_len %f, not to normalize\n", min_sqr_len, max_sqr_len);
+        }
+    }
+
     if (kmpp) {
         kmeanspp<T>(x_in, nx, dim, k, centroids);
     } else {
@@ -272,22 +296,22 @@ void kmeans (int32_t nx, const T* x_in, int32_t dim, int32_t k, float* centroids
         // printf("iter %d ", i);
 
         elkan_L2_assign<T, float, float>(x_in, centroids, dim, nx, k, assign.get(), dis.get());
-        
-        float cur_err = 0.0;
-        for (auto j = 0; j < nx; j ++)
-            cur_err += dis[j];
 
-        if (fabs(cur_err - err) < err * 0.01) {
-            std::cout << "exit kmeans iteration after the " << i << "th iteration, err = " << err << ", cur_err = " << cur_err << std::endl;
-            break;
-        }
-        err = cur_err;
-
-        compute_centroids<T>(dim, k, nx, x_in, assign.get(), hassign.get(), centroids, normalize);
+        compute_centroids<T>(dim, k, nx, x_in, assign.get(), hassign.get(), centroids, avg_sqr_len);
 
         int32_t split = split_clusters(dim, k, nx, hassign.get(), centroids);
         if (split != 0) {
             printf("split %d\n", split);
+        } else {
+            float cur_err = 0.0;
+            for (auto j = 0; j < nx; j ++)
+                cur_err += dis[j];
+
+            if (fabs(cur_err - err) < err * 0.01) {
+                std::cout << "exit kmeans iteration after the " << i << "th iteration, err = " << err << ", cur_err = " << cur_err << std::endl;
+                break;
+            }
+            err = cur_err;
         }
     }
 
