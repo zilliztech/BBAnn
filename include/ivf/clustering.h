@@ -277,7 +277,7 @@ void kmeans (int32_t nx, const T* x_in, int32_t dim, int32_t k, float* centroids
         for (auto j = 0; j < nx; j ++)
             cur_err += dis[j];
 
-        if (fabs(cur_err - err) < err * 0.03) {
+        if (fabs(cur_err - err) < err * 0.01) {
             std::cout << "exit kmeans iteration after the " << i << "th iteration, err = " << err << ", cur_err = " << cur_err << std::endl;
             break;
         }
