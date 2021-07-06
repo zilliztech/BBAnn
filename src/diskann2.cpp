@@ -705,25 +705,12 @@ void refine(const std::string& index_path,
 
 
 template<typename DISTT, typename HEAPT>
-void save_answers(const std::string& answer_bin_file,
+void save_sift_answer(const std::string& answer_bin_file,
                   const int topk,
                   const uint32_t nq,
                   DISTT*& answer_dists,
                   uint32_t*& answer_ids) {
-    TimeRecorder rc("save answers");
-    std::cout << "save answer parameters:" << std::endl;
-    std::cout << " answer_bin_file: " << answer_bin_file
-              << " topk: " << topk
-              << " nq: " << nq
-              << " answer_dists: " << answer_dists
-              << " answer_ids: " << answer_ids
-              << std::endl;
-    uint32_t ans_num = nq * topk;
-    uint32_t ans_dim = 2;
     std::ofstream answer_writer(answer_bin_file, std::ios::binary);
-    // answer_writer.write((char*)&ans_num, sizeof(uint32_t));
-    // answer_writer.write((char*)&ans_dim, sizeof(uint32_t));
-
     for (auto i = 0; i < nq; i ++) {
         auto ans_disi = answer_dists + topk * i;
         auto ans_idsi = answer_ids + topk * i;
@@ -735,6 +722,51 @@ void save_answers(const std::string& answer_bin_file,
         }
     }
     answer_writer.close();
+}
+
+template<typename DISTT, typename HEAPT>
+void save_comp_answer(const std::string& answer_bin_file,
+                  const int topk,
+                  const uint32_t nq,
+                  DISTT*& answer_dists,
+                  uint32_t*& answer_ids) {
+    std::ofstream answer_writer(answer_bin_file, std::ios::binary);
+    answer_writer.write((char*)&nq, sizeof(uint32_t));
+    answer_writer.write((char*)&topk, sizeof(uint32_t));
+
+    for (auto i = 0; i < nq; i ++) {
+        auto ans_disi = answer_dists + topk * i;
+        auto ans_idsi = answer_ids + topk * i;
+        heap_reorder<HEAPT>(topk, ans_disi, ans_idsi);
+    }
+
+    uint32_t tot = nq * topk;
+    answer_writer.write((char*)answer_ids, tot * sizeof(uint32_t));
+    answer_writer.write((char*)answer_dists, tot * sizeof(DISTT));
+
+    answer_writer.close();
+}
+
+template<typename DISTT, typename HEAPT>
+void save_answers(const std::string& answer_bin_file,
+                  const int topk,
+                  const uint32_t nq,
+                  DISTT*& answer_dists,
+                  uint32_t*& answer_ids,
+                  bool use_comp_format) {
+    TimeRecorder rc("save answers");
+    std::cout << "save answer parameters:" << std::endl;
+    std::cout << " answer_bin_file: " << answer_bin_file
+              << " topk: " << topk
+              << " nq: " << nq
+              << " answer_dists: " << answer_dists
+              << " answer_ids: " << answer_ids
+              << std::endl;
+
+    auto f = use_comp_format ? save_comp_answer<DISTT, HEAPT> : save_sift_answer<DISTT, HEAPT>;
+
+    f(answer_bin_file, topk, nq, answer_dists, answer_ids);
+
     rc.ElapseFromBegin("save answers done.");
 }
 
@@ -955,42 +987,48 @@ void save_answers<float, CMax<float, uint32_t>>(const std::string& answer_bin_fi
                   const int topk,
                   const uint32_t nq,
                   float*& answer_dists,
-                  uint32_t*& answer_ids);
+                  uint32_t*& answer_ids,
+                  bool use_comp_format = true);
 
 template
 void save_answers<float, CMin<float, uint32_t>>(const std::string& answer_bin_file,
                   const int topk,
                   const uint32_t nq,
                   float*& answer_dists,
-                  uint32_t*& answer_ids);
+                  uint32_t*& answer_ids,
+                  bool use_comp_format = true);
 
 template
 void save_answers<uint32_t, CMax<uint32_t, uint32_t>>(const std::string& answer_bin_file,
                   const int topk,
                   const uint32_t nq,
                   uint32_t*& answer_dists,
-                  uint32_t*& answer_ids);
+                  uint32_t*& answer_ids,
+                  bool use_comp_format = true);
 
 template
 void save_answers<uint32_t, CMin<uint32_t, uint32_t>>(const std::string& answer_bin_file,
                   const int topk,
                   const uint32_t nq,
                   uint32_t*& answer_dists,
-                  uint32_t*& answer_ids);
+                  uint32_t*& answer_ids,
+                  bool use_comp_format = true);
 
 template
 void save_answers<int32_t, CMax<int32_t, uint32_t>>(const std::string& answer_bin_file,
                   const int topk,
                   const uint32_t nq,
                   int32_t*& answer_dists,
-                  uint32_t*& answer_ids);
+                  uint32_t*& answer_ids,
+                  bool use_comp_format = true);
 
 template
 void save_answers<int32_t, CMin<int32_t, uint32_t>>(const std::string& answer_bin_file,
                   const int topk,
                   const uint32_t nq,
                   int32_t*& answer_dists,
-                  uint32_t*& answer_ids);
+                  uint32_t*& answer_ids,
+                  bool use_comp_format = true);
 
 template
 void search_graph<float>(std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
