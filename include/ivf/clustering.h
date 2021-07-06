@@ -296,7 +296,6 @@ void kmeans (int32_t nx, const T* x_in, int32_t dim, int32_t k, float* centroids
         // printf("iter %d ", i);
 
         elkan_L2_assign<T, float, float>(x_in, centroids, dim, nx, k, assign.get(), dis.get());
-
         compute_centroids<T>(dim, k, nx, x_in, assign.get(), hassign.get(), centroids, avg_sqr_len);
 
         int32_t split = split_clusters(dim, k, nx, hassign.get(), centroids);
