@@ -20,7 +20,7 @@ void train_cluster(const std::string& raw_data_bin_file,
     std::cout << "nb = " << nb << ", dim = " << dim << ", sample_num 4 K1: " << sample_num << std::endl;
 
     *centroids = new float[K1 * dim];
-    sample_data = new DATAT[sample_num * dim];
+    sample_data = new DATAT[(uint64_t)sample_num * dim];
     reservoir_sampling(raw_data_bin_file, sample_num, sample_data);
     rc.RecordSection("reservoir sample with sample rate: " + std::to_string(K1_SAMPLE_RATE) + " done");
     kmeans<DATAT>(sample_num, sample_data, (int32_t)dim, K1, *centroids, true);
@@ -74,7 +74,7 @@ void divide_raw_data(const std::string& raw_data_bin_file,
         auto sp = i * block_size;
         auto ep = std::min(nb, sp + block_size);
         std::cout << "split the " << i << "th block, start position = " << sp << ", end position = " << ep << std::endl;
-        reader.read((char*)block_buf, (ep - sp) * dim * sizeof(DATAT));
+        reader.read((char*)block_buf, (uint64_t)(ep - sp) * dim * sizeof(DATAT));
         rci.RecordSection("read block data done");
         elkan_L2_assign<const DATAT, const float, DISTT>(block_buf, centroids, dim, ep -sp, K1, cluster_id.data(), dists.data());
         //knn_1<HEAPT, DATAT, float> (
@@ -159,10 +159,10 @@ void conquer_clusters(const std::string& output_path,
         ids_reader.read((char*)&ids_dim, sizeof(uint32_t));
         assert(cluster_size == ids_size);
         assert(ids_dim == 1);
-        DATAT* datai = new DATAT[cluster_size * cluster_dim];
-        data_reader.read((char*)datai, cluster_size * cluster_dim * sizeof(DATAT));
-        uint32_t* idsi = new uint32_t[ids_size * ids_dim];
-        ids_reader.read((char*)idsi, ids_size * ids_dim * sizeof(uint32_t));
+        DATAT* datai = new DATAT[(uint64_t)cluster_size * cluster_dim];
+        data_reader.read((char*)datai, (uint64_t)cluster_size * cluster_dim * sizeof(DATAT));
+        uint32_t* idsi = new uint32_t[(uint64_t)ids_size * ids_dim];
+        ids_reader.read((char*)idsi, (uint64_t)ids_size * ids_dim * sizeof(uint32_t));
 
         auto K2 = (cluster_size - 1) / threshold + 1;
         std::cout << "cluster-" << i << " will split into " << K2 << " buckets." << std::endl;
@@ -234,7 +234,7 @@ void conquer_clusters(const std::string& output_path,
             ids_writer.write((char*)&ids_size, sizeof(uint32_t));
             ids_writer.write((char*)&ids_dim, sizeof(uint32_t));
             for (auto j = 0; j < cluster_size; j ++) {
-                auto ori_pos = cluster_off[j].second;
+                uint64_t ori_pos = cluster_off[j].second;
                 data_writer.write((char*)(datai + ori_pos * cluster_dim), sizeof(DATAT) * cluster_dim);
                 ids_writer.write((char*)(idsi + ori_pos * ids_dim), sizeof(uint32_t) * ids_dim);
                 // for debug
@@ -372,7 +372,7 @@ void train_quantizer(const std::string& raw_data_bin_file,
     uint32_t nb, dim;
     get_bin_metadata(raw_data_bin_file, nb, dim);
     uint32_t pq_sample_num = (uint32_t)(nb * PQ_SAMPLE_RATE);
-    DATAT* pq_sample_data = new DATAT[pq_sample_num * dim];
+    DATAT* pq_sample_data = new DATAT[(uint64_t)pq_sample_num * dim];
     reservoir_sampling(raw_data_bin_file, pq_sample_num, pq_sample_data);
     rc.RecordSection("reservoir_sampling 4 pq train set done");
     ProductQuantizer<HEAPT, DATAT, uint8_t> pq_quantizer(dim, PQM, PQnbits);
@@ -388,10 +388,11 @@ void train_quantizer(const std::string& raw_data_bin_file,
         IOReader data_reader(data_file);
         data_reader.read((char*)&cluster_size, sizeof(uint32_t));
         data_reader.read((char*)&cluster_dim, sizeof(uint32_t));
-        DATAT* datai = new DATAT[cluster_size * cluster_dim];
-        data_reader.read((char*)datai, cluster_size * cluster_dim * sizeof(DATAT));
+        DATAT* datai = new DATAT[(uint64_t)cluster_size * cluster_dim];
+        data_reader.read((char*)datai, (uint64_t)cluster_size * cluster_dim * sizeof(DATAT));
         pq_quantizer.encode_vectors_and_save(precomputer_table, cluster_size, datai, pq_codebook_file);
         delete[] datai;
+        rc.RecordSection("the " + std::to_string(i) + "th cluster encode and save codebook done.");
     }
 
     delete[] precomputer_table;
@@ -452,8 +453,8 @@ void load_pq_codebook(const std::string& index_path,
         uint32_t sizei, dimi;
         reader.read((char*)&sizei, sizeof(uint32_t));
         reader.read((char*)&dimi, sizeof(uint32_t));
-        pq_codebook[i].resize(sizei * dimi);
-        reader.read((char*)pq_codebook[i].data(), sizei * dimi * sizeof(uint8_t));
+        pq_codebook[i].resize((uint64_t)sizei * dimi);
+        reader.read((char*)pq_codebook[i].data(), (uint64_t)sizei * dimi * sizeof(uint8_t));
         reader.close();
     }
     rc.ElapseFromBegin("load pq codebook done.");
@@ -475,7 +476,7 @@ void load_meta(const std::string& index_path,
         reader.read((char*)&dmeta, sizeof(uint32_t));
         assert(1 == dmeta);
         meta[i].resize(nmeta);
-        reader.read((char*)meta[i].data(), nmeta * dmeta * sizeof(uint32_t));
+        reader.read((char*)meta[i].data(), (uint64_t)nmeta * dmeta * sizeof(uint32_t));
         reader.close();
     }
     rc.ElapseFromBegin("load meta done.");
@@ -674,7 +675,7 @@ void refine(const std::string& index_path,
         std::sort(refine_records[i].begin(), refine_records[i].end(), [](const auto &l, const auto &r) {
                 return l.first < r.first;
                 });
-        uint32_t pre_off = refine_records[i][0].first;
+        uint64_t pre_off = refine_records[i][0].first;
         uint32_t meta_bytes = 8; // pass meta
         DATAT* data_bufi = new DATAT[dq];
         uint32_t global_id;

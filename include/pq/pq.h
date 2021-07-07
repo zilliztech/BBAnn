@@ -28,7 +28,7 @@ template<class C, typename T, typename U>
 class ProductQuantizer {
 private:
     int32_t d, dsub, K, ntotal, npos;
-    uint8_t m, nbits;
+    uint32_t m, nbits;
 
     float* centroids = nullptr;
     U* codes = nullptr;
@@ -141,7 +141,7 @@ public:
                 const uint32_t& cid, const uint32_t& off, const uint32_t& qid);
 
     void save_centroids(const std::string& save_file) {
-        uint32_t num_centroids = (uint32_t)m * K;
+        uint32_t num_centroids = m * K;
         uint32_t dim_centroids = dsub;
         std::ofstream centroids_writer(save_file, std::ios::binary);
         centroids_writer.write((char*)&num_centroids, sizeof(uint32_t));
@@ -198,7 +198,7 @@ void ProductQuantizer<C, T, U>::compute_dis_tab(const T* q, float* dis_tab,
 template<class C, typename T, typename U>
 void ProductQuantizer<C, T, U>::train(int32_t n, const T* x) {
     const size_t sub_code_size = dsub * sizeof(T);
-    T* xs = new T[n * dsub];
+    T* xs = new T[(uint64_t)n * dsub];
 
     bool remove_dup = false;
     if (sub_code_size <= 4) {
@@ -206,9 +206,9 @@ void ProductQuantizer<C, T, U>::train(int32_t n, const T* x) {
         remove_dup = true;
     }
 
-    for (uint8_t i = 0; i < m; ++i) {
+    for (auto i = 0; i < m; ++i) {
         if (remove_dup) {
-            uint32_t idx = 0;
+            uint64_t idx = 0;
             std::unordered_set<uint32_t> st;
 
             if (sub_code_size == 4) {
@@ -246,7 +246,7 @@ void ProductQuantizer<C, T, U>::train(int32_t n, const T* x) {
 
         } else {
             auto xd = x + i * dsub;
-            for (int32_t j = 0; j < n; ++j) {
+            for (int64_t j = 0; j < n; ++j) {
                 memcpy(xs + j * dsub, xd, sub_code_size);
                 xd += d;
             }
@@ -268,9 +268,9 @@ void ProductQuantizer<C, T, U>::encode_vectors(float*& precomputer_table,
 
     if (npos + n > ntotal) {
         ntotal = npos + n;
-        U* new_codes = new U[ntotal * m];
+        U* new_codes = new U[(uint64_t)ntotal * m];
         if (npos != 0) {
-            memcpy(new_codes, codes, npos * m * sizeof(U));
+            memcpy(new_codes, codes, (uint64_t)npos * m * sizeof(U));
         }
         if (codes != nullptr) {
             delete[] codes;
@@ -311,7 +311,7 @@ void ProductQuantizer<C, T, U>::encode_vectors(float*& precomputer_table,
         }
 
 #pragma omp parallel for
-        for (int32_t i = 0; i < n; i++) {
+        for (int64_t i = 0; i < n; i++) {
             const T* x_i = x + i * d + loop * dsub;
 
             int32_t ids_i = 0;
@@ -347,7 +347,7 @@ void ProductQuantizer<C, T, U>::encode_vectors_and_save(float*& precomputer_tabl
     std::ofstream code_writer(save_file, std::ios::binary | std::ios::out);
     code_writer.write((char*)&n, sizeof(uint32_t));
     code_writer.write((char*)&wm, sizeof(uint32_t));
-    code_writer.write((char*)codes, n * m * sizeof(U));
+    code_writer.write((char*)codes, (uint64_t)n * m * sizeof(U));
     code_writer.close();
     std::cout << "ProductQuantizer encode " << n << " vectors with m = " << wm << " into file "
               << save_file << std::endl;
