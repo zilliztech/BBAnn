@@ -813,7 +813,7 @@ void search_bigann(const std::string& index_path,
               << " query_bin_file: " << query_bin_file
               << " answer_bin_file: " << answer_bin_file
               << " nprobe: " << nprobe
-              << " refine_nprobe: " << nprobe
+              << " refine_nprobe: " << refine_nprobe
               << " topk: " << topk
               << " refine topk: " << refine_topk
               << " K1: " << K1
