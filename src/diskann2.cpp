@@ -1,5 +1,10 @@
 #include "diskann.h"
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+
 template<typename DATAT>
 void train_cluster(const std::string& raw_data_bin_file,
                    const std::string& output_path,
@@ -651,7 +656,7 @@ void refine(const std::string& index_path,
         std::cout << "cluster-" << i << " has " << clu_size << " vectors,"
                   << " has clu_dim = " << clu_dim
                   << " clu_id_size = " << clu_id_size
-                  << " clu_id_dim = " << clu_id_dim 
+                  << " clu_id_dim = " << clu_id_dim
                   << std::endl;
     }
     rc.RecordSection("open rawdata and idsdata file handlers");
@@ -673,8 +678,8 @@ void refine(const std::string& index_path,
         if (refine_records[i].size() == 0)
             continue;
         std::sort(refine_records[i].begin(), refine_records[i].end(), [](const auto &l, const auto &r) {
-                return l.first < r.first;
-                });
+            return l.first < r.first;
+        });
         uint64_t pre_off = refine_records[i][0].first;
         uint32_t meta_bytes = 8; // pass meta
         DATAT* data_bufi = new DATAT[dq];
@@ -719,6 +724,163 @@ void refine(const std::string& index_path,
         std::string ids_filei  = index_path + CLUSTER + std::to_string(i) + GLOBAL_IDS + BIN;
         raw_data_file_handlers[i].close();
         ids_data_file_handlers[i].close();
+    }
+    rc.ElapseFromBegin("refine done.");
+}
+
+template<typename DATAT, typename DISTT, typename HEAPT>
+void refine_c(const std::string& index_path,
+            const int K1,
+            const uint32_t nq,
+            const uint32_t dq,
+            const int topk,
+            const int refine_topk,
+            uint64_t* pq_offsets,
+            const DATAT* pquery,
+            DISTT*& answer_dists,
+            uint32_t*& answer_ids,
+            Computer<DATAT, DATAT, DISTT>& dis_computer) {
+    TimeRecorder rc("refine");
+    std::cout << "refine parameters:" << std::endl;
+    std::cout << " index_path: " << index_path
+              << " cluster size: " << K1
+              << " number of query: " << nq
+              << " dim of query: " << dq
+              << " topk: " << topk
+              << " refine_topk:" << refine_topk
+              << " pq_offsets:" << pq_offsets
+              << " pquery:" << pquery
+              << " answer_dists:" << answer_dists
+              << " answer_ids:" << answer_ids
+              << std::endl;
+    std::vector<std::vector<std::pair<uint32_t, uint32_t>>> refine_records(K1);
+    for (auto i = 0; i < nq; i ++) {
+        auto pq_offseti = pq_offsets + i * refine_topk;
+        for (auto j = 0; j < refine_topk; j ++) {
+            if (pq_offseti[j] == (uint64_t)(-1))
+                continue;
+            uint32_t cid, off, qid;
+            parse_refine_id(pq_offseti[j], cid, off, qid);
+            refine_records[cid].emplace_back(off, qid);
+        }
+    }
+    rc.RecordSection("parse_refine_id done");
+
+    std::vector<int> raw_data_file_fds;
+    raw_data_file_fds.reserve(K1);
+    std::vector<int> ids_data_file_fds;
+    ids_data_file_fds.reserve(K1);
+    constexpr size_t O_DIRECT_ALIGNMENT = 512;
+    for (auto i = 0; i < K1; i ++) {
+        std::string data_filei = index_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
+        std::string ids_filei  = index_path + CLUSTER + std::to_string(i) + GLOBAL_IDS + BIN;
+        raw_data_file_fds.emplace_back(open(data_filei.c_str(), O_RDONLY | O_DIRECT));
+        assert(raw_data_file_fds.back() != -1);
+        ids_data_file_fds.emplace_back(open(ids_filei.c_str(), O_RDONLY | O_DIRECT));
+        assert(ids_data_file_fds.back() != -1);
+
+        void *clu_size;
+        int posix_memalign_size = posix_memalign(&clu_size, O_DIRECT_ALIGNMENT, sizeof(uint32_t));
+        assert(posix_memalign_size == sizeof(uint32_t));
+        void *clu_dim;
+        posix_memalign_size = posix_memalign(&clu_dim, O_DIRECT_ALIGNMENT, sizeof(uint32_t));
+        assert(posix_memalign_size == sizeof(uint32_t));
+        void *clu_id_size;
+        posix_memalign_size = posix_memalign(&clu_id_size, O_DIRECT_ALIGNMENT, sizeof(uint32_t));
+        assert(posix_memalign_size == sizeof(uint32_t));
+        void *clu_id_dim;
+        posix_memalign_size = posix_memalign(&clu_id_dim, O_DIRECT_ALIGNMENT, sizeof(uint32_t));
+        assert(posix_memalign_size == sizeof(uint32_t));
+
+        int pread_size = pread(raw_data_file_fds.back(), clu_size, sizeof(uint32_t), 0);
+        assert(pread_size == sizeof(uint32_t));
+        pread_size = pread(raw_data_file_fds.back(), clu_dim, sizeof(uint32_t), 0 + sizeof(uint32_t));
+        assert(pread_size == sizeof(uint32_t));
+        pread_size = pread(ids_data_file_fds.back(), clu_id_size, sizeof(uint32_t), 0);
+        assert(pread_size == sizeof(uint32_t));
+        pread_size = pread(ids_data_file_fds.back(), clu_id_dim, sizeof(uint32_t), 0 + sizeof(uint32_t));
+        assert(pread_size == sizeof(uint32_t));
+
+        std::cout << "cluster-" << i << " has " << *static_cast<uint32_t *>(clu_size) << " vectors,"
+                  << " has clu_dim = " << *static_cast<uint32_t *>(clu_dim)
+                  << " clu_id_size = " << *static_cast<uint32_t *>(clu_id_size)
+                  << " clu_id_dim = " << *static_cast<uint32_t *>(clu_id_dim)
+                  << std::endl;
+        free(clu_size);
+        free(clu_dim);
+        free(clu_id_size);
+        free(clu_id_dim);
+    }
+    rc.RecordSection("open rawdata and idsdata file FDs with open()");
+
+    // init answer heap
+#pragma omp parallel for schedule (static, 128)
+    for (auto i = 0; i < nq; i ++) {
+        auto ans_disi = answer_dists + topk * i;
+        auto ans_idsi = answer_ids + topk * i;
+        heap_heapify<HEAPT>(topk, ans_disi, ans_idsi);
+    }
+    rc.RecordSection("heapify answers heaps");
+
+    // statistics
+    std::vector<int> load_vectors(K1, 0);
+    std::vector<std::mutex> mtx(nq);
+#pragma omp parallel for
+    for (auto i = 0; i < K1; i ++) {
+        if (refine_records[i].size() == 0)
+            continue;
+        std::sort(refine_records[i].begin(), refine_records[i].end(), [](const auto &l, const auto &r) {
+                return l.first < r.first;
+                });
+        uint64_t pre_off = refine_records[i][0].first;
+        uint32_t meta_bytes = 8; // pass meta
+        void *data_bufi;
+        int posix_memalign_size = posix_memalign(&data_bufi, O_DIRECT_ALIGNMENT, dq * sizeof(DATAT));
+        assert(posix_memalign_size == dq * sizeof(DATAT));
+        void *global_id;
+        posix_memalign_size = posix_memalign(&global_id, O_DIRECT_ALIGNMENT, sizeof(uint32_t));
+        assert(posix_memalign_size == sizeof(uint32_t));
+
+        int pread_size = pread(raw_data_file_fds[i], data_bufi, dq * sizeof(DATAT), meta_bytes + pre_off * dq * sizeof(DATAT));
+        assert(pread_size == dq * sizeof(DATAT));
+        pread_size = pread(ids_data_file_fds[i], global_id, sizeof(uint32_t), meta_bytes + pre_off * sizeof(uint32_t));
+        assert(pread_size == sizeof(uint32_t));
+        load_vectors[i] ++;
+        // for debug
+        for (auto j = 0; j < refine_records[i].size(); j ++) {
+            if (refine_records[i][j].first != pre_off) {
+                pre_off = refine_records[i][j].first;
+                pread_size = pread(raw_data_file_fds[i], data_bufi, dq * sizeof(DATAT), meta_bytes + pre_off * dq * sizeof(DATAT));
+                assert(pread_size == dq * sizeof(DATAT));
+                pread_size = pread(ids_data_file_fds[i], global_id, sizeof(uint32_t), meta_bytes + pre_off * sizeof(uint32_t));
+                assert(pread_size == sizeof(uint32_t));
+                assert(*static_cast<uint32_t *>(global_id) >= 0);
+                load_vectors[i] ++;
+            }
+            uint32_t qid = refine_records[i][j].second;
+            auto dis = dis_computer(static_cast<DATAT*>(data_bufi), pquery + qid * dq, dq);
+            std::unique_lock<std::mutex> lk(mtx[qid]);
+            if (HEAPT::cmp(answer_dists[topk * qid], dis)) {
+                heap_swap_top<HEAPT>(topk, answer_dists + topk * qid, answer_ids + topk * qid, dis, *static_cast<uint32_t *>(global_id));
+            }
+        }
+        free(data_bufi);
+        free(global_id);
+    }
+    rc.RecordSection("calculate done.");
+    int tot = 0;
+    std::cout << "show load refine vectors of each cluster:" << std::endl;
+    for (auto i = 0; i < K1; i ++) {
+        std::cout << "cluster-" << i << ": " << load_vectors[i] << "/" << refine_topk << std::endl;
+        tot += load_vectors[i];
+    }
+    std::cout << "total load refine vectors: " << tot << "/" << refine_topk * nq << std::endl;
+
+    for (auto i = 0; i < K1; i ++) {
+        std::string data_filei = index_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
+        std::string ids_filei  = index_path + CLUSTER + std::to_string(i) + GLOBAL_IDS + BIN;
+        close(raw_data_file_fds[i]);
+        close(ids_data_file_fds[i]);
     }
     rc.ElapseFromBegin("refine done.");
 }
@@ -890,7 +1052,8 @@ void search_bigann(const std::string& index_path,
     */
 
 
-    refine<DATAT, DISTT, HEAPT>(index_path, K1, nq, dq, topk, refine_topk, pq_offsets, pquery, answer_dists, answer_ids, dis_computer);
+    refine<DATAT, DISTT, HEAPT>(index_path, K1, nq, dq, topk, refine_topk, pq_offsets, pquery, answer_dists, answer_ids, dis_computer);  // refine with C++ std::ifstream
+//    refine_c<DATAT, DISTT, HEAPT>(index_path, K1, nq, dq, topk, refine_topk, pq_offsets, pquery, answer_dists, answer_ids, dis_computer);  // refine_c with C open(), pread(), close()
     rc.RecordSection("refine done");
     // write answers
     save_answers<DISTT, HEAPT>(answer_bin_file, topk, nq, answer_dists, answer_ids);
