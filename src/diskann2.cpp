@@ -740,7 +740,7 @@ void refine_c(const std::string& index_path,
             DISTT*& answer_dists,
             uint32_t*& answer_ids,
             Computer<DATAT, DATAT, DISTT>& dis_computer) {
-    TimeRecorder rc("refine");
+    TimeRecorder rc("refine_c with C-style interface: open(), pread(), close(). Here with O_RDONLY | O_DIRECT");
     std::cout << "refine parameters:" << std::endl;
     std::cout << " index_path: " << index_path
               << " cluster size: " << K1
@@ -882,7 +882,7 @@ void refine_c(const std::string& index_path,
         close(raw_data_file_fds[i]);
         close(ids_data_file_fds[i]);
     }
-    rc.ElapseFromBegin("refine done.");
+    rc.ElapseFromBegin("refine_c with C-style interface done.");
 }
 
 
