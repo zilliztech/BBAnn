@@ -44,6 +44,21 @@ inline void set_bin_metadata(const std::string& bin_file, const uint32_t& nrows,
     std::cout << "set meta to " << bin_file << ", nrows = " << nrows << ", ncols = " << ncols << std::endl;
 }
 
+void load_meta_impl(const std::string& index_path,
+               std::vector<std::vector<uint32_t>>& meta,
+               const int K1) {
+    for (auto i = 0; i < K1; i ++) {
+        std::ifstream reader(index_path + CLUSTER + std::to_string(i) + META + BIN, std::ios::binary);
+        uint32_t nmeta, dmeta;
+        reader.read((char*)&nmeta, sizeof(uint32_t));
+        reader.read((char*)&dmeta, sizeof(uint32_t));
+        assert(1 == dmeta);
+        meta[i].resize(nmeta);
+        reader.read((char*)meta[i].data(), nmeta * dmeta * sizeof(uint32_t));
+        reader.close();
+    }
+}
+
 template<typename T>
 void reservoir_sampling(const std::string& data_file, const size_t sample_num, T* sample_data) {
     assert(sample_data != nullptr);
@@ -70,6 +85,74 @@ void reservoir_sampling(const std::string& data_file, const size_t sample_num, T
             memcpy((char*)(sample_data + ndims * rand), tmp_buf.get(), ndims * sizeof(T));
         }
     }
+}
+
+template<typename T>
+void reservoir_sampling_residual(
+        const uint32_t sample_num,
+        float* residuals,
+        const int K1,
+        const std::string& output_path) {
+    assert(residuals != nullptr);
+
+    std::random_device rd;
+    std::mt19937 generator((unsigned)(rd()));
+    uint32_t cluster_size, cluster_dim, bucket_cnt = 0, filled_cnt = 0, global_cnt = 0;
+    std::vector<T> cluster_data;
+    std::vector<std::vector<uint32_t> > metas;
+    std::vector<uint32_t> centroid_offsets(sample_num);
+
+    T* sample_data = new T[sample_num * cluster_dim];
+
+    load_meta_impl(output_path, metas, K1);
+
+    for (int i = 0; i < K1; ++i) {
+        std::string data_file = output_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
+
+        IOReader data_reader(data_file);
+        data_reader.read((char*)&cluster_size, sizeof(uint32_t));
+        data_reader.read((char*)&cluster_dim, sizeof(uint32_t));
+
+        // read vectors in each cluster
+        const uint64_t total_size = cluster_size * cluster_dim;
+        cluster_data.resize(total_size);
+        data_reader.read((char*)(cluster_data.data()), total_size * sizeof(T));
+
+        const T* vec = cluster_data.data();
+        for (int j = 0; j < metas[i].size(); ++j) {
+            for (int k = 0; k < metas[i][j]; ++k) {
+                // deal with the situation when one bucket is not enough
+                // for filling the resulting array
+                if (filled_cnt < sample_num) {
+                    memcpy(sample_data + cluster_dim * filled_cnt, vec, cluster_dim * sizeof(T));
+                    ++filled_cnt;
+                } else {
+                    std::uniform_int_distribution<size_t> distribution(0, global_cnt);
+                    size_t rand = (size_t)distribution(generator);
+                    if (rand < sample_num) {
+                        memcpy(sample_data + cluster_dim * rand), vec, cluster_dim * sizeof(T));
+                        centroid_offsets[rand] = bucket_cnt;
+                    }
+                }
+
+                vec += cluster_dim;
+                ++global_cnt;
+            }
+            ++bucket_cnt;
+        }
+    }
+
+    // read centroids
+    float *centroids = nullptr;
+    uint32_t n, dim;
+    read_bin_file<float>(index_path + BUCKET + CENTROIDS + BIN, centroids, n, dim);
+    for (int i = 0; i < sample_num; ++i) {
+        compute_residual<float, T, float>(centroids, sample_data, residual, dim);
+        centroids += d, sample_data += d, residual += d;
+    }
+
+    delete[] sample_data;
+    delete[] centroids;
 }
 
 template<typename T>

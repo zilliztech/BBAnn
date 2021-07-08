@@ -83,10 +83,17 @@ void build_graph(const std::string& index_path,
 
 
 template<typename DATAT, typename DISTT, typename HEAPT>
-void train_quantizer(const std::string& raw_data_bin_file,
+void train_pq_quantizer(const std::string& raw_data_bin_file,
                      const std::string& output_path,
                      const int K1,
                      const int PQM, const int PQnbits);
+
+template<typename DATAT, typename DISTT, typename HEAPT>
+void train_pq_residual_quantizer(
+        const std::string& raw_data_bin_file,
+        const std::string& output_path,
+        const int K1,
+        const int PQM, const int PQnbits);
 
 template<typename DATAT, typename DISTT, typename HEAPT>
 void build_bigann(const std::string& raw_data_bin_file,

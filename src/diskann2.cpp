@@ -357,11 +357,11 @@ void build_graph(const std::string& index_path,
 */
 
 template<typename DATAT, typename DISTT, typename HEAPT>
-void train_quantizer(const std::string& raw_data_bin_file,
+void train_pq_quantizer(const std::string& raw_data_bin_file,
                      const std::string& output_path,
                      const int K1,
                      const int PQM, const int PQnbits) {
-    TimeRecorder rc("train quantizer");
+    TimeRecorder rc("train pq quantizer");
     std::cout << "train quantizer parameters:" << std::endl;
     std::cout << " raw_data_bin_file: " << raw_data_bin_file
               << " output_path: " << output_path
@@ -399,6 +399,56 @@ void train_quantizer(const std::string& raw_data_bin_file,
 }
 
 template<typename DATAT, typename DISTT, typename HEAPT>
+void train_pq_residual_quantizer(
+        const std::string& raw_data_bin_file,
+        const std::string& output_path,
+        const int K1,
+        const int PQM,
+        const int PQnbits) {
+    
+    TimeRecorder rc("train pq quantizer with residual");
+    std::cout << "train quantizer parameters:" << std::endl;
+    std::cout << " raw_data_bin_file: " << raw_data_bin_file
+              << " output_path: " << output_path
+              << " PQM: " << PQM
+              << " PQnbits: " << PQnbits
+              << std::endl;
+
+    uint32_t nb, dim;
+    get_bin_metadata(raw_data_bin_file, nb, dim);
+
+    uint32_t pq_sample_num = (uint32_t)(nb * PQ_SAMPLE_RATE);
+    float* residuals = new float[pq_sample_num * dim];
+    reservoir_sampling_residual(sample_num, residuals, K1, output_path);
+    rc.RecordSection("reservoir_sampling_residual for pq training set done");
+
+
+
+    // ProductQuantizer<HEAPT, DATAT, uint8_t> pq_quantizer(dim, PQM, PQnbits);
+    // pq_quantizer.train(pq_sample_num, pq_sample_data);
+    // rc.RecordSection("pq quantizer train done");
+    // pq_quantizer.save_centroids(output_path + PQ_CENTROIDS + BIN);
+    // rc.RecordSection("pq quantizer save centroids done");
+    // float* precomputer_table = nullptr;
+    // for (auto i = 0; i < K1; i ++) {
+    //     std::string data_file = output_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
+    //     std::string pq_codebook_file = output_path + CLUSTER + std::to_string(i) + PQ + CODEBOOK + BIN;
+    //     uint32_t cluster_size, cluster_dim;
+    //     IOReader data_reader(data_file);
+    //     data_reader.read((char*)&cluster_size, sizeof(uint32_t));
+    //     data_reader.read((char*)&cluster_dim, sizeof(uint32_t));
+    //     DATAT* datai = new DATAT[cluster_size * cluster_dim];
+    //     data_reader.read((char*)datai, cluster_size * cluster_dim * sizeof(DATAT));
+    //     pq_quantizer.encode_vectors_and_save(precomputer_table, cluster_size, datai, pq_codebook_file);
+    //     delete[] datai;
+    // }
+
+    // delete[] precomputer_table;
+    // rc.ElapseFromBegin("train quantizer totally done.");
+    delete[] residual;
+}
+
+template<typename DATAT, typename DISTT, typename HEAPT>
 void build_bigann(const std::string& raw_data_bin_file,
                   const std::string& output_path,
                   const int hnswM, const int hnswefC,
@@ -432,7 +482,7 @@ void build_bigann(const std::string& raw_data_bin_file,
     build_graph(output_path, hnswM, hnswefC, metric_type);
     rc.RecordSection("build hnsw done.");
 
-    train_quantizer<DATAT, DISTT, HEAPT>(raw_data_bin_file, output_path, K1, PQM, PQnbits);
+    train_pq_quantizer<DATAT, DISTT, HEAPT>(raw_data_bin_file, output_path, K1, PQM, PQnbits);
     rc.RecordSection("train quantizer done.");
     delete[] centroids;
     rc.ElapseFromBegin("build bigann totally done.");
@@ -468,16 +518,7 @@ void load_meta(const std::string& index_path,
               << " K1: " << K1 
               << std::endl;
 
-    for (auto i = 0; i < K1; i ++) {
-        std::ifstream reader(index_path + CLUSTER + std::to_string(i) + META + BIN, std::ios::binary);
-        uint32_t nmeta, dmeta;
-        reader.read((char*)&nmeta, sizeof(uint32_t));
-        reader.read((char*)&dmeta, sizeof(uint32_t));
-        assert(1 == dmeta);
-        meta[i].resize(nmeta);
-        reader.read((char*)meta[i].data(), nmeta * dmeta * sizeof(uint32_t));
-        reader.close();
-    }
+    load_meta_impl(index_path, meta, K1);
     rc.ElapseFromBegin("load meta done.");
 }
 
