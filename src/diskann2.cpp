@@ -412,19 +412,19 @@ void page_align(const std::string& raw_data_bin_file, const std::string& output_
     // number of ids per page
     uint32_t nipp = page_size / id_size;
 
-    DATAT* data_page_buf = new DATA[page_size];
-    uint32_t* ids_page_buf = new uint32_t[page_size];
+    char* data_page_buf = new char[page_size];
+    char* ids_page_buf = new char[page_size];
 
-    for (auto i = 0; i < K1; i ++) {
+    for (uint32_t i = 0; i < K1; i ++) {
         std::string cluster_raw_data_file_name = output_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
         std::string cluster_ids_data_file_name = output_path + CLUSTER + std::to_string(i) + GLOBAL_IDS + BIN;
         std::string cluster_raw_data_file_name2 = output_path + CLUSTER + "-" + std::to_string(i) + RAWDATA + BIN;
         std::string cluster_ids_data_file_name2 = output_path + CLUSTER + "-" + std::to_string(i) + GLOBAL_IDS + BIN;
         uint32_t cluster_size, cluster_dim, ids_size, ids_dim;
 
-        IOReader data_reader(cluster_raw_data_file_name, (uint64_t)(10) * GIGABYTE);
+        IOReader data_reader(cluster_raw_data_file_name, (uint64_t)(2) * GIGABYTE);
         IOReader ids_reader(cluster_ids_data_file_name);
-        IOWriter data_writer(cluster_raw_data_file_name2, (uint64_t)(10) * GIGABYTE);
+        IOWriter data_writer(cluster_raw_data_file_name2, (uint64_t)(2) * GIGABYTE);
         IOWriter ids_writer(cluster_ids_data_file_name2);
 
         data_reader.read((char*)&cluster_size, sizeof(uint32_t));
@@ -436,6 +436,41 @@ void page_align(const std::string& raw_data_bin_file, const std::string& output_
         // number of pages 4 id, the first page is meta page
         uint32_t npi = (ids_size - 1) / nipp + 2;
 
+        memset(data_page_buf, 0, page_size);
+        memset(ids_page_buf, 0, page_size);
+        *(uint32_t*)(data_page_buf + 0 * sizeof(uint32_t)) = cluster_size;
+        *(uint32_t*)(data_page_buf + 1 * sizeof(uint32_t)) = cluster_dim;
+        *(uint32_t*)(data_page_buf + 2 * sizeof(uint32_t)) = page_size;
+        *(uint32_t*)(data_page_buf + 3 * sizeof(uint32_t)) = nvpp;
+        *(uint32_t*)(data_page_buf + 4 * sizeof(uint32_t)) = npv;
+        *(uint32_t*)(data_page_buf + 5 * sizeof(uint32_t)) = i;
+        data_writer.write(data_page_buf, page_size);
+        *(uint32_t*)(ids_page_buf + 0 * sizeof(uint32_t)) = ids_size;
+        *(uint32_t*)(ids_page_buf + 1 * sizeof(uint32_t)) = ids_dim;
+        *(uint32_t*)(ids_page_buf + 2 * sizeof(uint32_t)) = page_size;
+        *(uint32_t*)(ids_page_buf + 3 * sizeof(uint32_t)) = nipp;
+        *(uint32_t*)(ids_page_buf + 4 * sizeof(uint32_t)) = npi;
+        *(uint32_t*)(ids_page_buf + 5 * sizeof(uint32_t)) = i;
+        ids_writer.write(ids_page_buf, page_size);
+
+        uint32_t write_cnt = 0;
+        for (auto j = 0; j < npv; j ++) {
+            memset(data_page_buf, 0, sizeof(page_size));
+            for (auto k = 0; k < nvpp && write_cnt < cluster_size; k ++) {
+                data_reader.read(data_page_buf + k * vector_size, vector_size);
+                write_cnt ++;
+            }
+            data_writer.write(data_page_buf, page_size);
+        }
+        write_cnt = 0;
+        for (auto j = 0; j < npv; j ++) {
+            memset(ids_page_buf, 0, sizeof(page_size));
+            for (auto k = 0; k < nipp && write_cnt < ids_size; k ++) {
+                ids_reader.read(ids_page_buf + k * id_size, id_size);
+                write_cnt ++;
+            }
+            ids_writer.write(ids_page_buf, page_size);
+        }
     }
 
     delete[] data_page_buf;
@@ -748,6 +783,161 @@ void refine(const std::string& index_path,
     }
     rc.ElapseFromBegin("refine done.");
 }
+
+template<typename DATAT, typename DISTT, typename HEAPT>
+void aligned_refine(const std::string& index_path,
+            const int K1,
+            const uint32_t nq,
+            const uint32_t dq,
+            const int topk,
+            const int refine_topk,
+            uint64_t* pq_offsets,
+            const DATAT* pquery,
+            DISTT*& answer_dists,
+            uint32_t*& answer_ids,
+            Computer<DATAT, DATAT, DISTT>& dis_computer) {
+    TimeRecorder rc("aligned refine");
+    std::cout << "aligned refine parameters:" << std::endl;
+    std::cout << " index_path: " << index_path
+              << " cluster size: " << K1
+              << " number of query: " << nq
+              << " dim of query: " << dq
+              << " topk: " << topk
+              << " refine_topk:" << refine_topk
+              << " pq_offsets:" << pq_offsets
+              << " pquery:" << pquery
+              << " answer_dists:" << answer_dists
+              << " answer_ids:" << answer_ids
+              << std::endl;
+    std::vector<std::vector<std::pair<uint32_t, uint32_t>>> refine_records(K1);
+    for (auto i = 0; i < nq; i ++) {
+        auto pq_offseti = pq_offsets + i * refine_topk;
+        for (auto j = 0; j < refine_topk; j ++) {
+            if (pq_offseti[j] == (uint64_t)(-1))
+                continue;
+            uint32_t cid, off, qid;
+            parse_refine_id(pq_offseti[j], cid, off, qid);
+            refine_records[cid].emplace_back(off, qid);
+        }
+    }
+    rc.RecordSection("parse_refine_id done");
+
+    uint32_t page_size = PAGESIZE;
+    uint32_t nvpp = 0;
+    uint32_t nipp = 0;
+    uint32_t npv = 0;
+    uint32_t npi = 0;
+
+    char* dat_buf = new char[page_size];
+    char* ids_buf = new char[page_size];
+    memset(dat_buf, 0 page_size);
+    memset(ids_buf, 0 page_size);
+
+    std::vector<std::ifstream> raw_data_file_handlers(K1);
+    std::vector<std::ifstream> ids_data_file_handlers(K1);
+    for (auto i = 0; i < K1; i ++) {
+        std::string aligned_data_filei = index_path + CLUSTER + "-" + std::to_string(i) + RAWDATA + BIN;
+        std::string aligned_ids_filei  = index_path + CLUSTER + "-" + std::to_string(i) + GLOBAL_IDS + BIN;
+        raw_data_file_handlers[i] = std::ifstream(aligned_data_filei, std::ios::binary);
+        ids_data_file_handlers[i] = std::ifstream(aligned_ids_filei , std::ios::binary);
+        uint32_t clu_size, clu_dim, clu_id_size, clu_id_dim;
+        uint32_t ps, check;
+        raw_data_file_handlers[i].read(dat_buf, page_size);
+        ids_data_file_handlers[i].read(ids_buf, page_size);
+        memcpy(&clu_size, dat_buf + 0 * sizeof(uint32_t), sizeof(uint32_t));
+        memcpy(&clu_dim , dat_buf + 1 * sizeof(uint32_t), sizeof(uint32_t));
+        memcpy(&ps      , dat_buf + 2 * sizeof(uint32_t), sizeof(uint32_t));
+        assert(ps == page_size);
+        memcpy(&nvpp    , dat_buf + 3 * sizeof(uint32_t), sizeof(uint32_t));
+        memcpy(&npv     , dat_buf + 4 * sizeof(uint32_t), sizeof(uint32_t));
+        memcpy(&check   , dat_buf + 5 * sizeof(uint32_t), sizeof(uint32_t));
+        assert(check == i);
+        memcpy(&clu_id_size, ids_buf + 0 * sizeof(uint32_t), sizeof(uint32_t));
+        memcpy(&clu_id_dim , ids_buf + 1 * sizeof(uint32_t), sizeof(uint32_t));
+        memcpy(&ps         , ids_buf + 2 * sizeof(uint32_t), sizeof(uint32_t));
+        assert(ps == page_size);
+        memcpy(&nipp    , ids_buf + 3 * sizeof(uint32_t), sizeof(uint32_t));
+        memcpy(&npi     , ids_buf + 4 * sizeof(uint32_t), sizeof(uint32_t));
+        memcpy(&check   , ids_buf + 5 * sizeof(uint32_t), sizeof(uint32_t));
+        assert(check == i);
+        std::cout << "cluster-" << i << " has " << clu_size << " vectors,"
+                  << " has clu_dim = " << clu_dim
+                  << " clu_id_size = " << clu_id_size
+                  << " clu_id_dim = " << clu_id_dim 
+                  << std::endl;
+        std::cout << "main meta: " << std::endl;
+        std::cout << " number of vectors in per page: " << nvpp
+                  << " number of pages 4 vector: " << npv
+                  << " number of ids in per page: " << nipp
+                  << " number of pages 4 id: " << npi
+                  << std::endl;
+    }
+    rc.RecordSection("open rawdata and idsdata file handlers");
+
+    // init answer heap
+#pragma omp parallel for schedule (static, 128)
+    for (auto i = 0; i < nq; i ++) {
+        auto ans_disi = answer_dists + topk * i;
+        auto ans_idsi = answer_ids + topk * i;
+        heap_heapify<HEAPT>(topk, ans_disi, ans_idsi);
+    }
+    rc.RecordSection("heapify answers heaps");
+
+    uint32_t vector_size = dq * sizeof(DATAT);
+    std::vector<std::mutex> mtx(nq);
+#pragma omp parallel for
+    for (auto i = 0; i < K1; i ++) {
+        if (refine_records[i].size() == 0)
+            continue;
+        uint32_t pre_off = refine_records[i][0].first;
+        uint64_t pv, pi;
+        pv = pre_off / nvpp;
+        pi = pre_off / nipp;
+        char* dat_bufi = new char[page_size];
+        char* ids_bufi = new char[page_size];
+        uint32_t global_id;
+        raw_data_file_handlers[i].seekg((pv + 1) * page_size);
+        raw_data_file_handlers[i].read(dat_bufi, page_size);
+        ids_data_file_handlers[i].seekg((pi + 1) * page_size);
+        ids_data_file_handlers[i].read(ids_bufi, page_size);
+        // for debug
+        for (auto j = 0; j < refine_records[i].size(); j ++) {
+            auto refine_off = refine_records[i][j].first;
+            if (refine_off > pv * nvpp) {
+                pv = refine_off / nvpp;
+                raw_data_file_handlers[i].seekg((pv + 1) * page_size);
+                raw_data_file_handlers[i].read(dat_bufi, page_size);
+            }
+            if (refine_off > pi * nipp) {
+                pi = refine_off / nipp;
+                ids_data_file_handlers[i].seekg((pi + 1) * page_size);
+                ids_data_file_handlers[i].read(ids_bufi, page_size);
+            }
+            uint32_t qid = refine_records[i][j].second;
+            auto dis = dis_computer((DATAT*)(dat_bufi + (refine_off % nvpp) * vector_size), pquery + qid * dq, dq);
+            std::unique_lock<std::mutex> lk(mtx[qid]);
+            if (HEAPT::cmp(answer_dists[topk * qid], dis)) {
+                heap_swap_top<HEAPT>(topk, answer_dists + topk * qid, answer_ids + topk * qid, dis, *((uint32_t*)(ids_bufi + (refine_off % nipp) * sizeof(uint32_t))));
+            }
+        }
+
+        delete[] dat_bufi;
+        delete[] ids_bufi;
+    }
+    rc.RecordSection("calculate done.");
+
+    for (auto i = 0; i < K1; i ++) {
+        std::string data_filei = index_path + CLUSTER + "-" + std::to_string(i) + RAWDATA + BIN;
+        std::string ids_filei  = index_path + CLUSTER + "-" + std::to_string(i) + GLOBAL_IDS + BIN;
+        raw_data_file_handlers[i].close();
+        ids_data_file_handlers[i].close();
+    }
+
+    delete[] dat_buf;
+    delete[] ids_buf;
+    rc.ElapseFromBegin("refine done.");
+}
+
 
 
 template<typename DISTT, typename HEAPT>
