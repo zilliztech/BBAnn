@@ -70,7 +70,7 @@ void divide_raw_data(const std::string& raw_data_bin_file,
     int64_t block_size = 1000000;
     assert(nb > 0);
     int64_t block_num = (nb - 1) / block_size + 1;
-    std::vector<uint64_t> cluster_id(block_size);
+    std::vector<int64_t> cluster_id(block_size);
     std::vector<DISTT> dists(block_size);
     DATAT* block_buf = new DATAT[block_size * dim];
     for (int64_t i = 0; i < block_num; i ++) {
@@ -135,7 +135,7 @@ void conquer_clusters(const std::string& output_path,
     std::cout << "conquer clusters parameters:" << std::endl;
     std::cout << " output_path: " << output_path
               << std::endl;
-    std::vector<uint64_t> cluster_id;
+    std::vector<int64_t> cluster_id;
     std::vector<DISTT> dists;
     uint32_t placeholder = 1;
     std::string bucket_centroids_file = output_path + BUCKET + CENTROIDS + BIN;

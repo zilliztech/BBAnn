@@ -5,13 +5,13 @@
 #include "util/distance.h"
 
 template<typename T>
-void stat_length(T *x, int n, int dim, double &max_len, double &min_len, double &avg_len) {
+void stat_length(T *x, int64_t n, int64_t dim, double &max_len, double &min_len, double &avg_len) {
     double sum_len = 0;
     max_len = 0;
     min_len = std::numeric_limits<double>::max();
 
 #pragma omp parallel for reduction(max:max_len) reduction(min:min_len) reduction(+:sum_len) 
-    for (size_t i = 0; i < n; i++) {
+    for (int64_t i = 0; i < n; i++) {
         T* p = x + i * dim;
         double len = sqrt(IP<T, T, double>(p, p, dim));
         if (len > max_len) max_len = len;
