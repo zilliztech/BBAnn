@@ -1,5 +1,10 @@
 #include "diskann.h"
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+
 template<typename DATAT>
 void train_cluster(const std::string& raw_data_bin_file,
                    const std::string& output_path,
@@ -20,7 +25,7 @@ void train_cluster(const std::string& raw_data_bin_file,
     std::cout << "nb = " << nb << ", dim = " << dim << ", sample_num 4 K1: " << sample_num << std::endl;
 
     *centroids = new float[K1 * dim];
-    sample_data = new DATAT[sample_num * dim];
+    sample_data = new DATAT[(uint64_t)sample_num * dim];
     reservoir_sampling(raw_data_bin_file, sample_num, sample_data);
     rc.RecordSection("reservoir sample with sample rate: " + std::to_string(K1_SAMPLE_RATE) + " done");
     kmeans<DATAT>(sample_num, sample_data, (int32_t)dim, K1, *centroids, true);
@@ -36,7 +41,7 @@ void divide_raw_data(const std::string& raw_data_bin_file,
                      const std::string& output_path,
                      const float* centroids,
                      const uint32_t K1) {
-    TimeRecorder rc("split_raw_data");
+    TimeRecorder rc("divide raw data");
     std::cout << "divide_raw_data parameters:" << std::endl;
     std::cout << " raw_data_bin_file: " << raw_data_bin_file
               << " output_path: " << output_path
@@ -74,7 +79,7 @@ void divide_raw_data(const std::string& raw_data_bin_file,
         auto sp = i * block_size;
         auto ep = std::min(nb, sp + block_size);
         std::cout << "split the " << i << "th block, start position = " << sp << ", end position = " << ep << std::endl;
-        reader.read((char*)block_buf, (ep - sp) * dim * sizeof(DATAT));
+        reader.read((char*)block_buf, (uint64_t)(ep - sp) * dim * sizeof(DATAT));
         rci.RecordSection("read block data done");
         elkan_L2_assign<const DATAT, const float, DISTT>(block_buf, centroids, dim, ep -sp, K1, cluster_id.data(), dists.data());
         //knn_1<HEAPT, DATAT, float> (
@@ -159,10 +164,10 @@ void conquer_clusters(const std::string& output_path,
         ids_reader.read((char*)&ids_dim, sizeof(uint32_t));
         assert(cluster_size == ids_size);
         assert(ids_dim == 1);
-        DATAT* datai = new DATAT[cluster_size * cluster_dim];
-        data_reader.read((char*)datai, cluster_size * cluster_dim * sizeof(DATAT));
-        uint32_t* idsi = new uint32_t[ids_size * ids_dim];
-        ids_reader.read((char*)idsi, ids_size * ids_dim * sizeof(uint32_t));
+        DATAT* datai = new DATAT[(uint64_t)cluster_size * cluster_dim];
+        data_reader.read((char*)datai, (uint64_t)cluster_size * cluster_dim * sizeof(DATAT));
+        uint32_t* idsi = new uint32_t[(uint64_t)ids_size * ids_dim];
+        ids_reader.read((char*)idsi, (uint64_t)ids_size * ids_dim * sizeof(uint32_t));
 
         auto K2 = (cluster_size - 1) / threshold + 1;
         std::cout << "cluster-" << i << " will split into " << K2 << " buckets." << std::endl;
@@ -234,7 +239,7 @@ void conquer_clusters(const std::string& output_path,
             ids_writer.write((char*)&ids_size, sizeof(uint32_t));
             ids_writer.write((char*)&ids_dim, sizeof(uint32_t));
             for (auto j = 0; j < cluster_size; j ++) {
-                auto ori_pos = cluster_off[j].second;
+                uint64_t ori_pos = cluster_off[j].second;
                 data_writer.write((char*)(datai + ori_pos * cluster_dim), sizeof(DATAT) * cluster_dim);
                 ids_writer.write((char*)(idsi + ori_pos * ids_dim), sizeof(uint32_t) * ids_dim);
                 // for debug
@@ -372,7 +377,7 @@ void train_quantizer(const std::string& raw_data_bin_file,
     uint32_t nb, dim;
     get_bin_metadata(raw_data_bin_file, nb, dim);
     uint32_t pq_sample_num = (uint32_t)(nb * PQ_SAMPLE_RATE);
-    DATAT* pq_sample_data = new DATAT[pq_sample_num * dim];
+    DATAT* pq_sample_data = new DATAT[(uint64_t)pq_sample_num * dim];
     reservoir_sampling(raw_data_bin_file, pq_sample_num, pq_sample_data);
     rc.RecordSection("reservoir_sampling 4 pq train set done");
     ProductQuantizer<HEAPT, DATAT, uint8_t> pq_quantizer(dim, PQM, PQnbits);
@@ -388,10 +393,11 @@ void train_quantizer(const std::string& raw_data_bin_file,
         IOReader data_reader(data_file);
         data_reader.read((char*)&cluster_size, sizeof(uint32_t));
         data_reader.read((char*)&cluster_dim, sizeof(uint32_t));
-        DATAT* datai = new DATAT[cluster_size * cluster_dim];
-        data_reader.read((char*)datai, cluster_size * cluster_dim * sizeof(DATAT));
+        DATAT* datai = new DATAT[(uint64_t)cluster_size * cluster_dim];
+        data_reader.read((char*)datai, (uint64_t)cluster_size * cluster_dim * sizeof(DATAT));
         pq_quantizer.encode_vectors_and_save(precomputer_table, cluster_size, datai, pq_codebook_file);
         delete[] datai;
+        rc.RecordSection("the " + std::to_string(i) + "th cluster encode and save codebook done.");
     }
 
     delete[] precomputer_table;
@@ -533,8 +539,8 @@ void load_pq_codebook(const std::string& index_path,
         uint32_t sizei, dimi;
         reader.read((char*)&sizei, sizeof(uint32_t));
         reader.read((char*)&dimi, sizeof(uint32_t));
-        pq_codebook[i].resize(sizei * dimi);
-        reader.read((char*)pq_codebook[i].data(), sizei * dimi * sizeof(uint8_t));
+        pq_codebook[i].resize((uint64_t)sizei * dimi);
+        reader.read((char*)pq_codebook[i].data(), (uint64_t)sizei * dimi * sizeof(uint8_t));
         reader.close();
     }
     rc.ElapseFromBegin("load pq codebook done.");
@@ -556,7 +562,7 @@ void load_meta(const std::string& index_path,
         reader.read((char*)&dmeta, sizeof(uint32_t));
         assert(1 == dmeta);
         meta[i].resize(nmeta);
-        reader.read((char*)meta[i].data(), nmeta * dmeta * sizeof(uint32_t));
+        reader.read((char*)meta[i].data(), (uint64_t)nmeta * dmeta * sizeof(uint32_t));
         reader.close();
     }
     rc.ElapseFromBegin("load meta done.");
@@ -584,13 +590,18 @@ void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
     index_hnsw->setEf(refine_nprobe);
 #pragma omp parallel for
     for (auto i = 0; i < nq; i ++) {
-        auto queryi = pquery + i * dq;
+        // auto queryi = pquery + i * dq;
+        // todo: hnsw need to support query data is not float
+        float* queryi = new float[dq];
+        for (auto j = 0; j < dq;j ++) 
+            queryi[j] = (float)(*(pquery + i * dq + j));
         auto reti = index_hnsw->searchKnn(queryi, nprobe);
         auto p_labeli = buckets_label + i * nprobe;
         while (!reti.empty()) {
             *p_labeli++ = reti.top().second;
             reti.pop();
         }
+        delete[] queryi;
     }
     rc.ElapseFromBegin("search graph done.");
 }
@@ -609,7 +620,7 @@ void search_quantizer(ProductQuantizer<HEAPTT, DATAT, uint8_t>& pq_quantizer,
                       DISTT*& pq_distance,
                       uint64_t*& pq_offsets,
                       PQ_Computer<DATAT>& pq_cmp) {
-    TimeRecorder rc("search graph");
+    TimeRecorder rc("search quantizer");
     std::cout << "search quantizer parameters:" << std::endl;
     std::cout << " pq_quantizer:" << &pq_quantizer
               << " nq: " << nq
@@ -726,7 +737,7 @@ void refine(const std::string& index_path,
         std::cout << "cluster-" << i << " has " << clu_size << " vectors,"
                   << " has clu_dim = " << clu_dim
                   << " clu_id_size = " << clu_id_size
-                  << " clu_id_dim = " << clu_id_dim 
+                  << " clu_id_dim = " << clu_id_dim
                   << std::endl;
     }
     rc.RecordSection("open rawdata and idsdata file handlers");
@@ -740,12 +751,17 @@ void refine(const std::string& index_path,
     }
     rc.RecordSection("heapify answers heaps");
 
+    // statistics
+    std::vector<int> load_vectors(K1, 0);
     std::vector<std::mutex> mtx(nq);
 #pragma omp parallel for
     for (auto i = 0; i < K1; i ++) {
         if (refine_records[i].size() == 0)
             continue;
-        uint32_t pre_off = refine_records[i][0].first;
+        std::sort(refine_records[i].begin(), refine_records[i].end(), [](const auto &l, const auto &r) {
+            return l.first < r.first;
+        });
+        uint64_t pre_off = refine_records[i][0].first;
         uint32_t meta_bytes = 8; // pass meta
         DATAT* data_bufi = new DATAT[dq];
         uint32_t global_id;
@@ -753,6 +769,7 @@ void refine(const std::string& index_path,
         raw_data_file_handlers[i].read((char*)data_bufi, dq * sizeof(DATAT));
         ids_data_file_handlers[i].seekg(meta_bytes + pre_off * sizeof(uint32_t));
         ids_data_file_handlers[i].read((char*)&global_id, sizeof(uint32_t));
+        load_vectors[i] ++;
         // for debug
         for (auto j = 0; j < refine_records[i].size(); j ++) {
             if (refine_records[i][j].first != pre_off) {
@@ -762,6 +779,7 @@ void refine(const std::string& index_path,
                 ids_data_file_handlers[i].seekg(meta_bytes + pre_off * sizeof(uint32_t));
                 ids_data_file_handlers[i].read((char*)&global_id, sizeof(uint32_t));
                 assert(global_id >= 0);
+                load_vectors[i] ++;
             }
             uint32_t qid = refine_records[i][j].second;
             auto dis = dis_computer(data_bufi, pquery + qid * dq, dq);
@@ -774,6 +792,13 @@ void refine(const std::string& index_path,
         delete[] data_bufi;
     }
     rc.RecordSection("calculate done.");
+    int tot = 0;
+    std::cout << "show load refine vectors of each cluster:" << std::endl;
+    for (auto i = 0; i < K1; i ++) {
+        std::cout << "cluster-" << i << ": " << load_vectors[i] << "/" << refine_topk << std::endl;
+        tot += load_vectors[i];
+    }
+    std::cout << "total load refine vectors: " << tot << "/" << refine_topk * nq << std::endl;
 
     for (auto i = 0; i < K1; i ++) {
         std::string data_filei = index_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
@@ -830,8 +855,8 @@ void aligned_refine(const std::string& index_path,
 
     char* dat_buf = new char[page_size];
     char* ids_buf = new char[page_size];
-    memset(dat_buf, 0 page_size);
-    memset(ids_buf, 0 page_size);
+    memset(dat_buf, 0, page_size);
+    memset(ids_buf, 0, page_size);
 
     std::vector<std::ifstream> raw_data_file_handlers(K1);
     std::vector<std::ifstream> ids_data_file_handlers(K1);
@@ -884,11 +909,15 @@ void aligned_refine(const std::string& index_path,
     rc.RecordSection("heapify answers heaps");
 
     uint32_t vector_size = dq * sizeof(DATAT);
+
     std::vector<std::mutex> mtx(nq);
 #pragma omp parallel for
     for (auto i = 0; i < K1; i ++) {
         if (refine_records[i].size() == 0)
             continue;
+        std::sort(refine_records[i].begin(), refine_records[i].end(), [](const auto &l, const auto &r) {
+                return l.first < r.first;
+                });
         uint32_t pre_off = refine_records[i][0].first;
         uint64_t pv, pi;
         pv = pre_off / nvpp;
@@ -935,10 +964,165 @@ void aligned_refine(const std::string& index_path,
 
     delete[] dat_buf;
     delete[] ids_buf;
-    rc.ElapseFromBegin("refine done.");
+    rc.ElapseFromBegin("aligned refine done.");
 }
 
+template<typename DATAT, typename DISTT, typename HEAPT>
+void refine_c(const std::string& index_path,
+            const int K1,
+            const uint32_t nq,
+            const uint32_t dq,
+            const int topk,
+            const int refine_topk,
+            uint64_t* pq_offsets,
+            const DATAT* pquery,
+            DISTT*& answer_dists,
+            uint32_t*& answer_ids,
+            Computer<DATAT, DATAT, DISTT>& dis_computer) {
+    TimeRecorder rc("refine_c with C-style interface: open(), pread(), close(). Here with O_RDONLY | O_DIRECT");
+    std::cout << "refine parameters:" << std::endl;
+    std::cout << " index_path: " << index_path
+              << " cluster size: " << K1
+              << " number of query: " << nq
+              << " dim of query: " << dq
+              << " topk: " << topk
+              << " refine_topk:" << refine_topk
+              << " pq_offsets:" << pq_offsets
+              << " pquery:" << pquery
+              << " answer_dists:" << answer_dists
+              << " answer_ids:" << answer_ids
+              << std::endl;
+    std::vector<std::vector<std::pair<uint32_t, uint32_t>>> refine_records(K1);
+    for (auto i = 0; i < nq; i ++) {
+        auto pq_offseti = pq_offsets + i * refine_topk;
+        for (auto j = 0; j < refine_topk; j ++) {
+            if (pq_offseti[j] == (uint64_t)(-1))
+                continue;
+            uint32_t cid, off, qid;
+            parse_refine_id(pq_offseti[j], cid, off, qid);
+            refine_records[cid].emplace_back(off, qid);
+        }
+    }
+    rc.RecordSection("parse_refine_id done");
 
+    std::vector<int> raw_data_file_fds;
+    raw_data_file_fds.reserve(K1);
+    std::vector<int> ids_data_file_fds;
+    ids_data_file_fds.reserve(K1);
+    constexpr size_t O_DIRECT_ALIGNMENT = 512;
+    for (auto i = 0; i < K1; i ++) {
+        std::string data_filei = index_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
+        std::string ids_filei  = index_path + CLUSTER + std::to_string(i) + GLOBAL_IDS + BIN;
+        raw_data_file_fds.emplace_back(open(data_filei.c_str(), O_RDONLY | O_DIRECT));
+        assert(raw_data_file_fds.back() != -1);
+        ids_data_file_fds.emplace_back(open(ids_filei.c_str(), O_RDONLY | O_DIRECT));
+        assert(ids_data_file_fds.back() != -1);
+
+        void *clu_size;
+        int posix_memalign_size = posix_memalign(&clu_size, O_DIRECT_ALIGNMENT, sizeof(uint32_t));
+        assert(posix_memalign_size == sizeof(uint32_t));
+        void *clu_dim;
+        posix_memalign_size = posix_memalign(&clu_dim, O_DIRECT_ALIGNMENT, sizeof(uint32_t));
+        assert(posix_memalign_size == sizeof(uint32_t));
+        void *clu_id_size;
+        posix_memalign_size = posix_memalign(&clu_id_size, O_DIRECT_ALIGNMENT, sizeof(uint32_t));
+        assert(posix_memalign_size == sizeof(uint32_t));
+        void *clu_id_dim;
+        posix_memalign_size = posix_memalign(&clu_id_dim, O_DIRECT_ALIGNMENT, sizeof(uint32_t));
+        assert(posix_memalign_size == sizeof(uint32_t));
+
+        int pread_size = pread(raw_data_file_fds.back(), clu_size, sizeof(uint32_t), 0);
+        assert(pread_size == sizeof(uint32_t));
+        pread_size = pread(raw_data_file_fds.back(), clu_dim, sizeof(uint32_t), 0 + sizeof(uint32_t));
+        assert(pread_size == sizeof(uint32_t));
+        pread_size = pread(ids_data_file_fds.back(), clu_id_size, sizeof(uint32_t), 0);
+        assert(pread_size == sizeof(uint32_t));
+        pread_size = pread(ids_data_file_fds.back(), clu_id_dim, sizeof(uint32_t), 0 + sizeof(uint32_t));
+        assert(pread_size == sizeof(uint32_t));
+
+        std::cout << "cluster-" << i << " has " << *static_cast<uint32_t *>(clu_size) << " vectors,"
+                  << " has clu_dim = " << *static_cast<uint32_t *>(clu_dim)
+                  << " clu_id_size = " << *static_cast<uint32_t *>(clu_id_size)
+                  << " clu_id_dim = " << *static_cast<uint32_t *>(clu_id_dim)
+                  << std::endl;
+        free(clu_size);
+        free(clu_dim);
+        free(clu_id_size);
+        free(clu_id_dim);
+    }
+    rc.RecordSection("open rawdata and idsdata file FDs with open()");
+
+    // init answer heap
+#pragma omp parallel for schedule (static, 128)
+    for (auto i = 0; i < nq; i ++) {
+        auto ans_disi = answer_dists + topk * i;
+        auto ans_idsi = answer_ids + topk * i;
+        heap_heapify<HEAPT>(topk, ans_disi, ans_idsi);
+    }
+    rc.RecordSection("heapify answers heaps");
+
+    // statistics
+    std::vector<int> load_vectors(K1, 0);
+    std::vector<std::mutex> mtx(nq);
+#pragma omp parallel for
+    for (auto i = 0; i < K1; i ++) {
+        if (refine_records[i].size() == 0)
+            continue;
+        std::sort(refine_records[i].begin(), refine_records[i].end(), [](const auto &l, const auto &r) {
+                return l.first < r.first;
+                });
+        uint64_t pre_off = refine_records[i][0].first;
+        uint32_t meta_bytes = 8; // pass meta
+        void *data_bufi;
+        int posix_memalign_size = posix_memalign(&data_bufi, O_DIRECT_ALIGNMENT, dq * sizeof(DATAT));
+        assert(posix_memalign_size == dq * sizeof(DATAT));
+        void *global_id;
+        posix_memalign_size = posix_memalign(&global_id, O_DIRECT_ALIGNMENT, sizeof(uint32_t));
+        assert(posix_memalign_size == sizeof(uint32_t));
+
+        int pread_size = pread(raw_data_file_fds[i], data_bufi, dq * sizeof(DATAT), meta_bytes + pre_off * dq * sizeof(DATAT));
+        assert(pread_size == dq * sizeof(DATAT));
+        pread_size = pread(ids_data_file_fds[i], global_id, sizeof(uint32_t), meta_bytes + pre_off * sizeof(uint32_t));
+        assert(pread_size == sizeof(uint32_t));
+        load_vectors[i] ++;
+        // for debug
+        for (auto j = 0; j < refine_records[i].size(); j ++) {
+            if (refine_records[i][j].first != pre_off) {
+                pre_off = refine_records[i][j].first;
+                pread_size = pread(raw_data_file_fds[i], data_bufi, dq * sizeof(DATAT), meta_bytes + pre_off * dq * sizeof(DATAT));
+                assert(pread_size == dq * sizeof(DATAT));
+                pread_size = pread(ids_data_file_fds[i], global_id, sizeof(uint32_t), meta_bytes + pre_off * sizeof(uint32_t));
+                assert(pread_size == sizeof(uint32_t));
+                assert(*static_cast<uint32_t *>(global_id) >= 0);
+                load_vectors[i] ++;
+            }
+            uint32_t qid = refine_records[i][j].second;
+            auto dis = dis_computer(static_cast<DATAT*>(data_bufi), pquery + qid * dq, dq);
+            std::unique_lock<std::mutex> lk(mtx[qid]);
+            if (HEAPT::cmp(answer_dists[topk * qid], dis)) {
+                heap_swap_top<HEAPT>(topk, answer_dists + topk * qid, answer_ids + topk * qid, dis, *static_cast<uint32_t *>(global_id));
+            }
+        }
+        free(data_bufi);
+        free(global_id);
+    }
+    rc.RecordSection("calculate done.");
+    int tot = 0;
+    std::cout << "show load refine vectors of each cluster:" << std::endl;
+    for (auto i = 0; i < K1; i ++) {
+        std::cout << "cluster-" << i << ": " << load_vectors[i] << "/" << refine_topk << std::endl;
+        tot += load_vectors[i];
+    }
+    std::cout << "total load refine vectors: " << tot << "/" << refine_topk * nq << std::endl;
+
+    for (auto i = 0; i < K1; i ++) {
+        std::string data_filei = index_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
+        std::string ids_filei  = index_path + CLUSTER + std::to_string(i) + GLOBAL_IDS + BIN;
+        close(raw_data_file_fds[i]);
+        close(ids_data_file_fds[i]);
+    }
+    rc.ElapseFromBegin("refine_c with C-style interface done.");
+}
 
 template<typename DISTT, typename HEAPT>
 void save_sift_answer(const std::string& answer_bin_file,
@@ -1029,7 +1213,7 @@ void search_bigann(const std::string& index_path,
               << " query_bin_file: " << query_bin_file
               << " answer_bin_file: " << answer_bin_file
               << " nprobe: " << nprobe
-              << " refine_nprobe: " << nprobe
+              << " refine_nprobe: " << refine_nprobe
               << " topk: " << topk
               << " refine topk: " << refine_topk
               << " K1: " << K1
@@ -1106,7 +1290,8 @@ void search_bigann(const std::string& index_path,
     */
 
 
-    refine<DATAT, DISTT, HEAPT>(index_path, K1, nq, dq, topk, refine_topk, pq_offsets, pquery, answer_dists, answer_ids, dis_computer);
+    refine<DATAT, DISTT, HEAPT>(index_path, K1, nq, dq, topk, refine_topk, pq_offsets, pquery, answer_dists, answer_ids, dis_computer);  // refine with C++ std::ifstream
+//    refine_c<DATAT, DISTT, HEAPT>(index_path, K1, nq, dq, topk, refine_topk, pq_offsets, pquery, answer_dists, answer_ids, dis_computer);  // refine_c with C open(), pread(), close()
     rc.RecordSection("refine done");
     // write answers
     save_answers<DISTT, HEAPT>(answer_bin_file, topk, nq, answer_dists, answer_ids);
@@ -1265,20 +1450,6 @@ void save_answers<int32_t, CMin<int32_t, uint32_t>>(const std::string& answer_bi
                   int32_t*& answer_dists,
                   uint32_t*& answer_ids,
                   bool use_comp_format = true);
-
-template
-void save_answers<int32_t, CMax<int32_t, uint32_t>>(const std::string& answer_bin_file,
-                  const int topk,
-                  const uint32_t nq,
-                  int32_t*& answer_dists,
-                  uint32_t*& answer_ids);
-
-template
-void save_answers<int32_t, CMin<int32_t, uint32_t>>(const std::string& answer_bin_file,
-                  const int topk,
-                  const uint32_t nq,
-                  int32_t*& answer_dists,
-                  uint32_t*& answer_ids);
 
 template
 void search_graph<float>(std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,

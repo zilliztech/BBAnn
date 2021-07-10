@@ -141,6 +141,19 @@ void refine(const std::string& index_path,
             uint32_t*& answer_ids,
             Computer<DATAT, DATAT, DISTT>& dis_computer);
 
+template<typename DATAT, typename DISTT, typename HEAPT>
+void refine_c(const std::string& index_path,
+            const int K1,
+            const uint32_t nq,
+            const uint32_t dq,
+            const int topk,
+            const int refine_topk,
+            uint64_t* pq_offsets,
+            const DATAT* pquery,
+            DISTT*& answer_dists,
+            uint32_t*& answer_ids,
+            Computer<DATAT, DATAT, DISTT>& dis_computer);
+
 template<typename DISTT, typename HEAPT>
 void save_answers(const std::string& answer_bin_file,
                   const int topk,

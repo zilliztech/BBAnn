@@ -1,5 +1,7 @@
 build/**/*
 data/**/*
+.idea/
+cmake-build-*/
 
 # Created by https://www.toptal.com/developers/gitignore/api/cmake,vim,visualstudiocode,c++,linux,macos
 # Edit at https://www.toptal.com/developers/gitignore?templates=cmake,vim,visualstudiocode,c++,linux,macos
