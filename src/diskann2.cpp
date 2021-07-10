@@ -330,32 +330,6 @@ void build_graph(const std::string& index_path,
     rc.ElapseFromBegin("create index hnsw totally done");
 }
 
-
-/*
- * residual pq
-{
-    read bucket_centroids_file into bucket_centroids;
-    int bucket_cnt = 0;
-    prepare sample array;
-    for (i = 0; i < K1; i ++) {
-        read metai; => meta_size(bucket num in cluster i), meta_dim(1);
-        read raw_datai; => cluster_size, cluster_dim;
-        for (j = 0; j < meta_size; j ++) {
-            for (k = 0; k < meta[j]; j ++) {
-                read one vector;
-                diff with bucket_centroids[bucket_cnt];
-            }
-            bucket_cnt ++;
-        }
-    }
-
-    pq.train();
-
-    for (i = 0; i < K1; i ++) {
-    }
-}
-*/
-
 template<typename DATAT, typename DISTT, typename HEAPT>
 void train_pq_quantizer(const std::string& raw_data_bin_file,
                      const std::string& output_path,
@@ -419,14 +393,32 @@ void train_pq_residual_quantizer(
 
     uint32_t pq_sample_num = (uint32_t)(nb * PQ_SAMPLE_RATE);
     float* residuals = new float[pq_sample_num * dim];
-    reservoir_sampling_residual(sample_num, residuals, K1, output_path);
+    float* ivf_centroids = new float[pq_sample_num * dim];
+    reservoir_sampling_residual(sample_num, residuals, ivf_centroids, K1, output_path);
     rc.RecordSection("reservoir_sampling_residual for pq training set done");
 
+    PQResidualQuantizer<HEAPT, DATAT, uint8_t> quantizer(dim, PQM, PQnbits);
+    quantizer.train(pq_sample_num, residuals);
+    rc.RecordSection("pq residual quantizer train done");
 
+    quantizer.save_centroids(output_path + PQ_CENTROIDS + BIN);
+    rc.RecordSection("pq residual quantizer save centroids done");
 
-    // ProductQuantizer<HEAPT, DATAT, uint8_t> pq_quantizer(dim, PQM, PQnbits);
-    // pq_quantizer.train(pq_sample_num, pq_sample_data);
-    // rc.RecordSection("pq quantizer train done");
+    float* precompute_table = nullptr;
+    for (int i = 0; i < K1; ++i) {
+        std::string data_file = output_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
+        std::string pq_codebook_file = output_path + CLUSTER + std::to_string(i) + PQ + CODEBOOK + BIN;
+        uint32_t cluster_size, cluster_dim;
+        IOReader data_reader(data_file);
+        data_reader.read((char*)&cluster_size, sizeof(uint32_t));
+        data_reader.read((char*)&cluster_dim, sizeof(uint32_t));
+
+        DATAT* datai = new DATAT[cluster_size * cluster_dim];
+        data_reader.read((char*)datai, cluster_size * cluster_dim * sizeof(DATAT));
+        quantizer.encode_vectors_and_save(precomputer_table, cluster_size, datai, ivf_centroids, pq_codebook_file);
+        delete[] datai;
+    }
+
     // pq_quantizer.save_centroids(output_path + PQ_CENTROIDS + BIN);
     // rc.RecordSection("pq quantizer save centroids done");
     // float* precomputer_table = nullptr;
@@ -443,9 +435,11 @@ void train_pq_residual_quantizer(
     //     delete[] datai;
     // }
 
-    // delete[] precomputer_table;
-    // rc.ElapseFromBegin("train quantizer totally done.");
+    delete[] precomputer_table;
     delete[] residual;
+    delete[] ivf_centroids;
+
+    rc.ElapseFromBegin("train pq residual quantizer totally done.");
 }
 
 template<typename DATAT, typename DISTT, typename HEAPT>

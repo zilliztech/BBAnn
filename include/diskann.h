@@ -5,13 +5,15 @@
 #include <vector>
 #include <mutex>
 #include <algorithm>
+#include <string>
+
 #include "util/defines.h"
 #include "util/constants.h"
 #include "util/utils.h"
 #include "util/heap.h"
 #include "hnswlib/hnswlib.h"
 #include "pq/pq.h"
-#include <string>
+#include "pq/pq_residual.h"
 #include "flat/flat.h"
 #include "ivf/clustering.h"
 #include "util/TimeRecorder.h"

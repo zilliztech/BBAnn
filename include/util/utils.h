@@ -91,9 +91,11 @@ template<typename T>
 void reservoir_sampling_residual(
         const uint32_t sample_num,
         float* residuals,
+        float* ivf_centroids,
         const int K1,
         const std::string& output_path) {
     assert(residuals != nullptr);
+    assert(ivf_centroids != nullptr);
 
     std::random_device rd;
     std::mt19937 generator((unsigned)(rd()));
@@ -146,9 +148,13 @@ void reservoir_sampling_residual(
     float *centroids = nullptr;
     uint32_t n, dim;
     read_bin_file<float>(index_path + BUCKET + CENTROIDS + BIN, centroids, n, dim);
+
+
     for (int i = 0; i < sample_num; ++i) {
-        compute_residual<float, T, float>(centroids, sample_data, residual, dim);
-        centroids += d, sample_data += d, residual += d;
+        const float *c = centroids + centroid_offsets[i] * dim;
+        compute_residual<float, T, float>(c, sample_data, residuals, dim);
+        memcpy(ivf_centroids + i * dim, c, dim * sizeof(float));
+        sample_data += dim, residuals += dim;
     }
 
     delete[] sample_data;
