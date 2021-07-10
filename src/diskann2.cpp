@@ -514,7 +514,7 @@ void build_bigann(const std::string& raw_data_bin_file,
     conquer_clusters<DATAT, DISTT, HEAPT>(output_path, K1, threshold);
     rc.RecordSection("conquer each cluster into buckets done");
 
-    // page_align<DATAT>(raw_data_bin_file, output_path, K1);
+    page_align<DATAT>(raw_data_bin_file, output_path, K1);
 
     build_graph(output_path, hnswM, hnswefC, metric_type);
     rc.RecordSection("build hnsw done.");
@@ -1290,11 +1290,11 @@ void search_bigann(const std::string& index_path,
     */
 
 
-    refine<DATAT, DISTT, HEAPT>(index_path, K1, nq, dq, topk, refine_topk, pq_offsets, pquery, answer_dists, answer_ids, dis_computer);  // refine with C++ std::ifstream
+    aligned_refine<DATAT, DISTT, HEAPT>(index_path, K1, nq, dq, topk, refine_topk, pq_offsets, pquery, answer_dists, answer_ids, dis_computer);  // refine with C++ std::ifstream
 //    refine_c<DATAT, DISTT, HEAPT>(index_path, K1, nq, dq, topk, refine_topk, pq_offsets, pquery, answer_dists, answer_ids, dis_computer);  // refine_c with C open(), pread(), close()
     rc.RecordSection("refine done");
     // write answers
-    save_answers<DISTT, HEAPT>(answer_bin_file, topk, nq, answer_dists, answer_ids);
+    save_answers<DISTT, HEAPT>(answer_bin_file, topk, nq, answer_dists, answer_ids, false);
     rc.RecordSection("write answers done");
 
     delete[] pquery;
