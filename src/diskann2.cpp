@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <cstdio>
 
 template<typename DATAT>
 void train_cluster(const std::string& raw_data_bin_file,
@@ -406,6 +407,7 @@ void train_quantizer(const std::string& raw_data_bin_file,
 // page alignment 4 raw data and uid in each cluster 4 better refine performance
 template<typename DATAT>
 void page_align(const std::string& raw_data_bin_file, const std::string& output_path, const int K1) {
+    TimeRecorder rc("page align");
     uint32_t nb, dim;
     get_bin_metadata(raw_data_bin_file, nb, dim);
     uint32_t page_size = PAGESIZE;
@@ -416,6 +418,8 @@ void page_align(const std::string& raw_data_bin_file, const std::string& output_
     assert(nvpp > 0);
     // number of ids per page
     uint32_t nipp = page_size / id_size;
+    std::cout << "page size = " << page_size << ", number of vectors in per page: " << nvpp
+              << ", number of ids in per page:" << nipp << std::endl;
 
     char* data_page_buf = new char[page_size];
     char* ids_page_buf = new char[page_size];
@@ -440,6 +444,7 @@ void page_align(const std::string& raw_data_bin_file, const std::string& output_
         uint32_t npv = (cluster_size - 1) / nvpp + 2;
         // number of pages 4 id, the first page is meta page
         uint32_t npi = (ids_size - 1) / nipp + 2;
+        std::cout << "there are " << npv << " pages 4 vectors and " << npi << " pages 4 ids in cluster " << std::to_string(i) << std::endl;
 
         memset(data_page_buf, 0, page_size);
         memset(ids_page_buf, 0, page_size);
@@ -459,27 +464,41 @@ void page_align(const std::string& raw_data_bin_file, const std::string& output_
         ids_writer.write(ids_page_buf, page_size);
 
         uint32_t write_cnt = 0;
-        for (int j = 0; j < npv; j ++) {
+        for (auto j = 1; j < npv; j ++) {
             memset(data_page_buf, 0, sizeof(page_size));
-            for (int k = 0; k < nvpp && write_cnt < cluster_size; k ++) {
+            for (auto k = 0; k < nvpp && write_cnt < cluster_size; k ++) {
                 data_reader.read(data_page_buf + k * vector_size, vector_size);
                 write_cnt ++;
             }
             data_writer.write(data_page_buf, page_size);
         }
         write_cnt = 0;
-        for (int j = 0; j < npv; j ++) {
+        for (auto j = 1; j < npi; j ++) {
             memset(ids_page_buf, 0, sizeof(page_size));
-            for (int k = 0; k < nipp && write_cnt < ids_size; k ++) {
+            for (auto k = 0; k < nipp && write_cnt < ids_size; k ++) {
                 ids_reader.read(ids_page_buf + k * id_size, id_size);
                 write_cnt ++;
             }
             ids_writer.write(ids_page_buf, page_size);
         }
+        auto rm_dat_ret = std::remove(cluster_raw_data_file_name.c_str());
+        if (rm_dat_ret == 0) {
+            std::cout << "remove old raw data file: " << cluster_raw_data_file_name << " success." << std::endl;
+        } else {
+            std::cout << "remove old raw data file: " << cluster_raw_data_file_name << " failed." << std::endl;
+        }
+        auto rm_ids_ret = std::remove(cluster_ids_data_file_name.c_str());
+        if (rm_ids_ret == 0) {
+            std::cout << "remove old ids data file: " << cluster_ids_data_file_name << " success." << std::endl;
+        } else {
+            std::cout << "remove old ids data file: " << cluster_ids_data_file_name << " failed." << std::endl;
+        }
+        rc.RecordSection("cluster " + std::to_string(i) + " page aligned done.");
     }
 
     delete[] data_page_buf;
     delete[] ids_page_buf;
+    rc.ElapseFromBegin("page align totally done.");
 }
 
 template<typename DATAT, typename DISTT, typename HEAPT>
@@ -520,6 +539,9 @@ void build_bigann(const std::string& raw_data_bin_file,
 
     train_quantizer<DATAT, DISTT, HEAPT>(raw_data_bin_file, output_path, K1, PQM, PQnbits);
     rc.RecordSection("train quantizer done.");
+
+    page_align<DATAT>(raw_data_bin_file, output_path, K1);
+
     delete[] centroids;
     rc.ElapseFromBegin("build bigann totally done.");
 }
@@ -1289,11 +1311,11 @@ void search_bigann(const std::string& index_path,
     */
 
 
-    refine<DATAT, DISTT, HEAPT>(index_path, K1, nq, dq, topk, refine_topk, pq_offsets, pquery, answer_dists, answer_ids, dis_computer);  // refine with C++ std::ifstream
+    aligned_refine<DATAT, DISTT, HEAPT>(index_path, K1, nq, dq, topk, refine_topk, pq_offsets, pquery, answer_dists, answer_ids, dis_computer);  // refine with C++ std::ifstream
 //    refine_c<DATAT, DISTT, HEAPT>(index_path, K1, nq, dq, topk, refine_topk, pq_offsets, pquery, answer_dists, answer_ids, dis_computer);  // refine_c with C open(), pread(), close()
     rc.RecordSection("refine done");
     // write answers
-    save_answers<DISTT, HEAPT>(answer_bin_file, topk, nq, answer_dists, answer_ids);
+    save_answers<DISTT, HEAPT>(answer_bin_file, topk, nq, answer_dists, answer_ids, false);
     rc.RecordSection("write answers done");
 
     delete[] pquery;
