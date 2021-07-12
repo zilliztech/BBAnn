@@ -58,11 +58,11 @@ void reservoir_sampling(const std::string& data_file, const size_t sample_num, T
     ntotal = nb;
     ndims = dim;
     std::unique_ptr<T[]> tmp_buf = std::make_unique<T[]>(ndims);
-    for (auto i = 0; i < sample_num; i ++) {
+    for (size_t i = 0; i < sample_num; i ++) {
         auto pi = sample_data + ndims * i;
         reader.read((char*) pi, ndims * sizeof(T));
     }
-    for (auto i = sample_num; i < ntotal; i ++) {
+    for (size_t i = sample_num; i < ntotal; i ++) {
         reader.read((char*)tmp_buf.get(), ndims * sizeof(T));
         std::uniform_int_distribution<size_t> distribution(0, i);
         size_t rand = (size_t)distribution(generator);
@@ -95,7 +95,7 @@ inline void read_bin_file(const std::string& file_name, T*& data, uint32_t& n,
     reader.read((char*)&n, sizeof(uint32_t));
     reader.read((char*)&dim, sizeof(uint32_t));
     if (data == nullptr) {
-        data = new T[n * dim];
+        data = new T[(int64_t)n * (int64_t)dim];
     }
     reader.read((char*)data, sizeof(T) * n * dim);
 
