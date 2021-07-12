@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <cstdio>
 
 template<typename DATAT>
 void train_cluster(const std::string& raw_data_bin_file,
@@ -479,6 +480,18 @@ void page_align(const std::string& raw_data_bin_file, const std::string& output_
                 write_cnt ++;
             }
             ids_writer.write(ids_page_buf, page_size);
+        }
+        auto rm_dat_ret = std::remove(cluster_raw_data_file_name.c_str());
+        if (rm_dat_ret == 0) {
+            std::cout << "remove old raw data file: " << cluster_raw_data_file_name << " success." << std::endl;
+        } else {
+            std::cout << "remove old raw data file: " << cluster_raw_data_file_name << " failed." << std::endl;
+        }
+        auto rm_ids_ret = std::remove(cluster_ids_data_file_name.c_str());
+        if (rm_ids_ret == 0) {
+            std::cout << "remove old ids data file: " << cluster_ids_data_file_name << " success." << std::endl;
+        } else {
+            std::cout << "remove old ids data file: " << cluster_ids_data_file_name << " failed." << std::endl;
         }
         rc.RecordSection("cluster " + std::to_string(i) + " page aligned done.");
     }
