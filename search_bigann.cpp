@@ -22,6 +22,7 @@
  */
 
 int main(int argc, char** argv) {
+    TimeRecorder rc("main");
     if (argc != 15) {
         std::cout << "Usage: << " << argv[0]
                   << " data_type(float or uint8 or int8)"
@@ -136,7 +137,7 @@ int main(int argc, char** argv) {
                     (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
             } else if (QuantizerType::PQRES == quantizer_type) {
                 PQResidualQuantizer<CMax<float, uint64_t>, float, uint8_t> pq_quantizer(dim, PQM, PQnbits);
-                pq_quantizer.load_centroids(pq_centroids_file);
+                pq_quantizer.pq->load_centroids(pq_centroids_file);
                 rc.RecordSection("load pq centroids done.");
                 search_bigann<float, float, CMax<float, uint32_t>, CMax<float, uint64_t>>
                     (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
@@ -153,7 +154,7 @@ int main(int argc, char** argv) {
                     (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
             } else if (QuantizerType::PQRES == quantizer_type) {
                 PQResidualQuantizer<CMin<float, uint64_t>, float, uint8_t> pq_quantizer(dim, PQM, PQnbits);
-                pq_quantizer.load_centroids(pq_centroids_file);
+                pq_quantizer.pq->load_centroids(pq_centroids_file);
                 rc.RecordSection("load pq centroids done.");
                 search_bigann<float, float, CMin<float, uint32_t>, CMin<float, uint64_t>>
                     (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
@@ -177,7 +178,7 @@ int main(int argc, char** argv) {
                     (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
             } else if (QuantizerType::PQRES == quantizer_type) {
                 PQResidualQuantizer<CMax<uint32_t, uint64_t>, uint8_t, uint8_t> pq_quantizer(dim, PQM, PQnbits);
-                pq_quantizer.load_centroids(pq_centroids_file);
+                pq_quantizer.pq->load_centroids(pq_centroids_file);
                 rc.RecordSection("load pq centroids done.");
                 search_bigann<uint8_t, uint32_t, CMax<uint32_t, uint32_t>, CMax<uint32_t, uint64_t>>
                     (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
@@ -194,7 +195,7 @@ int main(int argc, char** argv) {
                     (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
             } else if (QuantizerType::PQRES == quantizer_type) {
                 PQResidualQuantizer<CMin<uint32_t, uint64_t>, uint8_t, uint8_t> pq_quantizer(dim, PQM, PQnbits);
-                pq_quantizer.load_centroids(pq_centroids_file);
+                pq_quantizer.pq->load_centroids(pq_centroids_file);
                 rc.RecordSection("load pq centroids done.");
                 search_bigann<uint8_t, uint32_t, CMin<uint32_t, uint32_t>, CMin<uint32_t, uint64_t>>
                     (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
@@ -218,7 +219,7 @@ int main(int argc, char** argv) {
                     (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
             } else if (QuantizerType::PQRES == quantizer_type) {
                 PQResidualQuantizer<CMax<int32_t, uint64_t>, int8_t, uint8_t> pq_quantizer(dim, PQM, PQnbits);
-                pq_quantizer.load_centroids(pq_centroids_file);
+                pq_quantizer.pq->load_centroids(pq_centroids_file);
                 rc.RecordSection("load pq centroids done.");
                 search_bigann<int8_t, int32_t, CMax<int32_t, uint32_t>, CMax<int32_t, uint64_t>>
                     (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
@@ -235,7 +236,7 @@ int main(int argc, char** argv) {
                     (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
             } else if (QuantizerType::PQRES == quantizer_type) {
                 PQResidualQuantizer<CMin<int32_t, uint64_t>, int8_t, uint8_t> pq_quantizer(dim, PQM, PQnbits);
-                pq_quantizer.load_centroids(pq_centroids_file);
+                pq_quantizer.pq->load_centroids(pq_centroids_file);
                 rc.RecordSection("load pq centroids done.");
                 search_bigann<int8_t, int32_t, CMin<int32_t, uint32_t>, CMin<int32_t, uint64_t>>
                     (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);

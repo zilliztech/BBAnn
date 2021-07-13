@@ -378,6 +378,60 @@ void train_pq_quantizer(const std::string& raw_data_bin_file,
     rc.ElapseFromBegin("train quantizer totally done.");
 }
 
+template<typename DATAT, typename DISTT, typename HEAPT>
+void train_pq_residual_quantizer(
+        const std::string& raw_data_bin_file,
+        const std::string& output_path,
+        const int K1,
+        const int PQM,
+        const int PQnbits) {
+    
+    TimeRecorder rc("train pq quantizer with residual");
+    std::cout << "train quantizer parameters:" << std::endl;
+    std::cout << " raw_data_bin_file: " << raw_data_bin_file
+              << " output_path: " << output_path
+              << " PQM: " << PQM
+              << " PQnbits: " << PQnbits
+              << std::endl;
+
+    uint32_t nb, dim;
+    get_bin_metadata(raw_data_bin_file, nb, dim);
+
+    uint32_t pq_sample_num = (uint32_t)(nb * PQ_SAMPLE_RATE);
+    float* residuals = new float[pq_sample_num * dim];
+    float* ivf_centroids = new float[pq_sample_num * dim];
+    reservoir_sampling_residual<DATAT>(pq_sample_num, residuals, ivf_centroids, K1, output_path);
+    rc.RecordSection("reservoir_sampling_residual for pq training set done");
+
+    PQResidualQuantizer<HEAPT, DATAT, uint8_t> quantizer(dim, PQM, PQnbits);
+    quantizer.pq->train(pq_sample_num, residuals);
+    rc.RecordSection("pq residual quantizer train done");
+
+    quantizer.pq->save_centroids(output_path + PQ_CENTROIDS + BIN);
+    rc.RecordSection("pq residual quantizer save centroids done");
+
+    float* precompute_table = nullptr;
+    for (int i = 0; i < K1; ++i) {
+        std::string data_file = output_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
+        std::string pq_codebook_file = output_path + CLUSTER + std::to_string(i) + PQ + CODEBOOK + BIN;
+        uint32_t cluster_size, cluster_dim;
+        IOReader data_reader(data_file);
+        data_reader.read((char*)&cluster_size, sizeof(uint32_t));
+        data_reader.read((char*)&cluster_dim, sizeof(uint32_t));
+
+        DATAT* datai = new DATAT[cluster_size * cluster_dim];
+        data_reader.read((char*)datai, cluster_size * cluster_dim * sizeof(DATAT));
+        quantizer.encode_vectors_and_save(precompute_table, cluster_size, datai, ivf_centroids, pq_codebook_file);
+        delete[] datai;
+    }
+
+    delete[] precompute_table;
+    delete[] residuals;
+    delete[] ivf_centroids;
+
+    rc.ElapseFromBegin("train pq residual quantizer totally done.");
+}
+
 // page alignment 4 raw data and uid in each cluster 4 better refine performance
 template<typename DATAT>
 void page_align(const std::string& raw_data_bin_file, const std::string& output_path, const int K1) {
@@ -476,60 +530,6 @@ void page_align(const std::string& raw_data_bin_file, const std::string& output_
 }
 
 template<typename DATAT, typename DISTT, typename HEAPT>
-void train_pq_residual_quantizer(
-        const std::string& raw_data_bin_file,
-        const std::string& output_path,
-        const int K1,
-        const int PQM,
-        const int PQnbits) {
-    
-    TimeRecorder rc("train pq quantizer with residual");
-    std::cout << "train quantizer parameters:" << std::endl;
-    std::cout << " raw_data_bin_file: " << raw_data_bin_file
-              << " output_path: " << output_path
-              << " PQM: " << PQM
-              << " PQnbits: " << PQnbits
-              << std::endl;
-
-    uint32_t nb, dim;
-    get_bin_metadata(raw_data_bin_file, nb, dim);
-
-    uint32_t pq_sample_num = (uint32_t)(nb * PQ_SAMPLE_RATE);
-    float* residuals = new float[pq_sample_num * dim];
-    float* ivf_centroids = new float[pq_sample_num * dim];
-    reservoir_sampling_residual(sample_num, residuals, ivf_centroids, K1, output_path);
-    rc.RecordSection("reservoir_sampling_residual for pq training set done");
-
-    PQResidualQuantizer<HEAPT, DATAT, uint8_t> quantizer(dim, PQM, PQnbits);
-    quantizer.train(pq_sample_num, residuals);
-    rc.RecordSection("pq residual quantizer train done");
-
-    quantizer.save_centroids(output_path + PQ_CENTROIDS + BIN);
-    rc.RecordSection("pq residual quantizer save centroids done");
-
-    float* precompute_table = nullptr;
-    for (int i = 0; i < K1; ++i) {
-        std::string data_file = output_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
-        std::string pq_codebook_file = output_path + CLUSTER + std::to_string(i) + PQ + CODEBOOK + BIN;
-        uint32_t cluster_size, cluster_dim;
-        IOReader data_reader(data_file);
-        data_reader.read((char*)&cluster_size, sizeof(uint32_t));
-        data_reader.read((char*)&cluster_dim, sizeof(uint32_t));
-
-        DATAT* datai = new DATAT[cluster_size * cluster_dim];
-        data_reader.read((char*)datai, cluster_size * cluster_dim * sizeof(DATAT));
-        quantizer.encode_vectors_and_save(precomputer_table, cluster_size, datai, ivf_centroids, pq_codebook_file);
-        delete[] datai;
-    }
-
-    delete[] precomputer_table;
-    delete[] residual;
-    delete[] ivf_centroids;
-
-    rc.ElapseFromBegin("train pq residual quantizer totally done.");
-}
-
-template<typename DATAT, typename DISTT, typename HEAPT>
 void build_bigann(const std::string& raw_data_bin_file,
                   const std::string& output_path,
                   const int hnswM, const int hnswefC,
@@ -605,6 +605,7 @@ void load_meta(const std::string& index_path,
               << std::endl;
 
     load_meta_impl(index_path, meta, K1);
+
     rc.ElapseFromBegin("load meta done.");
 }
 
@@ -742,7 +743,7 @@ void search_pq_residual_quantizer(
         PQ_Computer<DATAT>& pq_cmp) {
     TimeRecorder rc("search pq residual quantizer");
     std::cout << "search quantizer parameters:" << std::endl;
-    std::cout << " quantizer:" << &pq_quantizer
+    std::cout << " quantizer:" << &quantizer
               << " nq: " << nq
               << " dq: " << dq
               << " buckets_label: " << buckets_label
@@ -764,7 +765,7 @@ void search_pq_residual_quantizer(
         float* precompute_table = nullptr;
 #pragma omp for
         for (auto i = 0; i < nq; i ++) {
-            quantizer.calc_precompute_table(precompute_table, pquery + i * dq, pq_cmp);
+            quantizer.pq->calc_precompute_table(precompute_table, pquery + i * dq, pq_cmp);
             auto p_labeli = buckets_label + i * nprobe;
             auto pq_offseti = pq_offsets + i * refine_topk;
             auto pq_distancei = pq_distance + i * refine_topk;
@@ -1320,15 +1321,14 @@ void search_bigann(const std::string& index_path,
                    const int topk,
                    const int refine_topk,
                    std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
-                   PQResidualQuantizer<HEAPTT, DATAT, uint8_t>& pq_quantizer,
+                   PQResidualQuantizer<HEAPTT, DATAT, uint8_t>& quantizer,
                    const int K1,
                    PQ_Computer<DATAT>& pq_cmp,
                    std::vector<std::vector<uint8_t>>& pq_codebook,
                    std::vector<std::vector<uint32_t>>& meta,
                    Computer<DATAT, DATAT, DISTT>& dis_computer) {
-    // std::cout << "show pq centroids at the begining:" << std::endl;
-    // pq_quantizer.show_centroids();
     TimeRecorder rc("search bigann");
+
     std::cout << "search bigann parameters:" << std::endl;
     std::cout << " index_path: " << index_path
               << " query_bin_file: " << query_bin_file
@@ -1364,10 +1364,10 @@ void search_bigann(const std::string& index_path,
     search_graph<DATAT>(index_hnsw, nq, dq, nprobe, refine_nprobe, pquery, p_labels);
     rc.RecordSection("search buckets done.");
 
-    float* ivf_centroids = nulptr;
+    float* ivf_centroids = nullptr;
     uint32_t c_n, c_dim;
-    read_bin_file<float>(index_path + BUCKET + CENTROIDS + BIN, centroids, c_n, c_dim);
-    search_pq_residual_quantizer<DATAT, DISTT, HEAPTT>(pq_quantizer, nq, dq, ivf_centroids, p_labels, nprobe, 
+    read_bin_file<float>(index_path + BUCKET + CENTROIDS + BIN, ivf_centroids, c_n, c_dim);
+    search_pq_residual_quantizer<DATAT, DISTT, HEAPTT>(quantizer, nq, dq, ivf_centroids, p_labels, nprobe, 
                      refine_topk, K1, pquery, pq_codebook, 
                      meta, pq_distance, pq_offsets, pq_cmp);
     delete[] ivf_centroids;

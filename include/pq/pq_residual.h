@@ -8,13 +8,13 @@
     Term 3: -2qr (pq table)
 */
 
+// TODO: refactor this to inherit from pq and overload some functions
+
 // T: type of the database vector
 // U: type of codes ID (PQ representation)
 template <class C, typename T, typename U>
 class PQResidualQuantizer {
 private:
-    ProductQuantizer<C, T, U>* pq;
-
     // for easy access
     int64_t d, K;
     uint32_t m;
@@ -25,11 +25,9 @@ public:
 
     ~PQResidualQuantizer();
 
-    void train(int64_t n, const T* x);
-    
-    void save_centroids(const std::string& save_file);
+    ProductQuantizer<C, T, U>* pq;
 
-    void load_centroids(const std::string& load_file);
+    uint32_t getM() { return m; }
 
     void encode_vectors_and_save(
             float*& precomputer_table,
@@ -70,21 +68,6 @@ PQResidualQuantizer<C, T, U>::~PQResidualQuantizer() {
     delete pq;
 }
 
-template <class C, typename T, typename U>
-void PQResidualQuantizer<C, T, U>::train(int64_t n, const T* x) {
-    pq->train(n, x);
-}
-
-template <class C, typename T, typename U>
-void PQResidualQuantizer<C, T, U>::save_centroids(const std::string& save_file) {
-    pq->save_centroids(save_file);
-}    
-
-template <class C, typename T, typename U>
-void PQResidualQuantizer<C, T, U>::load_centroids(const std::string& load_file) {
-    pq->load_centroids(load_file);
-}
-
 template<class C, typename T, typename U>
 void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
         float*& precomputer_table,
@@ -102,7 +85,7 @@ void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
     for (int i = 0; i < n; ++i, c += m, ivf_c += d) {
         pq->reconstruct(r, c);
         term2s[i] += norm_L2sqr<U, float>(r, d);
-        term2s[i] += 2.0f * IP(ivf_c, r, d);
+        term2s[i] += 2.0f * IP<const float, const float, float>(ivf_c, r, d);
     }
 
     uint32_t wm = m + sizeof(float);
@@ -152,10 +135,10 @@ void PQResidualQuantizer<C, T, U>::search(
 
     for (int j = 0; j < n; ++j) {
         // term 1
-        float dis = L2sqr<T, float, float>(q, centroid, d);
+        float dis = L2sqr<const T, const float, float>(q, centroid, d);
 
         // term 2
-        dis += *reinterpret_cast<float *>(pcodes + m);
+        dis += *reinterpret_cast<const float *>(pcodes + m);
 
         // term 3
         const float* __restrict dt = dis_tab;
