@@ -80,6 +80,15 @@ public:
         return m;
     }
 
+    float* reconstruct(float* r, const U* c) {
+        for (uint32_t i = 0; i < m; ++i, ++c) {
+            memcpy(
+                r + i * dsub,
+                centroids + i * K + (*c) * dsub,
+                dsub * sizeof(float));
+        }
+    }
+
     void show_centroids() {
         std::cout << "show pq.centroids:" << std::endl;
         auto pc = centroids;

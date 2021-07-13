@@ -96,12 +96,13 @@ void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
     std::vector<float> term2s(n, 0);
     const U* c = pq->get_codes();
     const float* ivf_c = ivf_centroids;
+    float* r = new float[d];
 
     // precompute term2
-    for (int i = 0; i < n; ++i, c += m) {
-        // TODO: reconstruct
-        term2s[i] += norm_L2sqr<U, float>(c, d);
-        term2s[i] += 2.0f * IP(ivf_c, c, d);
+    for (int i = 0; i < n; ++i, c += m, ivf_c += d) {
+        pq->reconstruct(r, c);
+        term2s[i] += norm_L2sqr<U, float>(r, d);
+        term2s[i] += 2.0f * IP(ivf_c, r, d);
     }
 
     uint32_t wm = m + sizeof(float);
@@ -117,6 +118,7 @@ void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
         code_writer.write((char*)t2, sizeof(float));
     }
     code_writer.close();
+    delete[] r;
     std::cout << "PQResidualQuantizer encode " << n << " vectors with m = " << m << "and term2 into file "
               << file_path << std::endl;
 }
