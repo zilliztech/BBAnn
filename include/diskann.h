@@ -95,7 +95,8 @@ void train_pq_residual_quantizer(
         const std::string& raw_data_bin_file,
         const std::string& output_path,
         const int K1,
-        const int PQM, const int PQnbits);
+        const int PQM, const int PQnbits,
+        MetricType metric_type);
 
 template<typename DATAT, typename DISTT, typename HEAPT>
 void build_bigann(const std::string& raw_data_bin_file,
@@ -103,7 +104,8 @@ void build_bigann(const std::string& raw_data_bin_file,
                   const int hnswM, const int hnswefC,
                   const int PQM, const int PQnbits,
                   const int K1, const int threshold,
-                  MetricType metric_type);
+                  MetricType metric_type,
+                  QuantizerType quantizer_type);
 
 void load_pq_codebook(const std::string& index_path,
                       std::vector<std::vector<uint8_t>>& pq_codebook, 
@@ -186,7 +188,8 @@ void search_bigann(const std::string& index_path,
                    PQ_Computer<DATAT>& pq_cmp,
                    std::vector<std::vector<uint8_t>>& pq_codebook,
                    std::vector<std::vector<uint32_t>>& meta,
-                   Computer<DATAT, DATAT, DISTT>& dis_computer);
+                   Computer<DATAT, DATAT, DISTT>& dis_computer,
+                   MetricType metric_type);
 
 template<typename DATAT, typename DISTT, typename HEAPT, typename HEAPTT>
 void search_bigann(const std::string& index_path,

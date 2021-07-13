@@ -183,7 +183,7 @@ void reservoir_sampling_residual(
 
     for (int i = 0; i < sample_num; ++i) {
         const float *c = centroids + centroid_offsets[i] * dim;
-        compute_residual<float, T, float>(c, sample_data, residuals, dim);
+        compute_residual<const float, const T, float>(c, sample_data, residuals, dim);
         memcpy(ivf_centroids + i * dim, c, dim * sizeof(float));
         sample_data += dim, residuals += dim;
     }

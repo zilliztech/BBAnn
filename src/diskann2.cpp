@@ -384,7 +384,8 @@ void train_pq_residual_quantizer(
         const std::string& output_path,
         const int K1,
         const int PQM,
-        const int PQnbits) {
+        const int PQnbits,
+        MetricType metric_type) {
     
     TimeRecorder rc("train pq quantizer with residual");
     std::cout << "train quantizer parameters:" << std::endl;
@@ -404,7 +405,7 @@ void train_pq_residual_quantizer(
     rc.RecordSection("reservoir_sampling_residual for pq training set done");
 
     PQResidualQuantizer<HEAPT, DATAT, uint8_t> quantizer(dim, PQM, PQnbits);
-    quantizer.pq->train(pq_sample_num, residuals);
+    quantizer.pq->train_residual(pq_sample_num, residuals);
     rc.RecordSection("pq residual quantizer train done");
 
     quantizer.pq->save_centroids(output_path + PQ_CENTROIDS + BIN);
@@ -421,7 +422,7 @@ void train_pq_residual_quantizer(
 
         DATAT* datai = new DATAT[cluster_size * cluster_dim];
         data_reader.read((char*)datai, cluster_size * cluster_dim * sizeof(DATAT));
-        quantizer.encode_vectors_and_save(precompute_table, cluster_size, datai, ivf_centroids, pq_codebook_file);
+        quantizer.encode_vectors_and_save(precompute_table, cluster_size, datai, ivf_centroids, pq_codebook_file, metric_type);
         delete[] datai;
     }
 
@@ -535,7 +536,8 @@ void build_bigann(const std::string& raw_data_bin_file,
                   const int hnswM, const int hnswefC,
                   const int PQM, const int PQnbits,
                   const int K1, const int threshold,
-                  MetricType metric_type) {
+                  MetricType metric_type,
+                  QuantizerType quantizer_type) {
     TimeRecorder rc("build bigann");
     std::cout << "build bigann parameters:" << std::endl;
     std::cout << " raw_data_bin_file: " << raw_data_bin_file
@@ -565,7 +567,11 @@ void build_bigann(const std::string& raw_data_bin_file,
     build_graph(output_path, hnswM, hnswefC, metric_type);
     rc.RecordSection("build hnsw done.");
 
-    train_pq_quantizer<DATAT, DISTT, HEAPT>(raw_data_bin_file, output_path, K1, PQM, PQnbits);
+    if (QuantizerType::PQ == quantizer_type) {
+        train_pq_quantizer<DATAT, DISTT, HEAPT>(raw_data_bin_file, output_path, K1, PQM, PQnbits);
+    } else if (QuantizerType::PQRES == quantizer_type) {
+        train_pq_residual_quantizer<DATAT, DISTT, HEAPT>(raw_data_bin_file, output_path, K1, PQM, PQnbits, metric_type);
+    }
     rc.RecordSection("train quantizer done.");
 
     page_align<DATAT>(raw_data_bin_file, output_path, K1);
@@ -740,7 +746,8 @@ void search_pq_residual_quantizer(
         std::vector<std::vector<uint32_t>>& meta,
         DISTT*& pq_distance,
         uint64_t*& pq_offsets,
-        PQ_Computer<DATAT>& pq_cmp) {
+        PQ_Computer<DATAT>& pq_cmp,
+        MetricType metric_type) {
     TimeRecorder rc("search pq residual quantizer");
     std::cout << "search quantizer parameters:" << std::endl;
     std::cout << " quantizer:" << &quantizer
@@ -777,7 +784,7 @@ void search_pq_residual_quantizer(
                 quantizer.search(precompute_table, pquery + i * dq, cen,
                         pq_codebook[cid].data() + off * pqm, meta[cid][bid],
                         refine_topk, pq_distancei, pq_offseti, pq_cmp,
-                        j + 1 == nprobe, j == 0, cid, off, i);
+                        j + 1 == nprobe, j == 0, cid, off, i, metric_type);
             }
         }
         delete[] precompute_table;
@@ -1326,7 +1333,8 @@ void search_bigann(const std::string& index_path,
                    PQ_Computer<DATAT>& pq_cmp,
                    std::vector<std::vector<uint8_t>>& pq_codebook,
                    std::vector<std::vector<uint32_t>>& meta,
-                   Computer<DATAT, DATAT, DISTT>& dis_computer) {
+                   Computer<DATAT, DATAT, DISTT>& dis_computer,
+                   MetricType metric_type) {
     TimeRecorder rc("search bigann");
 
     std::cout << "search bigann parameters:" << std::endl;
@@ -1369,7 +1377,7 @@ void search_bigann(const std::string& index_path,
     read_bin_file<float>(index_path + BUCKET + CENTROIDS + BIN, ivf_centroids, c_n, c_dim);
     search_pq_residual_quantizer<DATAT, DISTT, HEAPTT>(quantizer, nq, dq, ivf_centroids, p_labels, nprobe, 
                      refine_topk, K1, pquery, pq_codebook, 
-                     meta, pq_distance, pq_offsets, pq_cmp);
+                     meta, pq_distance, pq_offsets, pq_cmp, metric_type);
     delete[] ivf_centroids;
 
     rc.RecordSection("pq residual search done.");
@@ -1519,7 +1527,8 @@ void search_bigann<float, float, CMax<float, uint32_t>, CMax<float, uint64_t>>(c
                    PQ_Computer<float>& pq_cmp,
                    std::vector<std::vector<uint8_t>>& pq_codebook,
                    std::vector<std::vector<uint32_t>>& meta,
-                   Computer<float, float, float>& dis_computer);
+                   Computer<float, float, float>& dis_computer,
+                   MetricType metric_type);
 
 template 
 void search_bigann<float, float, CMin<float, uint32_t>, CMin<float, uint64_t>>(const std::string& index_path,
@@ -1535,7 +1544,8 @@ void search_bigann<float, float, CMin<float, uint32_t>, CMin<float, uint64_t>>(c
                    PQ_Computer<float>& pq_cmp,
                    std::vector<std::vector<uint8_t>>& pq_codebook,
                    std::vector<std::vector<uint32_t>>& meta,
-                   Computer<float, float, float>& dis_computer);
+                   Computer<float, float, float>& dis_computer,
+                   MetricType metric_type);
 
 template 
 void search_bigann<uint8_t, uint32_t, CMax<uint32_t, uint32_t>, CMax<uint32_t, uint64_t>>(const std::string& index_path,
@@ -1551,7 +1561,8 @@ void search_bigann<uint8_t, uint32_t, CMax<uint32_t, uint32_t>, CMax<uint32_t, u
                    PQ_Computer<uint8_t>& pq_cmp,
                    std::vector<std::vector<uint8_t>>& pq_codebook,
                    std::vector<std::vector<uint32_t>>& meta,
-                   Computer<uint8_t, uint8_t, uint32_t>& dis_computer);
+                   Computer<uint8_t, uint8_t, uint32_t>& dis_computer,
+                   MetricType metric_type);
 
 template 
 void search_bigann<uint8_t, uint32_t, CMin<uint32_t, uint32_t>, CMin<uint32_t, uint64_t>>(const std::string& index_path,
@@ -1567,7 +1578,8 @@ void search_bigann<uint8_t, uint32_t, CMin<uint32_t, uint32_t>, CMin<uint32_t, u
                    PQ_Computer<uint8_t>& pq_cmp,
                    std::vector<std::vector<uint8_t>>& pq_codebook,
                    std::vector<std::vector<uint32_t>>& meta,
-                   Computer<uint8_t, uint8_t, uint32_t>& dis_computer);
+                   Computer<uint8_t, uint8_t, uint32_t>& dis_computer,
+                   MetricType metric_type);
 
 template 
 void search_bigann<int8_t, int32_t, CMax<int32_t, uint32_t>, CMax<int32_t, uint64_t>>(const std::string& index_path,
@@ -1583,7 +1595,8 @@ void search_bigann<int8_t, int32_t, CMax<int32_t, uint32_t>, CMax<int32_t, uint6
                    PQ_Computer<int8_t>& pq_cmp,
                    std::vector<std::vector<uint8_t>>& pq_codebook,
                    std::vector<std::vector<uint32_t>>& meta,
-                   Computer<int8_t, int8_t, int32_t>& dis_computer);
+                   Computer<int8_t, int8_t, int32_t>& dis_computer,
+                   MetricType metric_type);
 
 template 
 void search_bigann<int8_t, int32_t, CMin<int32_t, uint32_t>, CMin<int32_t, uint64_t>>(const std::string& index_path,
@@ -1599,7 +1612,8 @@ void search_bigann<int8_t, int32_t, CMin<int32_t, uint32_t>, CMin<int32_t, uint6
                    PQ_Computer<int8_t>& pq_cmp,
                    std::vector<std::vector<uint8_t>>& pq_codebook,
                    std::vector<std::vector<uint32_t>>& meta,
-                   Computer<int8_t, int8_t, int32_t>& dis_computer);
+                   Computer<int8_t, int8_t, int32_t>& dis_computer,
+                   MetricType metric_type);
 
 template 
 void search_bigann<float, float, CMax<float, uint32_t>, CMax<float, uint64_t>>(const std::string& index_path,
@@ -1781,7 +1795,8 @@ void build_bigann<float, float, CMax<float, uint32_t>>
                   const int hnswM, const int hnswefC,
                   const int PQM, const int PQnbits,
                   const int K1, const int threshold,
-                  MetricType metric_type);
+                  MetricType metric_type,
+                  QuantizerType quantizer_type);
 
 template
 void build_bigann<float, float, CMin<float, uint32_t>>
@@ -1790,7 +1805,8 @@ void build_bigann<float, float, CMin<float, uint32_t>>
                   const int hnswM, const int hnswefC,
                   const int PQM, const int PQnbits,
                   const int K1, const int threshold,
-                  MetricType metric_type);
+                  MetricType metric_type,
+                  QuantizerType quantizer_type);
 
 template
 void build_bigann<uint8_t, uint32_t, CMax<uint32_t, uint32_t>>
@@ -1799,7 +1815,8 @@ void build_bigann<uint8_t, uint32_t, CMax<uint32_t, uint32_t>>
                   const int hnswM, const int hnswefC,
                   const int PQM, const int PQnbits,
                   const int K1, const int threshold,
-                  MetricType metric_type);
+                  MetricType metric_type,
+                  QuantizerType quantizer_type);
 
 template
 void build_bigann<uint8_t, uint32_t, CMin<uint32_t, uint32_t>>
@@ -1808,7 +1825,8 @@ void build_bigann<uint8_t, uint32_t, CMin<uint32_t, uint32_t>>
                   const int hnswM, const int hnswefC,
                   const int PQM, const int PQnbits,
                   const int K1, const int threshold,
-                  MetricType metric_type);
+                  MetricType metric_type,
+                  QuantizerType quantizer_type);
 
 template
 void build_bigann<int8_t, int32_t, CMax<int32_t, uint32_t>>
@@ -1817,7 +1835,8 @@ void build_bigann<int8_t, int32_t, CMax<int32_t, uint32_t>>
                   const int hnswM, const int hnswefC,
                   const int PQM, const int PQnbits,
                   const int K1, const int threshold,
-                  MetricType metric_type);
+                  MetricType metric_type,
+                  QuantizerType quantizer_type);
 
 template
 void build_bigann<int8_t, int32_t, CMin<int32_t, uint32_t>>
@@ -1826,7 +1845,8 @@ void build_bigann<int8_t, int32_t, CMin<int32_t, uint32_t>>
                   const int hnswM, const int hnswefC,
                   const int PQM, const int PQnbits,
                   const int K1, const int threshold,
-                  MetricType metric_type);
+                  MetricType metric_type,
+                  QuantizerType quantizer_type);
 
 
 template
