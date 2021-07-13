@@ -16,18 +16,16 @@ private:
     ProductQuantizer<C, T, U>* pq;
 
     // for easy access
-    int32_t d, K;
-    uint8_t m;
+    int64_t d, K;
+    uint32_t m;
 
     void compute_residual(const T*, const float* x, float* residual);
 public:
-    PQResidualQuantizer(int32_t _d, uint8_t _m, uint8_t _nbits);
+    PQResidualQuantizer(int64_t _d, uint32_t _m, uint32_t _nbits);
 
     ~PQResidualQuantizer();
 
-    int32_t get_d();
-
-    void train(int32_t n, const T* x);
+    void train(int64_t n, const T* x);
     
     void save_centroids(const std::string& save_file);
 
@@ -35,7 +33,7 @@ public:
 
     void encode_vectors_and_save(
             float*& precomputer_table,
-            int32_t n,
+            int64_t n,
             const T* x,
             const float* ivf_centroids,
             const std::string& file_path);
@@ -45,8 +43,8 @@ public:
         const T* q,
         const float* centroid,
         const U* pcodes,
-        int32_t n,
-        int32_t topk,
+        int64_t n,
+        int64_t topk,
         typename C::T* values,
         typename C::TI* labels,
         PQ_Computer<T> computer,
@@ -59,11 +57,12 @@ public:
 
 template <class C, typename T, typename U>
 PQResidualQuantizer<C, T, U>::PQResidualQuantizer(
-        int32_t _d,
-        uint8_t _m,
-        uint8_t _nbits)
+        int64_t _d,
+        uint32_t _m,
+        uint32_t _nbits)
             : d(_d), m(_m) {
     pq = new ProductQuantizer<C, T, U>(_d, _m, _nbits);
+    K = 1 << _nbits;
 }
 
 template <class C, typename T, typename U>
@@ -72,7 +71,7 @@ PQResidualQuantizer<C, T, U>::~PQResidualQuantizer() {
 }
 
 template <class C, typename T, typename U>
-void PQResidualQuantizer<C, T, U>::train(int32_t n, const T* x) {
+void PQResidualQuantizer<C, T, U>::train(int64_t n, const T* x) {
     pq->train(n, x);
 }
 
@@ -89,7 +88,7 @@ void PQResidualQuantizer<C, T, U>::load_centroids(const std::string& load_file) 
 template<class C, typename T, typename U>
 void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
         float*& precomputer_table,
-        int32_t n,
+        int64_t n,
         const T* x,
         const float* ivf_centroids,
         const std::string& file_path) {
@@ -128,8 +127,8 @@ void PQResidualQuantizer<C, T, U>::search(
         const T* q,
         const float* centroid,
         const U* pcodes,
-        int32_t n,
-        int32_t topk,
+        int64_t n,
+        int64_t topk,
         typename C::T* values,
         typename C::TI* labels,
         PQ_Computer<T> computer,
