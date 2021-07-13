@@ -15,8 +15,8 @@
 template<class C, typename T1, typename T2>
 void knn_1 (const T1 * x, // query
             const T2 * y, // base
-            int32_t nx, int32_t ny, int32_t dim,
-            int32_t k,
+            int64_t nx, int64_t ny, int64_t dim,
+            int64_t k,
             typename C::T * value,
             typename C::TI * labels,
             Computer<T1, T2, typename C::T> comptuer)
@@ -24,7 +24,7 @@ void knn_1 (const T1 * x, // query
     std::cout << "do knn_1 with nx = " << nx << ", ny = " << ny
               << ", k = " << k << std::endl;
 #pragma omp parallel for
-    for (int32_t i = 0; i < nx; i++) {
+    for (int64_t i = 0; i < nx; i++) {
         auto *x_i = x + i * dim;
         auto *y_j = y;
 
@@ -33,7 +33,7 @@ void knn_1 (const T1 * x, // query
 
         heap_heapify<C>(k, val_, ids_);
 
-        for (int32_t j = 0; j < ny; j++) {
+        for (int64_t j = 0; j < ny; j++) {
             auto disij = comptuer (x_i, y_j, dim);
             if (C::cmp(val_[0], disij)) {
                 heap_swap_top<C>(k, val_, ids_, disij, j);
@@ -48,8 +48,8 @@ void knn_1 (const T1 * x, // query
 template<class C, typename T1, typename T2>
 void knn_2 (const T1 * x, // query
             const T2 * y, // base
-            int32_t nx, int32_t ny, int32_t dim,
-            int32_t k,
+            int64_t nx, int64_t ny, int64_t dim,
+            int64_t k,
             typename C::T * value,
             typename C::TI * labels,
             Computer<T1, T2, typename C::T> comptuer)
@@ -57,34 +57,34 @@ void knn_2 (const T1 * x, // query
     using DIS_TYPE = typename C::T;
     using ID_TYPE = typename C::TI;
 
-    int32_t thread_max_num = omp_get_max_threads();
-    int32_t l3_size = get_L3_Size();
+    int64_t thread_max_num = omp_get_max_threads();
+    int64_t l3_size = get_L3_Size();
 
-    int32_t block_x = std::min(
-        int32_t(l3_size / (dim * sizeof(T1) + thread_max_num * k * (sizeof(DIS_TYPE) + sizeof(ID_TYPE)))),
+    int64_t block_x = std::min(
+        int64_t(l3_size / (dim * sizeof(T1) + thread_max_num * k * (sizeof(DIS_TYPE) + sizeof(ID_TYPE)))),
         nx);
     if (block_x == 0) {
         block_x = 1;
     }
 
-    int32_t all_heap_size = block_x * k * thread_max_num;
+    int64_t all_heap_size = block_x * k * thread_max_num;
     DIS_TYPE* value_global = new DIS_TYPE[all_heap_size];
     ID_TYPE* labels_global = new ID_TYPE[all_heap_size];
 
-    for (int32_t x_from = 0, x_to; x_from < nx; x_from = x_to) {
+    for (int64_t x_from = 0, x_to; x_from < nx; x_from = x_to) {
         x_to = std::min(nx, x_from + block_x);
-        int32_t size = x_to - x_from;
-        int32_t thread_heap_size = size * k;
+        int64_t size = x_to - x_from;
+        int64_t thread_heap_size = size * k;
 
         // init heap
         heap_heapify<C>(all_heap_size, value_global, labels_global);
 
 #pragma omp parallel for schedule(static)
         for (int j = 0; j < ny; j++) {
-            int32_t thread_no = omp_get_thread_num();
+            int64_t thread_no = omp_get_thread_num();
             auto* y_j = y + j * dim;
             auto* x_i = x + x_from * dim;
-            for (int32_t i = 0; i < size; i++) {
+            for (int64_t i = 0; i < size; i++) {
                 DIS_TYPE disij = comptuer (x_i, y_j, dim);
                 DIS_TYPE* val_ = value_global + thread_no * thread_heap_size + i * k;
                 ID_TYPE* ids_ = labels_global + thread_no * thread_heap_size + i * k;
@@ -96,8 +96,8 @@ void knn_2 (const T1 * x, // query
         }
 
         // merge heap
-        for (int32_t t = 1; t < thread_max_num; t++) {
-            for (int32_t i = 0; i < size; i++) {
+        for (int64_t t = 1; t < thread_max_num; t++) {
+            for (int64_t i = 0; i < size; i++) {
                 DIS_TYPE* __restrict value_x = value_global + i * k;
                 ID_TYPE* __restrict labels_x = labels_global + i * k;
                 DIS_TYPE* value_x_t = value_x + t * thread_heap_size;
@@ -111,7 +111,7 @@ void knn_2 (const T1 * x, // query
         }
 
         // sort
-        for (int32_t i = 0; i < size; i++) {
+        for (int64_t i = 0; i < size; i++) {
             DIS_TYPE * value_x = value_global + i * k;
             ID_TYPE * labels_x = labels_global + i * k;
             heap_reorder<C> (k, value_x, labels_x);

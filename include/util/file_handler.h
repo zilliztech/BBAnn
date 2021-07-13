@@ -30,7 +30,7 @@ class IOReader {
 
      uint64_t get_file_size() { return fsize_; }
 
-     void read(char* read_buf, const size_t n_bytes) {
+     void read(char* read_buf, const uint64_t n_bytes) {
          assert(read_buf != nullptr);
          assert(cache_buf_ != nullptr);
          if (cur_off_ + n_bytes <= cache_size_) {
@@ -82,7 +82,7 @@ class IOWriter {
 
     uint64_t get_file_size() { return fsize_; }
 
-    void write(char* buff, const size_t n_bytes) {
+    void write(char* buff, const uint64_t n_bytes) {
         assert(buff != nullptr);
         if (n_bytes + cur_off_ <= cache_size_) {
             memcpy(cache_buf_ + cur_off_, buff, n_bytes);

@@ -105,11 +105,11 @@ void reservoir_sampling(const std::string& data_file, const size_t sample_num, T
     ntotal = nb;
     ndims = dim;
     std::unique_ptr<T[]> tmp_buf = std::make_unique<T[]>(ndims);
-    for (auto i = 0; i < sample_num; i ++) {
+    for (size_t i = 0; i < sample_num; i ++) {
         auto pi = sample_data + ndims * i;
         reader.read((char*) pi, ndims * sizeof(T));
     }
-    for (auto i = sample_num; i < ntotal; i ++) {
+    for (size_t i = sample_num; i < ntotal; i ++) {
         reader.read((char*)tmp_buf.get(), ndims * sizeof(T));
         std::uniform_int_distribution<size_t> distribution(0, i);
         size_t rand = (size_t)distribution(generator);
@@ -304,6 +304,36 @@ void read_comp(std::vector<std::vector<std::pair<IDT, DISTT>>>& v, const std::st
     gin.close();
 }
 
+// TODO: need a is_range_search argument from top-level
+template<typename FILE_IDT, typename IDT>
+void read_comp_range_search(
+        std::vector<std::vector<IDT>>& v,
+        const std::string& gt_file,
+        int32_t& nq,
+        int32_t& total_res) {
+    std::ifstream gin(gt_file, std::ios::binary);
+
+    gin.read((char*)&nq, sizeof(int32_t));
+    gin.read((char*)&total_res, sizeof(int32_t));
+    
+    v.resize(nq);
+    int32_t n_results_per_query;
+    for (int i = 0; i < nq; ++i) {
+        gin.read((char*)&n_results_per_query, sizeof(int32_t));
+        v[i].resize(n_results_per_query);
+    }
+
+    FILE_IDT t_id;
+    for (uint32_t i = 0; i < nq; ++i) {
+        for (uint32_t j = 0; j < v[i].size(); ++j) {
+            gin.read((char*)&t_id, sizeof(FILE_IDT));
+            v[i][j] = static_cast<IDT>(t_id);
+        }
+    }
+
+    gin.close();
+}
+
 template<typename DISTT, typename IDT>
 void recall(const std::string& groundtruth_file, const std::string& answer_file, bool use_comp_format = true) {
     uint32_t gt_nq, gt_topk, answer_nq, answer_topk;
@@ -329,13 +359,6 @@ void recall(const std::string& groundtruth_file, const std::string& answer_file,
         << "(" << answer_nq << "), topk " << gt_topk << "(" << answer_topk << ")" << std::endl;
         return ;
     }
-
-    if (gt_nq != answer_nq || gt_topk != answer_topk) {
-        std::cerr << "Grountdtruth parammeters does not match. GT nq " << gt_nq
-        << "(" << answer_nq << "), topk " << gt_topk << "(" << answer_topk << ")" << std::endl;
-        return ;
-    }
-
 
     // print_vec_id_dis<DISTT, IDT>(resultset, "show resultset:");
 

@@ -1,14 +1,14 @@
 #include "util/random.h"
 
-void rand_perm (uint64_t *perm, uint64_t n, uint64_t k, int32_t seed) {
+void rand_perm (int64_t *perm, int64_t n, int64_t k, int64_t seed) {
     std::mt19937 generator(seed);
 
-    for (int32_t i = 0; i < n; i++) {
+    for (int64_t i = 0; i < n; i++) {
         perm[i] = i;
     }
 
-    for (int32_t i = 0; i < k; i++) {
-        int i2 = i + generator() % (n - i);
+    for (int64_t i = 0; i < k; i++) {
+        int64_t i2 = i + generator() % (n - i);
         std::swap(perm[i], perm[i2]);
     }
 }
