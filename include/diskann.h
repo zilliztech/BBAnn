@@ -123,9 +123,10 @@ void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
                   uint64_t* buckets_label);
 
 template<typename DATAT, typename DISTT, typename HEAPTT>
-void search_quantizer(ProductQuantizer<HEAPTT, DATAT, uint8_t>& pq_quantizer,
+void search_pq_quantizer(ProductQuantizer<HEAPTT, DATAT, uint8_t>& pq_quantizer,
                       const uint32_t nq,
                       const uint32_t dq,
+                      float* ivf_centroids,
                       uint64_t* buckets_label,
                       const int nprobe,
                       const int refine_topk,
@@ -157,6 +158,22 @@ void save_answers(const std::string& answer_bin_file,
                   DISTT*& answer_dists,
                   uint32_t*& answer_ids,
                   bool use_comp_format = true);
+
+template<typename DATAT, typename DISTT, typename HEAPT, typename HEAPTT>
+void search_bigann(const std::string& index_path,
+                   const std::string& query_bin_file,
+                   const std::string& answer_bin_file,
+                   const int nprobe,
+                   const int refine_nprobe,
+                   const int topk,
+                   const int refine_topk,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   PQResidualQuantizer<HEAPTT, DATAT, uint8_t>& pq_quantizer,
+                   const int K1,
+                   PQ_Computer<DATAT>& pq_cmp,
+                   std::vector<std::vector<uint8_t>>& pq_codebook,
+                   std::vector<std::vector<uint32_t>>& meta,
+                   Computer<DATAT, DATAT, DISTT>& dis_computer);
 
 template<typename DATAT, typename DISTT, typename HEAPT, typename HEAPTT>
 void search_bigann(const std::string& index_path,

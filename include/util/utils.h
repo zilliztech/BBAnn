@@ -60,6 +60,38 @@ void load_meta_impl(const std::string& index_path,
 }
 
 template<typename T>
+inline void write_bin_file(const std::string& file_name, T* data, uint32_t n,
+                    uint32_t dim) {
+    assert(data != nullptr);
+    std::ofstream writer(file_name, std::ios::binary);
+
+    writer.write((char*)&n, sizeof(uint32_t));
+    writer.write((char*)&dim, sizeof(uint32_t));
+    writer.write((char*)data, sizeof(T) * n * dim);
+
+    writer.close();
+    std::cout << "write binary file to " << file_name << " done in ... seconds, n = "
+              << n << ", dim = " << dim << std::endl;
+}
+
+template<typename T>
+inline void read_bin_file(const std::string& file_name, T*& data, uint32_t& n,
+                    uint32_t& dim) {
+    std::ifstream reader(file_name, std::ios::binary);
+
+    reader.read((char*)&n, sizeof(uint32_t));
+    reader.read((char*)&dim, sizeof(uint32_t));
+    if (data == nullptr) {
+        data = new T[n * dim];
+    }
+    reader.read((char*)data, sizeof(T) * n * dim);
+
+    reader.close();
+    std::cout << "read binary file from " << file_name << " done in ... seconds, n = "
+              << n << ", dim = " << dim << std::endl;
+}
+
+template<typename T>
 void reservoir_sampling(const std::string& data_file, const size_t sample_num, T* sample_data) {
     assert(sample_data != nullptr);
     std::random_device rd;
@@ -132,7 +164,7 @@ void reservoir_sampling_residual(
                     std::uniform_int_distribution<size_t> distribution(0, global_cnt);
                     size_t rand = (size_t)distribution(generator);
                     if (rand < sample_num) {
-                        memcpy(sample_data + cluster_dim * rand), vec, cluster_dim * sizeof(T));
+                        memcpy(sample_data + cluster_dim * rand, vec, cluster_dim * sizeof(T));
                         centroid_offsets[rand] = bucket_cnt;
                     }
                 }
@@ -147,8 +179,7 @@ void reservoir_sampling_residual(
     // read centroids
     float *centroids = nullptr;
     uint32_t n, dim;
-    read_bin_file<float>(index_path + BUCKET + CENTROIDS + BIN, centroids, n, dim);
-
+    read_bin_file<float>(output_path + BUCKET + CENTROIDS + BIN, centroids, n, dim);
 
     for (int i = 0; i < sample_num; ++i) {
         const float *c = centroids + centroid_offsets[i] * dim;
@@ -159,38 +190,6 @@ void reservoir_sampling_residual(
 
     delete[] sample_data;
     delete[] centroids;
-}
-
-template<typename T>
-inline void write_bin_file(const std::string& file_name, T* data, uint32_t n,
-                    uint32_t dim) {
-    assert(data != nullptr);
-    std::ofstream writer(file_name, std::ios::binary);
-
-    writer.write((char*)&n, sizeof(uint32_t));
-    writer.write((char*)&dim, sizeof(uint32_t));
-    writer.write((char*)data, sizeof(T) * n * dim);
-
-    writer.close();
-    std::cout << "write binary file to " << file_name << " done in ... seconds, n = "
-              << n << ", dim = " << dim << std::endl;
-}
-
-template<typename T>
-inline void read_bin_file(const std::string& file_name, T*& data, uint32_t& n,
-                    uint32_t& dim) {
-    std::ifstream reader(file_name, std::ios::binary);
-
-    reader.read((char*)&n, sizeof(uint32_t));
-    reader.read((char*)&dim, sizeof(uint32_t));
-    if (data == nullptr) {
-        data = new T[n * dim];
-    }
-    reader.read((char*)data, sizeof(T) * n * dim);
-
-    reader.close();
-    std::cout << "read binary file from " << file_name << " done in ... seconds, n = "
-              << n << ", dim = " << dim << std::endl;
 }
 
 inline uint64_t gen_id(const uint32_t cid, const uint32_t bid, const uint32_t off) {
@@ -235,6 +234,15 @@ inline MetricType get_metric_type_by_name(const std::string& mt_name) {
     if (mt_name == std::string("IP"))
         return MetricType::IP;
     return MetricType::None;
+}
+
+inline QuantizerType get_quantizer_type_by_name(const std::string& s) {
+    if (s == "PQ") {
+        return QuantizerType::PQ;
+    } else if (s == "PQRes") {
+        return QuantizerType::PQRES;
+    }
+    return QuantizerType::None;
 }
 
 template<typename DISTT, typename IDT>

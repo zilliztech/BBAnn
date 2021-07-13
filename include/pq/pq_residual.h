@@ -13,10 +13,10 @@
 template <class C, typename T, typename U>
 class PQResidualQuantizer {
 private:
-    ProductQuantizer* pq;
+    ProductQuantizer<C, T, U>* pq;
 
     // for easy access
-    int32_t d;
+    int32_t d, K;
     uint8_t m;
 
     void compute_residual(const T*, const float* x, float* residual);
@@ -25,9 +25,13 @@ public:
 
     ~PQResidualQuantizer();
 
+    int32_t get_d();
+
     void train(int32_t n, const T* x);
     
     void save_centroids(const std::string& save_file);
+
+    void load_centroids(const std::string& load_file);
 
     void encode_vectors_and_save(
             float*& precomputer_table,
@@ -35,6 +39,22 @@ public:
             const T* x,
             const float* ivf_centroids,
             const std::string& file_path);
+
+    void search(
+        float* precompute_table,
+        const T* q,
+        const float* centroid,
+        const U* pcodes,
+        int32_t n,
+        int32_t topk,
+        typename C::T* values,
+        typename C::TI* labels,
+        PQ_Computer<T> computer,
+        bool reorder, 
+        bool heapify,
+        const uint32_t& cid, 
+        const uint32_t& off,
+        const uint32_t& qid);
 };
 
 template <class C, typename T, typename U>
@@ -43,7 +63,7 @@ PQResidualQuantizer<C, T, U>::PQResidualQuantizer(
         uint8_t _m,
         uint8_t _nbits)
             : d(_d), m(_m) {
-    pq = new ProductQuantizer(_d, _m, _nbits);
+    pq = new ProductQuantizer<C, T, U>(_d, _m, _nbits);
 }
 
 template <class C, typename T, typename U>
@@ -58,7 +78,12 @@ void PQResidualQuantizer<C, T, U>::train(int32_t n, const T* x) {
 
 template <class C, typename T, typename U>
 void PQResidualQuantizer<C, T, U>::save_centroids(const std::string& save_file) {
-    pq->save_centroids((save_file);
+    pq->save_centroids(save_file);
+}    
+
+template <class C, typename T, typename U>
+void PQResidualQuantizer<C, T, U>::load_centroids(const std::string& load_file) {
+    pq->load_centroids(load_file);
 }
 
 template<class C, typename T, typename U>
@@ -76,8 +101,8 @@ void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
     // precompute term2
     for (int i = 0; i < n; ++i, c += m) {
         // TODO: reconstruct
-        term2 += norm_L2sqr<U, float>(c, d);
-        term2 += 2.0f * IP(ivf_c, c, d);
+        term2s[i] += norm_L2sqr<U, float>(c, d);
+        term2s[i] += 2.0f * IP(ivf_c, c, d);
     }
 
     uint32_t wm = m + sizeof(float);
@@ -98,6 +123,51 @@ void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
 }
 
 template <class C, typename T, typename U>
-void search() {
+void PQResidualQuantizer<C, T, U>::search(
+        float* precompute_table,
+        const T* q,
+        const float* centroid,
+        const U* pcodes,
+        int32_t n,
+        int32_t topk,
+        typename C::T* values,
+        typename C::TI* labels,
+        PQ_Computer<T> computer,
+        bool reorder, 
+        bool heapify,
+        const uint32_t& cid, 
+        const uint32_t& off,
+        const uint32_t& qid) {
 
+    assert(precompute_table != nullptr);
+    const float* dis_tab = precompute_table;
+
+    auto* __restrict val_ = values;
+    auto* __restrict ids_ = labels;
+
+    if (heapify)
+        heap_heapify<C>(topk, val_, ids_);
+    const U* c = pcodes;
+
+    for (int j = 0; j < n; ++j) {
+        // term 1
+        float dis = L2sqr<T, float, float>(q, centroid, d);
+
+        // term 2
+        dis += *reinterpret_cast<float *>(pcodes + m);
+
+        // term 3
+        const float* __restrict dt = dis_tab;
+        float term3 = 0;
+        for (int mm = 0; mm < m; ++mm, dt += K) {
+            term3 += dt[*c++];
+        }
+        dis -= 2.0f * term3;
+
+        if (C::cmp(val_[0], dis)) {
+            heap_swap_top<C>(topk, val_, ids_, dis, gen_refine_id(cid, off + j, qid));
+        }
+    }
+    if (reorder)
+        heap_reorder<C>(topk, val_, ids_);
 }

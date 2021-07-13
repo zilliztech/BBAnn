@@ -22,7 +22,7 @@
  */
 
 int main(int argc, char** argv) {
-    if (argc != 14) {
+    if (argc != 15) {
         std::cout << "Usage: << " << argv[0]
                   << " data_type(float or uint8 or int8)"
                   << " index path"
@@ -37,6 +37,7 @@ int main(int argc, char** argv) {
                   << " PQ.nbits"
                   << " K1"
                   << " metric type(L2 or IP)"
+                  << " quantizer (PQ | PQRes)"
                   << std::endl;
         return 1;
     }
@@ -53,7 +54,10 @@ int main(int argc, char** argv) {
     int PQnbits = std::stoi(argv[11]);
     int K1 = std::stoi(argv[12]);
     auto metric_type = get_metric_type_by_name(std::string(argv[13]));
+    auto quantizer_type = get_quantizer_type_by_name(std::string(argv[14]));
     assert(PQnbits == 8);
+    assert(metric_type != MetricType::None);
+    assert(quantizer_type != QuantizerType::None);
 
     if ('/' != *index_path.rbegin())
         index_path += '/';
@@ -121,20 +125,33 @@ int main(int argc, char** argv) {
             pq_cmp = L2sqr<const float, const float, float>;
             dis_computer = L2sqr<const float, const float, float>;
 
-            ProductQuantizer<CMax<float, uint64_t>, float, uint8_t> pq_quantizer(dim, PQM, PQnbits);
-            pq_quantizer.load_centroids(pq_centroids_file);
+            if (QuantizerType::PQ == quantizer_type) {
+                ProductQuantizer<CMax<float, uint64_t>, float, uint8_t> pq_quantizer(dim, PQM, PQnbits);
+                pq_quantizer.load_centroids(pq_centroids_file);
+                search_bigann<float, float, CMax<float, uint32_t>, CMax<float, uint64_t>>
+                    (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
+            } else if (QuantizerType::PQRES == quantizer_type) {
+                PQResidualQuantizer<CMax<float, uint64_t>, float, uint8_t> pq_quantizer(dim, PQM, PQnbits);
+                pq_quantizer.load_centroids(pq_centroids_file);
+                search_bigann<float, float, CMax<float, uint32_t>, CMax<float, uint64_t>>
+                    (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
 
-            search_bigann<float, float, CMax<float, uint32_t>, CMax<float, uint64_t>>
-                (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
+            }
         } else if (MetricType::IP == metric_type) {
             pq_cmp = IP<const float, const float, float>;
             dis_computer = IP<const float, const float, float>;
 
-            ProductQuantizer<CMin<float, uint64_t>, float, uint8_t> pq_quantizer(dim, PQM, PQnbits);
-            pq_quantizer.load_centroids(pq_centroids_file);
-
-            search_bigann<float, float, CMin<float, uint32_t>, CMin<float, uint64_t>>
-                (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
+            if (QuantizerType::PQ == quantizer_type) {
+                ProductQuantizer<CMin<float, uint64_t>, float, uint8_t> pq_quantizer(dim, PQM, PQnbits);
+                pq_quantizer.load_centroids(pq_centroids_file);
+                search_bigann<float, float, CMin<float, uint32_t>, CMin<float, uint64_t>>
+                    (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
+            } else if (QuantizerType::PQRES == quantizer_type) {
+                PQResidualQuantizer<CMin<float, uint64_t>, float, uint8_t> pq_quantizer(dim, PQM, PQnbits);
+                pq_quantizer.load_centroids(pq_centroids_file);
+                search_bigann<float, float, CMin<float, uint32_t>, CMin<float, uint64_t>>
+                    (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
+            }
         }
         // calculate_recall<float>(ground_truth_file, answer_file, topk);
         recall<float, uint32_t>(ground_truth_file, answer_file);
@@ -146,20 +163,32 @@ int main(int argc, char** argv) {
             pq_cmp = L2sqr<const uint8_t, const float, float>;
             dis_computer = L2sqr<const uint8_t, const uint8_t, uint32_t>;
 
-            ProductQuantizer<CMax<uint32_t, uint64_t>, uint8_t, uint8_t> pq_quantizer(dim, PQM, PQnbits);
-            pq_quantizer.load_centroids(pq_centroids_file);
-
-            search_bigann<uint8_t, uint32_t, CMax<uint32_t, uint32_t>, CMax<uint32_t, uint64_t>>
-                (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
+            if (QuantizerType::PQ == quantizer_type) {
+                ProductQuantizer<CMax<uint32_t, uint64_t>, uint8_t, uint8_t> pq_quantizer(dim, PQM, PQnbits);
+                pq_quantizer.load_centroids(pq_centroids_file);
+                search_bigann<uint8_t, uint32_t, CMax<uint32_t, uint32_t>, CMax<uint32_t, uint64_t>>
+                    (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
+            } else if (QuantizerType::PQRES == quantizer_type) {
+                PQResidualQuantizer<CMax<uint32_t, uint64_t>, uint8_t, uint8_t> pq_quantizer(dim, PQM, PQnbits);
+                pq_quantizer.load_centroids(pq_centroids_file);
+                search_bigann<uint8_t, uint32_t, CMax<uint32_t, uint32_t>, CMax<uint32_t, uint64_t>>
+                    (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
+            }
         } else if (MetricType::IP == metric_type) {
             pq_cmp = IP<const uint8_t, const float, float>;
             dis_computer = IP<const uint8_t, const uint8_t, uint32_t>;
 
-            ProductQuantizer<CMin<uint32_t, uint64_t>, uint8_t, uint8_t> pq_quantizer(dim, PQM, PQnbits);
-            pq_quantizer.load_centroids(pq_centroids_file);
-
-            search_bigann<uint8_t, uint32_t, CMin<uint32_t, uint32_t>, CMin<uint32_t, uint64_t>>
-                (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
+            if (QuantizerType::PQ == quantizer_type) {
+                ProductQuantizer<CMin<uint32_t, uint64_t>, uint8_t, uint8_t> pq_quantizer(dim, PQM, PQnbits);
+                pq_quantizer.load_centroids(pq_centroids_file);
+                search_bigann<uint8_t, uint32_t, CMin<uint32_t, uint32_t>, CMin<uint32_t, uint64_t>>
+                    (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
+            } else if (QuantizerType::PQRES == quantizer_type) {
+                PQResidualQuantizer<CMin<uint32_t, uint64_t>, uint8_t, uint8_t> pq_quantizer(dim, PQM, PQnbits);
+                pq_quantizer.load_centroids(pq_centroids_file);
+                search_bigann<uint8_t, uint32_t, CMin<uint32_t, uint32_t>, CMin<uint32_t, uint64_t>>
+                    (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
+            }
         }
         // calculate_recall<uint32_t>(ground_truth_file, answer_file, topk);
         recall<uint32_t, uint32_t>(ground_truth_file, answer_file);
@@ -171,20 +200,32 @@ int main(int argc, char** argv) {
             pq_cmp = L2sqr<const int8_t, const float, float>;
             dis_computer = L2sqr<const int8_t, const int8_t, int32_t>;
 
-            ProductQuantizer<CMax<int32_t, uint64_t>, int8_t, uint8_t> pq_quantizer(dim, PQM, PQnbits);
-            pq_quantizer.load_centroids(pq_centroids_file);
-
-            search_bigann<int8_t, int32_t, CMax<int32_t, uint32_t>, CMax<int32_t, uint64_t>>
-                (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
+            if (QuantizerType::PQ == quantizer_type) {
+                ProductQuantizer<CMax<int32_t, uint64_t>, int8_t, uint8_t> pq_quantizer(dim, PQM, PQnbits);
+                pq_quantizer.load_centroids(pq_centroids_file);
+                search_bigann<int8_t, int32_t, CMax<int32_t, uint32_t>, CMax<int32_t, uint64_t>>
+                    (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
+            } else if (QuantizerType::PQRES == quantizer_type) {
+                PQResidualQuantizer<CMax<int32_t, uint64_t>, int8_t, uint8_t> pq_quantizer(dim, PQM, PQnbits);
+                pq_quantizer.load_centroids(pq_centroids_file);
+                search_bigann<int8_t, int32_t, CMax<int32_t, uint32_t>, CMax<int32_t, uint64_t>>
+                    (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
+            }
         } else if (MetricType::IP == metric_type) {
             pq_cmp = IP<const int8_t, const float, float>;
             dis_computer = IP<const int8_t, const int8_t, int32_t>;
 
-            ProductQuantizer<CMin<int32_t, uint64_t>, int8_t, uint8_t> pq_quantizer(dim, PQM, PQnbits);
-            pq_quantizer.load_centroids(pq_centroids_file);
-
-            search_bigann<int8_t, int32_t, CMin<int32_t, uint32_t>, CMin<int32_t, uint64_t>>
-                (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
+            if (QuantizerType::PQ == quantizer_type) {
+                ProductQuantizer<CMin<int32_t, uint64_t>, int8_t, uint8_t> pq_quantizer(dim, PQM, PQnbits);
+                pq_quantizer.load_centroids(pq_centroids_file);
+                search_bigann<int8_t, int32_t, CMin<int32_t, uint32_t>, CMin<int32_t, uint64_t>>
+                    (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
+            } else if (QuantizerType::PQRES == quantizer_type) {
+                PQResidualQuantizer<CMin<int32_t, uint64_t>, int8_t, uint8_t> pq_quantizer(dim, PQM, PQnbits);
+                pq_quantizer.load_centroids(pq_centroids_file);
+                search_bigann<int8_t, int32_t, CMin<int32_t, uint32_t>, CMin<int32_t, uint64_t>>
+                    (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer);
+            }
         }
         // calculate_recall<uint32_t>(ground_truth_file, answer_file, topk);
         recall<int32_t, uint32_t>(ground_truth_file, answer_file);
