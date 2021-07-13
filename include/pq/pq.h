@@ -185,7 +185,7 @@ void ProductQuantizer<C, T, U>::compute_dis_tab(const T* q, float* dis_tab,
 
 template<class C, typename T, typename U>
 void ProductQuantizer<C, T, U>::train_residual(int64_t n, const float* x) {
-    const size_t sub_code_size = dsub * sizeof(T);
+    const size_t sub_code_size = dsub * sizeof(float);
     float* xs = new float[n * dsub];
 
     bool remove_dup = false;
