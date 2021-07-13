@@ -28,19 +28,19 @@ Computer<T1, T2, R> select_computer(MetricType metric_type) {
 }
 
 inline void get_bin_metadata(const std::string& bin_file, uint32_t& nrows, uint32_t& ncols) {
-    std::ifstream reader(bin_file, std::ios::binary);
-    reader.read((char*) &nrows, sizeof(uint32_t));
-    reader.read((char*) &ncols, sizeof(uint32_t));
-    reader.close();
+    int fd = open(bin_file.c_str(), O_RDONLY);
+    read(fd, (char*) &nrows, sizeof(uint32_t));
+    read(fd, (char*) &ncols, sizeof(uint32_t));
+    close(fd);
     std::cout << "get meta from " << bin_file << ", nrows = " << nrows << ", ncols = " << ncols << std::endl;
 }
 
 inline void set_bin_metadata(const std::string& bin_file, const uint32_t& nrows, const uint32_t& ncols) {
-    std::ofstream writer(bin_file, std::ios::binary | std::ios::in);
-    writer.seekp(0);
-    writer.write((char*) &nrows, sizeof(uint32_t));
-    writer.write((char*) &ncols, sizeof(uint32_t));
-    writer.close();
+    int fd = open(bin_file.c_str(), O_WRONLY);
+    lseek(fd, 0, SEEK_SET);
+    write(fd, (char*) &nrows, sizeof(uint32_t));
+    write(fd, (char*) &ncols, sizeof(uint32_t));
+    close(fd);
     std::cout << "set meta to " << bin_file << ", nrows = " << nrows << ", ncols = " << ncols << std::endl;
 }
 
@@ -53,17 +53,17 @@ void reservoir_sampling(const std::string& data_file, const size_t sample_num, T
     uint32_t nb, dim;
     size_t ntotal, ndims;
     IOReader reader(data_file);
-    reader.read((char*)&nb, sizeof(uint32_t));
-    reader.read((char*)&dim, sizeof(uint32_t));
+    reader.Read((char*)&nb, sizeof(uint32_t));
+    reader.Read((char*)&dim, sizeof(uint32_t));
     ntotal = nb;
     ndims = dim;
     std::unique_ptr<T[]> tmp_buf = std::make_unique<T[]>(ndims);
     for (size_t i = 0; i < sample_num; i ++) {
         auto pi = sample_data + ndims * i;
-        reader.read((char*) pi, ndims * sizeof(T));
+        reader.Read((char*) pi, ndims * sizeof(T));
     }
     for (size_t i = sample_num; i < ntotal; i ++) {
-        reader.read((char*)tmp_buf.get(), ndims * sizeof(T));
+        reader.Read((char*)tmp_buf.get(), ndims * sizeof(T));
         std::uniform_int_distribution<size_t> distribution(0, i);
         size_t rand = (size_t)distribution(generator);
         if (rand < sample_num) {
@@ -76,13 +76,13 @@ template<typename T>
 inline void write_bin_file(const std::string& file_name, T* data, uint32_t n,
                     uint32_t dim) {
     assert(data != nullptr);
-    std::ofstream writer(file_name, std::ios::binary);
+    int fd = open(file_name.c_str(), O_WRONLY);
 
-    writer.write((char*)&n, sizeof(uint32_t));
-    writer.write((char*)&dim, sizeof(uint32_t));
-    writer.write((char*)data, sizeof(T) * n * dim);
+    write(fd, (char*)&n, sizeof(uint32_t));
+    write(fd, (char*)&dim, sizeof(uint32_t));
+    write(fd, (char*)data, sizeof(T) * n * dim);
 
-    writer.close();
+    close(fd);
     std::cout << "write binary file to " << file_name << " done in ... seconds, n = "
               << n << ", dim = " << dim << std::endl;
 }
@@ -90,16 +90,16 @@ inline void write_bin_file(const std::string& file_name, T* data, uint32_t n,
 template<typename T>
 inline void read_bin_file(const std::string& file_name, T*& data, uint32_t& n,
                     uint32_t& dim) {
-    std::ifstream reader(file_name, std::ios::binary);
+    int fd = open(file_name.c_str(), O_RDONLY);
 
-    reader.read((char*)&n, sizeof(uint32_t));
-    reader.read((char*)&dim, sizeof(uint32_t));
+    read(fd, (char*)&n, sizeof(uint32_t));
+    read(fd, (char*)&dim, sizeof(uint32_t));
     if (data == nullptr) {
         data = new T[(int64_t)n * (int64_t)dim];
     }
-    reader.read((char*)data, sizeof(T) * n * dim);
+    read(fd, (char*)data, sizeof(T) * n * dim);
 
-    reader.close();
+    close(fd);
     std::cout << "read binary file from " << file_name << " done in ... seconds, n = "
               << n << ", dim = " << dim << std::endl;
 }
@@ -165,34 +165,34 @@ template<typename DISTT, typename IDT>
 void read_sift(std::vector<std::vector<std::pair<IDT, DISTT>>>& v, const std::string& gt_file, uint32_t& nq, uint32_t& topk) {
     nq = 100; // default value 
 
-    std::ifstream gin(gt_file, std::ios::binary);
+    int fd = open(gt_file.c_str(), O_RDONLY);
     uint32_t sz;
     v.resize(nq);
     for (auto i = 0; i < nq; i ++) {
-        gin.read((char*)&sz, sizeof(sz));
+        read(fd, (char*)&sz, sizeof(sz));
         v[i].resize(sz);
         for (auto j = 0; j < sz; j ++) {
-            gin.read((char*)&v[i][j].first, sizeof(IDT));
-            gin.read((char*)&v[i][j].second, sizeof(DISTT));
+            read(fd, (char*)&v[i][j].first, sizeof(IDT));
+            read(fd, (char*)&v[i][j].second, sizeof(DISTT));
         }
     }
     topk = sz;
-    gin.close();
+    close(fd);
 }
 
 template<typename FILE_DISTT, typename FILE_IDT, typename DISTT, typename IDT>
 void read_comp(std::vector<std::vector<std::pair<IDT, DISTT>>>& v, const std::string& gt_file, uint32_t& nq, uint32_t& topk) {
-    std::ifstream gin(gt_file, std::ios::binary);
+    int fd = open(gt_file.c_str(), O_RDONLY);
 
-    gin.read((char*)&nq, sizeof(uint32_t));
-    gin.read((char*)&topk, sizeof(uint32_t));
+    read(fd, (char*)&nq, sizeof(uint32_t));
+    read(fd, (char*)&topk, sizeof(uint32_t));
 
     v.resize(nq);
     FILE_IDT t_id;
     for (uint32_t i = 0; i < nq; ++i) {
         v[i].resize(topk);
         for (uint32_t j = 0; j < topk; ++j) {
-            gin.read((char*)&t_id, sizeof(FILE_IDT));
+            read(fd, (char*)&t_id, sizeof(FILE_IDT));
             v[i][j].first = static_cast<IDT>(t_id);
         }
     }
@@ -200,11 +200,11 @@ void read_comp(std::vector<std::vector<std::pair<IDT, DISTT>>>& v, const std::st
     FILE_DISTT t_dist;
     for (uint32_t i = 0; i < nq; ++i) {
         for (uint32_t j = 0; j < topk; ++j) {
-            gin.read((char*)&t_dist, sizeof(FILE_DISTT));
+            read(fd, (char*)&t_dist, sizeof(FILE_DISTT));
             v[i][j].second = static_cast<DISTT>(t_dist);
         }
     }
-    gin.close();
+    close(fd);
 }
 
 // TODO: need a is_range_search argument from top-level
@@ -214,27 +214,27 @@ void read_comp_range_search(
         const std::string& gt_file,
         int32_t& nq,
         int32_t& total_res) {
-    std::ifstream gin(gt_file, std::ios::binary);
+    int fd = open(gt_file.c_str(), O_RDONLY);
 
-    gin.read((char*)&nq, sizeof(int32_t));
-    gin.read((char*)&total_res, sizeof(int32_t));
+    read(fd, (char*)&nq, sizeof(int32_t));
+    read(fd, (char*)&total_res, sizeof(int32_t));
     
     v.resize(nq);
     int32_t n_results_per_query;
     for (int i = 0; i < nq; ++i) {
-        gin.read((char*)&n_results_per_query, sizeof(int32_t));
+        read(fd, (char*)&n_results_per_query, sizeof(int32_t));
         v[i].resize(n_results_per_query);
     }
 
     FILE_IDT t_id;
     for (uint32_t i = 0; i < nq; ++i) {
         for (uint32_t j = 0; j < v[i].size(); ++j) {
-            gin.read((char*)&t_id, sizeof(FILE_IDT));
+            read(fd, (char*)&t_id, sizeof(FILE_IDT));
             v[i][j] = static_cast<IDT>(t_id);
         }
     }
 
-    gin.close();
+    close(fd);
 }
 
 template<typename DISTT, typename IDT>

@@ -51,21 +51,21 @@ void divide_raw_data(const std::string& raw_data_bin_file,
               << std::endl;
     IOReader reader(raw_data_bin_file);
     uint32_t nb, dim;
-    reader.read((char*)&nb, sizeof(uint32_t));
-    reader.read((char*)&dim, sizeof(uint32_t));
+    reader.Read((char*)&nb, sizeof(uint32_t));
+    reader.Read((char*)&dim, sizeof(uint32_t));
     uint32_t placeholder = 0, const_one = 1;
     std::vector<uint32_t> cluster_size(K1, 0);
-    std::vector<std::ofstream> cluster_dat_writer(K1);
-    std::vector<std::ofstream> cluster_ids_writer(K1);
+    std::vector<int> cluster_dat_writer(K1);
+    std::vector<int> cluster_ids_writer(K1);
     for (int i = 0; i < K1; i ++) {
         std::string cluster_raw_data_file_name = output_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
         std::string cluster_ids_data_file_name = output_path + CLUSTER + std::to_string(i) + GLOBAL_IDS + BIN;
-        cluster_dat_writer[i] = std::ofstream(cluster_raw_data_file_name, std::ios::binary);
-        cluster_ids_writer[i] = std::ofstream(cluster_ids_data_file_name, std::ios::binary);
-        cluster_dat_writer[i].write((char*)&placeholder, sizeof(uint32_t));
-        cluster_dat_writer[i].write((char*)&dim, sizeof(uint32_t));
-        cluster_ids_writer[i].write((char*)&placeholder, sizeof(uint32_t));
-        cluster_ids_writer[i].write((char*)&const_one, sizeof(uint32_t));
+        cluster_dat_writer[i] = open(cluster_raw_data_file_name.c_str(), O_WRONLY);
+        cluster_ids_writer[i] = open(cluster_ids_data_file_name.c_str(), O_WRONLY);
+        write(cluster_dat_writer[i], (char*)&placeholder, sizeof(uint32_t));
+        write(cluster_dat_writer[i], (char*)&dim, sizeof(uint32_t));
+        write(cluster_ids_writer[i], (char*)&placeholder, sizeof(uint32_t));
+        write(cluster_ids_writer[i], (char*)&const_one, sizeof(uint32_t));
     }
 
     int64_t block_size = 1000000;
@@ -79,7 +79,7 @@ void divide_raw_data(const std::string& raw_data_bin_file,
         int64_t sp = i * block_size;
         int64_t ep = std::min((int64_t)nb, sp + block_size);
         std::cout << "split the " << i << "th block, start position = " << sp << ", end position = " << ep << std::endl;
-        reader.read((char*)block_buf, (ep - sp) * dim * sizeof(DATAT));
+        reader.Read((char*)block_buf, (ep - sp) * dim * sizeof(DATAT));
         rci.RecordSection("read block data done");
         elkan_L2_assign<const DATAT, const float, DISTT>(block_buf, centroids, dim, ep -sp, K1, cluster_id.data(), dists.data());
         //knn_1<HEAPT, DATAT, float> (
@@ -100,8 +100,8 @@ void divide_raw_data(const std::string& raw_data_bin_file,
                 std::cout << std::endl;
             }
             */
-            cluster_dat_writer[cid].write((char*)(block_buf + j * dim), sizeof(DATAT) * dim);
-            cluster_ids_writer[cid].write((char*)&uid, sizeof(uint32_t));
+            write(cluster_dat_writer[cid], (char*)(block_buf + j * dim), sizeof(DATAT) * dim);
+            write(cluster_ids_writer[cid], (char*)&uid, sizeof(uint32_t));
             cluster_size[cid] ++;
         }
         rci.RecordSection("write done");
@@ -112,12 +112,12 @@ void divide_raw_data(const std::string& raw_data_bin_file,
     std::cout << "split_raw_data done in ... seconds, show statistics:" << std::endl;
     for (int i = 0; i < K1; i ++) {
         uint32_t cis = cluster_size[i];
-        cluster_dat_writer[i].seekp(0);
-        cluster_dat_writer[i].write((char*)&cis, sizeof(uint32_t));
-        cluster_dat_writer[i].close();
-        cluster_ids_writer[i].seekp(0);
-        cluster_ids_writer[i].write((char*)&cis, sizeof(uint32_t));
-        cluster_ids_writer[i].close();
+        lseek64(cluster_dat_writer[i], 0, SEEK_SET);
+        write(cluster_dat_writer[i], (char*)&cis, sizeof(uint32_t));
+        close(cluster_dat_writer[i]);
+        lseek64(cluster_ids_writer[i], 0, SEEK_SET);
+        write(cluster_ids_writer[i], (char*)&cis, sizeof(uint32_t));
+        close(cluster_ids_writer[i]);
         std::cout << "cluster-" << i << " has " << cis << " points." << std::endl;
         sump += cis;
     }
@@ -142,12 +142,12 @@ void conquer_clusters(const std::string& output_path,
     std::string bucket_centroids_file = output_path + BUCKET + CENTROIDS + BIN;
     std::string bucket_ids_file = output_path + CLUSTER + COMBINE_IDS + BIN;
 
-    std::ofstream bucket_ids_writer(bucket_ids_file, std::ios::binary);
-    std::ofstream bucket_ctd_writer(bucket_centroids_file, std::ios::binary);
-    bucket_ctd_writer.write((char*)&placeholder, sizeof(uint32_t));
-    bucket_ctd_writer.write((char*)&placeholder, sizeof(uint32_t));
-    bucket_ids_writer.write((char*)&placeholder, sizeof(uint32_t));
-    bucket_ids_writer.write((char*)&placeholder, sizeof(uint32_t));
+    int bucket_ids_writer = open(bucket_ids_file.c_str(), O_WRONLY);
+    int bucket_ctd_writer = open(bucket_centroids_file.c_str(), O_WRONLY);
+    write(bucket_ctd_writer, (char*)&placeholder, sizeof(uint32_t));
+    write(bucket_ctd_writer, (char*)&placeholder, sizeof(uint32_t));
+    write(bucket_ids_writer, (char*)&placeholder, sizeof(uint32_t));
+    write(bucket_ids_writer, (char*)&placeholder, sizeof(uint32_t));
     uint32_t graph_nb = 0, graph_dim;
     for (int i = 0; i < K1; i ++) {
         TimeRecorder rci("train-cluster-" + std::to_string(i));
@@ -158,16 +158,16 @@ void conquer_clusters(const std::string& output_path,
         uint32_t cluster_size, cluster_dim, ids_size, ids_dim;
         IOReader data_reader(data_file);
         IOReader ids_reader(ids_file);
-        data_reader.read((char*)&cluster_size, sizeof(uint32_t));
-        data_reader.read((char*)&cluster_dim, sizeof(uint32_t));
-        ids_reader.read((char*)&ids_size, sizeof(uint32_t));
-        ids_reader.read((char*)&ids_dim, sizeof(uint32_t));
+        data_reader.Read((char*)&cluster_size, sizeof(uint32_t));
+        data_reader.Read((char*)&cluster_dim, sizeof(uint32_t));
+        ids_reader.Read((char*)&ids_size, sizeof(uint32_t));
+        ids_reader.Read((char*)&ids_dim, sizeof(uint32_t));
         assert(cluster_size == ids_size);
         assert(ids_dim == 1);
         DATAT* datai = new DATAT[(uint64_t)cluster_size * cluster_dim];
-        data_reader.read((char*)datai, (uint64_t)cluster_size * cluster_dim * sizeof(DATAT));
+        data_reader.Read((char*)datai, (uint64_t)cluster_size * cluster_dim * sizeof(DATAT));
         uint32_t* idsi = new uint32_t[(uint64_t)ids_size * ids_dim];
-        ids_reader.read((char*)idsi, (uint64_t)ids_size * ids_dim * sizeof(uint32_t));
+        ids_reader.Read((char*)idsi, (uint64_t)ids_size * ids_dim * sizeof(uint32_t));
 
         int64_t K2 = (cluster_size - 1) / threshold + 1;
         std::cout << "cluster-" << i << " will split into " << K2 << " buckets." << std::endl;
@@ -211,13 +211,13 @@ void conquer_clusters(const std::string& output_path,
 
         // write buckets's centroids and combine ids
         // write_bin_file<float>(bucket_centroids_file, centroids_i, K2, cluster_dim);
-        bucket_ctd_writer.write((char*)centroids_i, K2 * cluster_dim * sizeof(float));
+        write(bucket_ctd_writer, (char*)centroids_i, K2 * cluster_dim * sizeof(float));
         rci.RecordSection("append centroids_i into bucket_centroids_file");
 
         for (int j = 0; j < K2; j ++) {
             assert(buckets_size[j] <= cluster_size);
             uint64_t gid = gen_id(i, j, buckets_size[j]);
-            bucket_ids_writer.write((char*)&gid, sizeof(uint64_t));
+            write(bucket_ids_writer, (char*)&gid, sizeof(uint64_t));
         }
         rci.RecordSection("append combine ids into bucket_ids_file");
 
@@ -234,14 +234,14 @@ void conquer_clusters(const std::string& output_path,
         { // data_writer will close and auto flush in de-constructor
             IOWriter data_writer(data_file, MEGABYTE * 100);
             IOWriter ids_writer(ids_file, MEGABYTE * 10);
-            data_writer.write((char*)&cluster_size, sizeof(uint32_t));
-            data_writer.write((char*)&cluster_dim, sizeof(uint32_t));
-            ids_writer.write((char*)&ids_size, sizeof(uint32_t));
-            ids_writer.write((char*)&ids_dim, sizeof(uint32_t));
+            data_writer.Write((char*)&cluster_size, sizeof(uint32_t));
+            data_writer.Write((char*)&cluster_dim, sizeof(uint32_t));
+            ids_writer.Write((char*)&ids_size, sizeof(uint32_t));
+            ids_writer.Write((char*)&ids_dim, sizeof(uint32_t));
             for (int j = 0; j < cluster_size; j ++) {
                 uint64_t ori_pos = cluster_off[j].second;
-                data_writer.write((char*)(datai + ori_pos * cluster_dim), sizeof(DATAT) * cluster_dim);
-                ids_writer.write((char*)(idsi + ori_pos * ids_dim), sizeof(uint32_t) * ids_dim);
+                data_writer.Write((char*)(datai + ori_pos * cluster_dim), sizeof(DATAT) * cluster_dim);
+                ids_writer.Write((char*)(idsi + ori_pos * ids_dim), sizeof(uint32_t) * ids_dim);
                 // for debug
                 /*
                 if (*(idsi + ori_pos * ids_dim) == 0) {
@@ -273,8 +273,8 @@ void conquer_clusters(const std::string& output_path,
         rci.ElapseFromBegin("done");
         rc.RecordSection("conquer the " + std::to_string(i) + "th cluster done");
     }
-    bucket_ids_writer.close();
-    bucket_ctd_writer.close();
+    close(bucket_ids_writer);
+    close(bucket_ctd_writer);
 
     std::cout << "total bucket num = " << graph_nb << std::endl;
     set_bin_metadata(bucket_centroids_file, graph_nb, graph_dim);
@@ -391,10 +391,10 @@ void train_quantizer(const std::string& raw_data_bin_file,
         std::string pq_codebook_file = output_path + CLUSTER + std::to_string(i) + PQ + CODEBOOK + BIN;
         uint32_t cluster_size, cluster_dim;
         IOReader data_reader(data_file);
-        data_reader.read((char*)&cluster_size, sizeof(uint32_t));
-        data_reader.read((char*)&cluster_dim, sizeof(uint32_t));
+        data_reader.Read((char*)&cluster_size, sizeof(uint32_t));
+        data_reader.Read((char*)&cluster_dim, sizeof(uint32_t));
         DATAT* datai = new DATAT[(uint64_t)cluster_size * cluster_dim];
-        data_reader.read((char*)datai, (uint64_t)cluster_size * cluster_dim * sizeof(DATAT));
+        data_reader.Read((char*)datai, (uint64_t)cluster_size * cluster_dim * sizeof(DATAT));
         pq_quantizer.encode_vectors_and_save(precomputer_table, cluster_size, datai, pq_codebook_file);
         delete[] datai;
         rc.RecordSection("the " + std::to_string(i) + "th cluster encode and save codebook done.");
@@ -436,10 +436,10 @@ void page_align(const std::string& raw_data_bin_file, const std::string& output_
         IOWriter data_writer(cluster_raw_data_file_name2, (uint64_t)(2) * GIGABYTE);
         IOWriter ids_writer(cluster_ids_data_file_name2);
 
-        data_reader.read((char*)&cluster_size, sizeof(uint32_t));
-        data_reader.read((char*)&cluster_dim, sizeof(uint32_t));
-        ids_reader.read((char*)&ids_size, sizeof(uint32_t));
-        ids_reader.read((char*)&ids_dim, sizeof(uint32_t));
+        data_reader.Read((char*)&cluster_size, sizeof(uint32_t));
+        data_reader.Read((char*)&cluster_dim, sizeof(uint32_t));
+        ids_reader.Read((char*)&ids_size, sizeof(uint32_t));
+        ids_reader.Read((char*)&ids_dim, sizeof(uint32_t));
         // number of pages 4 vector, the first page is meta page
         uint32_t npv = (cluster_size - 1) / nvpp + 2;
         // number of pages 4 id, the first page is meta page
@@ -454,32 +454,32 @@ void page_align(const std::string& raw_data_bin_file, const std::string& output_
         *(uint32_t*)(data_page_buf + 3 * sizeof(uint32_t)) = nvpp;
         *(uint32_t*)(data_page_buf + 4 * sizeof(uint32_t)) = npv;
         *(uint32_t*)(data_page_buf + 5 * sizeof(uint32_t)) = i;
-        data_writer.write(data_page_buf, page_size);
+        data_writer.Write(data_page_buf, page_size);
         *(uint32_t*)(ids_page_buf + 0 * sizeof(uint32_t)) = ids_size;
         *(uint32_t*)(ids_page_buf + 1 * sizeof(uint32_t)) = ids_dim;
         *(uint32_t*)(ids_page_buf + 2 * sizeof(uint32_t)) = page_size;
         *(uint32_t*)(ids_page_buf + 3 * sizeof(uint32_t)) = nipp;
         *(uint32_t*)(ids_page_buf + 4 * sizeof(uint32_t)) = npi;
         *(uint32_t*)(ids_page_buf + 5 * sizeof(uint32_t)) = i;
-        ids_writer.write(ids_page_buf, page_size);
+        ids_writer.Write(ids_page_buf, page_size);
 
         uint32_t write_cnt = 0;
         for (auto j = 1; j < npv; j ++) {
             memset(data_page_buf, 0, sizeof(page_size));
             for (auto k = 0; k < nvpp && write_cnt < cluster_size; k ++) {
-                data_reader.read(data_page_buf + k * vector_size, vector_size);
+                data_reader.Read(data_page_buf + k * vector_size, vector_size);
                 write_cnt ++;
             }
-            data_writer.write(data_page_buf, page_size);
+            data_writer.Write(data_page_buf, page_size);
         }
         write_cnt = 0;
         for (auto j = 1; j < npi; j ++) {
             memset(ids_page_buf, 0, sizeof(page_size));
             for (auto k = 0; k < nipp && write_cnt < ids_size; k ++) {
-                ids_reader.read(ids_page_buf + k * id_size, id_size);
+                ids_reader.Read(ids_page_buf + k * id_size, id_size);
                 write_cnt ++;
             }
-            ids_writer.write(ids_page_buf, page_size);
+            ids_writer.Write(ids_page_buf, page_size);
         }
         auto rm_dat_ret = std::remove(cluster_raw_data_file_name.c_str());
         if (rm_dat_ret == 0) {
@@ -556,13 +556,14 @@ void load_pq_codebook(const std::string& index_path,
               << std::endl;
 
     for (int i = 0; i < K1; i ++) {
-        std::ifstream reader(index_path + CLUSTER + std::to_string(i) + PQ + CODEBOOK + BIN, std::ios::binary);
+        std::string booki = index_path + CLUSTER + std::to_string(i) + PQ + CODEBOOK + BIN;
+        int fd = open(booki.c_str(), O_RDONLY);
         uint32_t sizei, dimi;
-        reader.read((char*)&sizei, sizeof(uint32_t));
-        reader.read((char*)&dimi, sizeof(uint32_t));
+        read(fd, (char*)&sizei, sizeof(uint32_t));
+        read(fd, (char*)&dimi, sizeof(uint32_t));
         pq_codebook[i].resize((uint64_t)sizei * dimi);
-        reader.read((char*)pq_codebook[i].data(), (uint64_t)sizei * dimi * sizeof(uint8_t));
-        reader.close();
+        read(fd, (char*)pq_codebook[i].data(), (uint64_t)sizei * dimi * sizeof(uint8_t));
+        close(fd);
     }
     rc.ElapseFromBegin("load pq codebook done.");
 }
@@ -577,14 +578,15 @@ void load_meta(const std::string& index_path,
               << std::endl;
 
     for (int i = 0; i < K1; i ++) {
-        std::ifstream reader(index_path + CLUSTER + std::to_string(i) + META + BIN, std::ios::binary);
+        std::string filei = index_path + CLUSTER + std::to_string(i) + META + BIN;
+        int reader = open(filei.c_str(), O_RDONLY);
         uint32_t nmeta, dmeta;
-        reader.read((char*)&nmeta, sizeof(uint32_t));
-        reader.read((char*)&dmeta, sizeof(uint32_t));
+        read(reader, (char*)&nmeta, sizeof(uint32_t));
+        read(reader, (char*)&dmeta, sizeof(uint32_t));
         assert(1 == dmeta);
         meta[i].resize(nmeta);
-        reader.read((char*)meta[i].data(), (uint64_t)nmeta * dmeta * sizeof(uint32_t));
-        reader.close();
+        read(reader, (char*)meta[i].data(), (uint64_t)nmeta * dmeta * sizeof(uint32_t));
+        close(reader);
     }
     rc.ElapseFromBegin("load meta done.");
 }
@@ -743,18 +745,18 @@ void refine(const std::string& index_path,
     }
     rc.RecordSection("parse_refine_id done");
 
-    std::vector<std::ifstream> raw_data_file_handlers(K1);
-    std::vector<std::ifstream> ids_data_file_handlers(K1);
+    std::vector<int> raw_data_file_handlers(K1);
+    std::vector<int> ids_data_file_handlers(K1);
     for (int i = 0; i < K1; i ++) {
         std::string data_filei = index_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
         std::string ids_filei  = index_path + CLUSTER + std::to_string(i) + GLOBAL_IDS + BIN;
-        raw_data_file_handlers[i] = std::ifstream(data_filei, std::ios::binary);
-        ids_data_file_handlers[i] = std::ifstream(ids_filei , std::ios::binary);
+        raw_data_file_handlers[i] = open(data_filei.c_str(), O_RDONLY);
+        ids_data_file_handlers[i] = open(ids_filei.c_str(), O_RDONLY);
         uint32_t clu_size, clu_dim, clu_id_size, clu_id_dim;
-        raw_data_file_handlers[i].read((char*)&clu_size, sizeof(clu_size));
-        raw_data_file_handlers[i].read((char*)&clu_dim, sizeof(clu_dim));
-        ids_data_file_handlers[i].read((char*)&clu_id_size, sizeof(clu_id_size));
-        ids_data_file_handlers[i].read((char*)&clu_id_dim, sizeof(clu_id_dim));
+        read(raw_data_file_handlers[i], (char*)&clu_size, sizeof(clu_size));
+        read(raw_data_file_handlers[i], (char*)&clu_dim, sizeof(clu_dim));
+        read(ids_data_file_handlers[i], (char*)&clu_id_size, sizeof(clu_id_size));
+        read(ids_data_file_handlers[i], (char*)&clu_id_dim, sizeof(clu_id_dim));
         std::cout << "cluster-" << i << " has " << clu_size << " vectors,"
                   << " has clu_dim = " << clu_dim
                   << " clu_id_size = " << clu_id_size
@@ -786,19 +788,18 @@ void refine(const std::string& index_path,
         uint32_t meta_bytes = 8; // pass meta
         DATAT* data_bufi = new DATAT[dq];
         uint32_t global_id;
-        raw_data_file_handlers[i].seekg(meta_bytes + pre_off * dq * sizeof(DATAT));
-        raw_data_file_handlers[i].read((char*)data_bufi, dq * sizeof(DATAT));
-        ids_data_file_handlers[i].seekg(meta_bytes + pre_off * sizeof(uint32_t));
-        ids_data_file_handlers[i].read((char*)&global_id, sizeof(uint32_t));
+        lseek64(raw_data_file_handlers[i], meta_bytes + pre_off * dq * sizeof(DATAT), SEEK_SET);
+        read(raw_data_file_handlers[i], (char*)data_bufi, dq * sizeof(DATAT));
+        lseek64(ids_data_file_handlers[i], meta_bytes + pre_off * sizeof(uint32_t), SEEK_SET);
+        read(ids_data_file_handlers[i], (char*)&global_id, sizeof(uint32_t));
         load_vectors[i] ++;
-        // for debug
         for (int j = 0; j < refine_records[i].size(); j ++) {
             if (refine_records[i][j].first != pre_off) {
                 pre_off = refine_records[i][j].first;
-                raw_data_file_handlers[i].seekg(meta_bytes + pre_off * dq * sizeof(DATAT));
-                raw_data_file_handlers[i].read((char*)data_bufi, dq * sizeof(DATAT));
-                ids_data_file_handlers[i].seekg(meta_bytes + pre_off * sizeof(uint32_t));
-                ids_data_file_handlers[i].read((char*)&global_id, sizeof(uint32_t));
+                lseek64(raw_data_file_handlers[i], meta_bytes + pre_off * dq * sizeof(DATAT), SEEK_SET);
+                read(raw_data_file_handlers[i], (char*)data_bufi, dq * sizeof(DATAT));
+                lseek64(ids_data_file_handlers[i], meta_bytes + pre_off * sizeof(uint32_t), SEEK_SET);
+                read(ids_data_file_handlers[i], (char*)&global_id, sizeof(uint32_t));
                 assert(global_id >= 0);
                 load_vectors[i] ++;
             }
@@ -822,10 +823,8 @@ void refine(const std::string& index_path,
     std::cout << "total load refine vectors: " << tot << "/" << refine_topk * nq << std::endl;
 
     for (int i = 0; i < K1; i ++) {
-        std::string data_filei = index_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
-        std::string ids_filei  = index_path + CLUSTER + std::to_string(i) + GLOBAL_IDS + BIN;
-        raw_data_file_handlers[i].close();
-        ids_data_file_handlers[i].close();
+        close(raw_data_file_handlers[i]);
+        close(ids_data_file_handlers[i]);
     }
     rc.ElapseFromBegin("refine done.");
 }
@@ -879,17 +878,17 @@ void aligned_refine(const std::string& index_path,
     memset(dat_buf, 0, page_size);
     memset(ids_buf, 0, page_size);
 
-    std::vector<std::ifstream> raw_data_file_handlers(K1);
-    std::vector<std::ifstream> ids_data_file_handlers(K1);
+    std::vector<int> raw_data_file_handlers(K1);
+    std::vector<int> ids_data_file_handlers(K1);
     for (int i = 0; i < K1; i ++) {
         std::string aligned_data_filei = index_path + CLUSTER + "-" + std::to_string(i) + RAWDATA + BIN;
         std::string aligned_ids_filei  = index_path + CLUSTER + "-" + std::to_string(i) + GLOBAL_IDS + BIN;
-        raw_data_file_handlers[i] = std::ifstream(aligned_data_filei, std::ios::binary);
-        ids_data_file_handlers[i] = std::ifstream(aligned_ids_filei , std::ios::binary);
+        raw_data_file_handlers[i] = open(aligned_data_filei.c_str(), O_RDONLY);
+        ids_data_file_handlers[i] = open(aligned_ids_filei.c_str(), O_RDONLY);
         uint32_t clu_size, clu_dim, clu_id_size, clu_id_dim;
         uint32_t ps, check;
-        raw_data_file_handlers[i].read(dat_buf, page_size);
-        ids_data_file_handlers[i].read(ids_buf, page_size);
+        read(raw_data_file_handlers[i], dat_buf, page_size);
+        read(ids_data_file_handlers[i], ids_buf, page_size);
         memcpy(&clu_size, dat_buf + 0 * sizeof(uint32_t), sizeof(uint32_t));
         memcpy(&clu_dim , dat_buf + 1 * sizeof(uint32_t), sizeof(uint32_t));
         memcpy(&ps      , dat_buf + 2 * sizeof(uint32_t), sizeof(uint32_t));
@@ -946,22 +945,22 @@ void aligned_refine(const std::string& index_path,
         char* dat_bufi = new char[page_size];
         char* ids_bufi = new char[page_size];
         uint32_t global_id;
-        raw_data_file_handlers[i].seekg((pv + 1) * page_size);
-        raw_data_file_handlers[i].read(dat_bufi, page_size);
-        ids_data_file_handlers[i].seekg((pi + 1) * page_size);
-        ids_data_file_handlers[i].read(ids_bufi, page_size);
+        lseek64(raw_data_file_handlers[i], (pv + 1) * page_size, SEEK_SET);
+        read(raw_data_file_handlers[i], dat_bufi, page_size);
+        lseek64(ids_data_file_handlers[i], (pi + 1) * page_size, SEEK_SET);
+        read(ids_data_file_handlers[i], ids_bufi, page_size);
         // for debug
         for (int j = 0; j < refine_records[i].size(); j ++) {
             int64_t refine_off = refine_records[i][j].first;
             if (refine_off > pv * nvpp) {
                 pv = refine_off / nvpp;
-                raw_data_file_handlers[i].seekg((pv + 1) * page_size);
-                raw_data_file_handlers[i].read(dat_bufi, page_size);
+                lseek64(raw_data_file_handlers[i], (pv + 1) * page_size, SEEK_SET);
+                read(raw_data_file_handlers[i], dat_bufi, page_size);
             }
             if (refine_off > pi * nipp) {
                 pi = refine_off / nipp;
-                ids_data_file_handlers[i].seekg((pi + 1) * page_size);
-                ids_data_file_handlers[i].read(ids_bufi, page_size);
+                lseek64(ids_data_file_handlers[i], (pi + 1) * page_size, SEEK_SET);
+                read(ids_data_file_handlers[i], ids_bufi, page_size);
             }
             uint32_t qid = refine_records[i][j].second;
             auto dis = dis_computer((DATAT*)(dat_bufi + (refine_off % nvpp) * vector_size), pquery + qid * dq, dq);
@@ -977,10 +976,8 @@ void aligned_refine(const std::string& index_path,
     rc.RecordSection("calculate done.");
 
     for (int i = 0; i < K1; i ++) {
-        std::string data_filei = index_path + CLUSTER + "-" + std::to_string(i) + RAWDATA + BIN;
-        std::string ids_filei  = index_path + CLUSTER + "-" + std::to_string(i) + GLOBAL_IDS + BIN;
-        raw_data_file_handlers[i].close();
-        ids_data_file_handlers[i].close();
+        close(raw_data_file_handlers[i]);
+        close(ids_data_file_handlers[i]);
     }
 
     delete[] dat_buf;
@@ -1151,18 +1148,18 @@ void save_sift_answer(const std::string& answer_bin_file,
                   const uint32_t nq,
                   DISTT*& answer_dists,
                   uint32_t*& answer_ids) {
-    std::ofstream answer_writer(answer_bin_file, std::ios::binary);
+    int answer_writer = open(answer_bin_file.c_str(), O_WRONLY);
     for (int i = 0; i < nq; i ++) {
         auto ans_disi = answer_dists + topk * i;
         auto ans_idsi = answer_ids + topk * i;
-        answer_writer.write((char*)&topk, sizeof(uint32_t));
+        write(answer_writer, (char*)&topk, sizeof(uint32_t));
         for (int j = topk; j > 0; j --) {
-            answer_writer.write((char*)ans_idsi, sizeof(uint32_t));
-            answer_writer.write((char*)ans_disi, sizeof(DISTT));
+            write(answer_writer, (char*)ans_idsi, sizeof(uint32_t));
+            write(answer_writer, (char*)ans_disi, sizeof(DISTT));
             heap_pop<HEAPT>(j, ans_disi, ans_idsi);
         }
     }
-    answer_writer.close();
+    close(answer_writer);
 }
 
 template<typename DISTT, typename HEAPT>
@@ -1171,9 +1168,9 @@ void save_comp_answer(const std::string& answer_bin_file,
                   const uint32_t nq,
                   DISTT*& answer_dists,
                   uint32_t*& answer_ids) {
-    std::ofstream answer_writer(answer_bin_file, std::ios::binary);
-    answer_writer.write((char*)&nq, sizeof(uint32_t));
-    answer_writer.write((char*)&topk, sizeof(uint32_t));
+    int answer_writer = open(answer_bin_file.c_str(), O_WRONLY);
+    write(answer_writer, (char*)&nq, sizeof(uint32_t));
+    write(answer_writer, (char*)&topk, sizeof(uint32_t));
 
     for (int i = 0; i < nq; i ++) {
         auto ans_disi = answer_dists + topk * i;
@@ -1182,10 +1179,10 @@ void save_comp_answer(const std::string& answer_bin_file,
     }
 
     uint32_t tot = nq * topk;
-    answer_writer.write((char*)answer_ids, tot * sizeof(uint32_t));
-    answer_writer.write((char*)answer_dists, tot * sizeof(DISTT));
+    write(answer_writer, (char*)answer_ids, tot * sizeof(uint32_t));
+    write(answer_writer, (char*)answer_dists, tot * sizeof(DISTT));
 
-    answer_writer.close();
+    close(answer_writer);
 }
 
 template<typename DISTT, typename HEAPT>

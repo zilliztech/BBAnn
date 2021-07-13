@@ -143,20 +143,20 @@ public:
     void save_centroids(const std::string& save_file) {
         uint32_t num_centroids = m * K;
         uint32_t dim_centroids = dsub;
-        std::ofstream centroids_writer(save_file, std::ios::binary);
-        centroids_writer.write((char*)&num_centroids, sizeof(uint32_t));
-        centroids_writer.write((char*)&dim_centroids, sizeof(uint32_t));
-        centroids_writer.write((char*)centroids, sizeof(float) * K * d);
-        centroids_writer.close();
+        int fd = open(save_file.c_str(), O_WRONLY);
+        write(fd, (char*)&num_centroids, sizeof(uint32_t));
+        write(fd, (char*)&dim_centroids, sizeof(uint32_t));
+        write(fd, (char*)centroids, sizeof(float) * K * d);
+        close(fd);
     }
 
     void load_centroids(const std::string& load_file) {
         uint32_t num_centroids ,dim_centroids;
-        std::ifstream centroids_reader(load_file, std::ios::binary);
-        centroids_reader.read((char*)&num_centroids, sizeof(uint32_t));
-        centroids_reader.read((char*)&dim_centroids, sizeof(uint32_t));
-        centroids_reader.read((char*)centroids, sizeof(float) * K * d);
-        centroids_reader.close();
+        int fd = open(load_file.c_str(), O_RDONLY);
+        read(fd, (char*)&num_centroids, sizeof(uint32_t));
+        read(fd, (char*)&dim_centroids, sizeof(uint32_t));
+        read(fd, (char*)centroids, sizeof(float) * K * d);
+        close(fd);
     }
 };
 
@@ -322,11 +322,11 @@ void ProductQuantizer<C, T, U>::encode_vectors_and_save(float*& precomputer_tabl
 
     uint32_t wn = n;
     uint32_t wm = m;
-    std::ofstream code_writer(save_file, std::ios::binary | std::ios::out);
-    code_writer.write((char*)&wn, sizeof(uint32_t));
-    code_writer.write((char*)&wm, sizeof(uint32_t));
-    code_writer.write((char*)codes, n * m * sizeof(U));
-    code_writer.close();
+    int fd = open(save_file.c_str(), O_WRONLY);
+    write(fd, (char*)&wn, sizeof(uint32_t));
+    write(fd, (char*)&wm, sizeof(uint32_t));
+    write(fd, (char*)codes, n * m * sizeof(U));
+    close(fd);
     std::cout << "ProductQuantizer encode " << wn << " vectors with m = " << wm << " into file "
               << save_file << std::endl;
 }

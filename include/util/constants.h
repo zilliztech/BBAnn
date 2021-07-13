@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 
+#define _FILE_OFFSET_BITS 64
 
 // constant defines
 
