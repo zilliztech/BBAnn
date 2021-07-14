@@ -400,6 +400,7 @@ void train_quantizer(const std::string& raw_data_bin_file,
         rc.RecordSection("the " + std::to_string(i) + "th cluster encode and save codebook done.");
     }
 
+    delete[] pq_sample_data;
     delete[] precomputer_table;
     rc.ElapseFromBegin("train quantizer totally done.");
 }
