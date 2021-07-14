@@ -19,6 +19,7 @@
  * 11. PQ.nbits(int): the number of sub-cluster 4 PQ codebook
  * 12. K1(int): number of centroids of the first round kmeans
  * 13. metric type(string): metric type
+ * 14. quantizer (PQ | PQRes)
  */
 
 int main(int argc, char** argv) {
