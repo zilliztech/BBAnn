@@ -6,6 +6,7 @@
 #include <random>
 #include <functional>
 #include <memory>
+#include <unordered_map>
 #include "file_handler.h" 
 #include "distance.h"
 #include "defines.h"
@@ -238,7 +239,7 @@ void read_comp_range_search(
 }
 
 template<typename DISTT, typename IDT>
-void recall(const std::string& groundtruth_file, const std::string& answer_file, bool use_comp_format = true) {
+void recall(const std::string& groundtruth_file, const std::string& answer_file, MetricType metric_type, bool use_comp_format = true, bool cmp_id = false) {
     uint32_t gt_nq, gt_topk, answer_nq, answer_topk;
 
     std::vector<std::vector<std::pair<IDT, DISTT>>> groundtruth;
@@ -269,14 +270,45 @@ void recall(const std::string& groundtruth_file, const std::string& answer_file,
     std::cout << "recall@" << gt_topk << " between groundtruth file:"
               << groundtruth_file << " and answer file:"
               << answer_file << " is:" << std::endl;
-    for (auto i = 0; i < gt_nq; i ++) {
-        int cnti = 0;
-        for (auto j = 0; j < gt_topk; j ++) {
-            if (resultset[i][j].second <= groundtruth[i][gt_topk - 1].second)
-                cnti ++;
+    if (cmp_id) {
+        for (auto i = 0; i < gt_nq; i ++) {
+            std::unordered_map<IDT, bool> hash;
+            int cnti = 0;
+            for (auto j = 0; j < gt_topk; j ++) {
+                hash[groundtruth[i][j].first] = true;
+            }
+            for (auto j = 0; j < answer_topk; j ++) {
+                if (hash.find(resultset[i][j].first) != hash.end())
+                    cnti ++;
+            }
+            tot_cnt += cnti;
         }
-        tot_cnt += cnti;
-        // std::cout << "query " << i << " recall@" << gt_topk << " is: " << ((double)(cnti)) / gt_topk * 100 << "%." << std::endl;
+        std::cout << "avg recall@" << gt_topk << " = " << ((double)(tot_cnt)) / gt_topk / gt_nq * 100 << "%." << std::endl;
+    } else {
+        if (MetricType::L2 == metric_type) {
+            for (auto i = 0; i < gt_nq; i ++) {
+                int cnti = 0;
+                for (auto j = 0; j < gt_topk; j ++) {
+                    if (resultset[i][j].second <= groundtruth[i][gt_topk - 1].second)
+                        cnti ++;
+                }
+                tot_cnt += cnti;
+                // std::cout << "query " << i << " recall@" << gt_topk << " is: " << ((double)(cnti)) / gt_topk * 100 << "%." << std::endl;
+            }
+            std::cout << "avg recall@" << gt_topk << " = " << ((double)(tot_cnt)) / gt_topk / gt_nq * 100 << "%." << std::endl;
+        } else if (MetricType::IP == metric_type) {
+            for (auto i = 0; i < gt_nq; i ++) {
+                int cnti = 0;
+                for (auto j = 0; j < gt_topk; j ++) {
+                    if (resultset[i][j].second >= groundtruth[i][gt_topk - 1].second)
+                        cnti ++;
+                }
+                tot_cnt += cnti;
+                // std::cout << "query " << i << " recall@" << gt_topk << " is: " << ((double)(cnti)) / gt_topk * 100 << "%." << std::endl;
+            }
+            std::cout << "avg recall@" << gt_topk << " = " << ((double)(tot_cnt)) / gt_topk / gt_nq * 100 << "%." << std::endl;
+        } else {
+            std::cout << "invalid metric type: " << (int)metric_type << std::endl;
+        }
     }
-    std::cout << "avg recall@" << gt_topk << " = " << ((double)(tot_cnt)) / gt_topk / gt_nq * 100 << "%." << std::endl;
 }
