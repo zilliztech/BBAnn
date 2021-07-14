@@ -71,7 +71,7 @@ class IOWriter {
  public:
     IOWriter(const std::string& file_name, const int64_t cache_size = GIGABYTE)
     : cache_size_(cache_size), cur_off_(0) {
-        fd_ = open(file_name.c_str(), O_WRONLY);
+        fd_ = open(file_name.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0664);
         assert(fd_ != -1);
         assert(cache_size_ > 0);
         cache_buf_ = (char*) malloc(cache_size_);
