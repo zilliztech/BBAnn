@@ -84,7 +84,7 @@ public:
         for (uint32_t i = 0; i < m; ++i, ++c) {
             memcpy(
                 r + i * dsub,
-                centroids + i * K + (*c) * dsub,
+                centroids + (i * K + (*c)) * dsub,
                 dsub * sizeof(float));
         }
     }

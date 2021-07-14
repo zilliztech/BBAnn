@@ -398,10 +398,25 @@ void train_pq_residual_quantizer(
     uint32_t nb, dim;
     get_bin_metadata(raw_data_bin_file, nb, dim);
 
-    uint32_t pq_sample_num = (uint32_t)(nb * PQ_SAMPLE_RATE);
+    int64_t pq_sample_num = (nb * PQ_SAMPLE_RATE);
+
     float* residuals = new float[pq_sample_num * dim];
-    float* ivf_centroids = new float[pq_sample_num * dim];
-    reservoir_sampling_residual<DATAT>(pq_sample_num, residuals, ivf_centroids, K1, output_path);
+    assert(residuals != nullptr);
+
+    DATAT* sample_data = new DATAT[pq_sample_num * dim];
+    assert(sample_data != nullptr);
+
+    std::vector<std::vector<uint32_t> > metas(K1);
+    load_meta_impl(output_path, metas, K1);
+    assert(metas.size() == K1);
+
+    // read ivf centroids
+    float *ivf_cen = nullptr;
+    uint32_t ivf_n, ivf_dim;
+    read_bin_file<float>(output_path + BUCKET + CENTROIDS + BIN, ivf_cen, ivf_n, ivf_dim);
+    assert(ivf_dim == dim);
+
+    reservoir_sampling_residual<DATAT>(output_path, metas, ivf_cen, dim, pq_sample_num, sample_data, residuals, K1);
     rc.RecordSection("reservoir_sampling_residual for pq training set done");
 
     PQResidualQuantizer<HEAPT, DATAT, uint8_t> quantizer(dim, PQM, PQnbits);
@@ -412,6 +427,7 @@ void train_pq_residual_quantizer(
     rc.RecordSection("pq residual quantizer save centroids done");
 
     float* precompute_table = nullptr;
+    uint64_t bucket_cnt = 0;
     for (int i = 0; i < K1; ++i) {
         std::string data_file = output_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
         std::string pq_codebook_file = output_path + CLUSTER + std::to_string(i) + PQ + CODEBOOK + BIN;
@@ -422,13 +438,15 @@ void train_pq_residual_quantizer(
 
         DATAT* datai = new DATAT[cluster_size * cluster_dim];
         data_reader.read((char*)datai, cluster_size * cluster_dim * sizeof(DATAT));
-        quantizer.encode_vectors_and_save(precompute_table, cluster_size, datai, ivf_centroids, pq_codebook_file, metric_type);
+        quantizer.encode_vectors_and_save(precompute_table, cluster_size, datai, ivf_cen, metas[i], bucket_cnt, pq_codebook_file, metric_type);
         delete[] datai;
+        rc.RecordSection("the " + std::to_string(i) + "th cluster encode and save codebook done.");
     }
 
     delete[] precompute_table;
+    delete[] sample_data;
     delete[] residuals;
-    delete[] ivf_centroids;
+    delete[] ivf_cen;
 
     rc.ElapseFromBegin("train pq residual quantizer totally done.");
 }
@@ -631,8 +649,8 @@ void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
               << " dq: " << dq
               << " nprobe: " << nprobe
               << " refine_nprobe: " << refine_nprobe
-              << " pquery: " << pquery
-              << " buckets_label: " << buckets_label
+              << " pquery: " << static_cast<const void *>(pquery)
+              << " buckets_label: " << static_cast<void *>(buckets_label)
               << std::endl;
     index_hnsw->setEf(refine_nprobe);
 #pragma omp parallel for
@@ -676,9 +694,9 @@ void search_pq_quantizer(ProductQuantizer<HEAPTT, DATAT, uint8_t>& pq_quantizer,
               << " nprobe: " << nprobe
               << " refine_topk: " << refine_topk
               << " K1: " << K1
-              << " pquery: " << pquery
-              << " pq_distance: " << pq_distance
-              << " pq_offsets: " << pq_offsets
+              << " pquery: " << static_cast<const void *>(pquery)
+              << " pq_distance: " << static_cast<void *>(pq_distance)
+              << " pq_offsets: " << static_cast<void *>(pq_offsets)
               << std::endl;
 
 
@@ -757,9 +775,9 @@ void search_pq_residual_quantizer(
               << " nprobe: " << nprobe
               << " refine_topk: " << refine_topk
               << " K1: " << K1
-              << " pquery: " << pquery
-              << " pq_distance: " << pq_distance
-              << " pq_offsets: " << pq_offsets
+              << " pquery: " << static_cast<const void *>(pquery)
+              << " pq_distance: " << static_cast<void *>(pq_distance)
+              << " pq_offsets: " << static_cast<void *>(pq_offsets)
               << std::endl;
 
 
@@ -833,10 +851,10 @@ void refine(const std::string& index_path,
               << " dim of query: " << dq
               << " topk: " << topk
               << " refine_topk:" << refine_topk
-              << " pq_offsets:" << pq_offsets
-              << " pquery:" << pquery
-              << " answer_dists:" << answer_dists
-              << " answer_ids:" << answer_ids
+              << " pq_offsets:" << static_cast<void *>(pq_offsets)
+              << " pquery:" << static_cast<const void *>(pquery)
+              << " answer_dists:" << static_cast<void *>(answer_dists)
+              << " answer_ids:" << static_cast<void *>(answer_ids)
               << std::endl;
     std::vector<std::vector<std::pair<uint32_t, uint32_t>>> refine_records(K1);
     for (int i = 0; i < nq; i ++) {
@@ -959,9 +977,9 @@ void aligned_refine(const std::string& index_path,
               << " topk: " << topk
               << " refine_topk:" << refine_topk
               << " pq_offsets:" << pq_offsets
-              << " pquery:" << pquery
-              << " answer_dists:" << answer_dists
-              << " answer_ids:" << answer_ids
+              << " pquery:" << static_cast<const void *>(pquery)
+              << " answer_dists:" << static_cast<void *>(answer_dists)
+              << " answer_ids:" << static_cast<void *>(answer_ids)
               << std::endl;
     std::vector<std::vector<std::pair<uint32_t, uint32_t>>> refine_records(K1);
     for (int i = 0; i < nq; i ++) {
@@ -1117,9 +1135,9 @@ void refine_c(const std::string& index_path,
               << " topk: " << topk
               << " refine_topk:" << refine_topk
               << " pq_offsets:" << pq_offsets
-              << " pquery:" << pquery
-              << " answer_dists:" << answer_dists
-              << " answer_ids:" << answer_ids
+              << " pquery:" << static_cast<const void *>(pquery)
+              << " answer_dists:" << static_cast<void *>(answer_dists)
+              << " answer_ids:" << static_cast<void *>(answer_ids)
               << std::endl;
     std::vector<std::vector<std::pair<uint32_t, uint32_t>>> refine_records(K1);
     for (int i = 0; i < nq; i ++) {

@@ -47,14 +47,14 @@ inline void set_bin_metadata(const std::string& bin_file, const uint32_t& nrows,
 void load_meta_impl(const std::string& index_path,
                std::vector<std::vector<uint32_t>>& meta,
                const int K1) {
-    for (auto i = 0; i < K1; i ++) {
+    for (int i = 0; i < K1; i ++) {
         std::ifstream reader(index_path + CLUSTER + std::to_string(i) + META + BIN, std::ios::binary);
         uint32_t nmeta, dmeta;
         reader.read((char*)&nmeta, sizeof(uint32_t));
         reader.read((char*)&dmeta, sizeof(uint32_t));
         assert(1 == dmeta);
         meta[i].resize(nmeta);
-        reader.read((char*)meta[i].data(), nmeta * dmeta * sizeof(uint32_t));
+        reader.read((char*)meta[i].data(), (uint64_t)nmeta * dmeta * sizeof(uint32_t));
         reader.close();
     }
 }
@@ -121,24 +121,22 @@ void reservoir_sampling(const std::string& data_file, const size_t sample_num, T
 
 template<typename T>
 void reservoir_sampling_residual(
+        const std::string& output_path,
+        const std::vector<std::vector<uint32_t> >& metas,
+        const float* ivf_cen,
+        const uint32_t dim, 
         const uint32_t sample_num,
+        T* sample_data,
         float* residuals,
-        float* ivf_centroids,
-        const int K1,
-        const std::string& output_path) {
+        const int K1) {
     assert(residuals != nullptr);
-    assert(ivf_centroids != nullptr);
+    assert(sample_data != nullptr);
 
     std::random_device rd;
     std::mt19937 generator((unsigned)(rd()));
     uint32_t cluster_size, cluster_dim, bucket_cnt = 0, filled_cnt = 0, global_cnt = 0;
     std::vector<T> cluster_data;
-    std::vector<std::vector<uint32_t> > metas;
     std::vector<uint32_t> centroid_offsets(sample_num);
-
-    T* sample_data = new T[sample_num * cluster_dim];
-
-    load_meta_impl(output_path, metas, K1);
 
     for (int i = 0; i < K1; ++i) {
         std::string data_file = output_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
@@ -146,6 +144,7 @@ void reservoir_sampling_residual(
         IOReader data_reader(data_file);
         data_reader.read((char*)&cluster_size, sizeof(uint32_t));
         data_reader.read((char*)&cluster_dim, sizeof(uint32_t));
+        assert(cluster_dim == dim);
 
         // read vectors in each cluster
         const uint64_t total_size = cluster_size * cluster_dim;
@@ -159,6 +158,7 @@ void reservoir_sampling_residual(
                 // for filling the resulting array
                 if (filled_cnt < sample_num) {
                     memcpy(sample_data + cluster_dim * filled_cnt, vec, cluster_dim * sizeof(T));
+                    centroid_offsets[filled_cnt] = bucket_cnt;
                     ++filled_cnt;
                 } else {
                     std::uniform_int_distribution<size_t> distribution(0, global_cnt);
@@ -176,20 +176,11 @@ void reservoir_sampling_residual(
         }
     }
 
-    // read centroids
-    float *centroids = nullptr;
-    uint32_t n, dim;
-    read_bin_file<float>(output_path + BUCKET + CENTROIDS + BIN, centroids, n, dim);
-
     for (int i = 0; i < sample_num; ++i) {
-        const float *c = centroids + centroid_offsets[i] * dim;
+        const float *c = ivf_cen + centroid_offsets[i] * dim;
         compute_residual<const float, const T, float>(c, sample_data, residuals, dim);
-        memcpy(ivf_centroids + i * dim, c, dim * sizeof(float));
         sample_data += dim, residuals += dim;
     }
-
-    delete[] sample_data;
-    delete[] centroids;
 }
 
 inline uint64_t gen_id(const uint32_t cid, const uint32_t bid, const uint32_t off) {

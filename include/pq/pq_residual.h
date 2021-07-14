@@ -36,7 +36,9 @@ public:
             float*& precomputer_table,
             int64_t n,
             const T* x,
-            const float* ivf_centroids,
+            const float* ivf_cen,
+            const std::vector<uint32_t>& buckets,
+            uint64_t& bucket_cnt,
             const std::string& file_path,
             MetricType metric_type);
 
@@ -78,22 +80,29 @@ void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
         float*& precomputer_table,
         int64_t n,
         const T* x,
-        const float* ivf_centroids,
+        const float* ivf_cen,
+        const std::vector<uint32_t>& buckets,
+        uint64_t& bucket_cnt,
         const std::string& file_path,
         MetricType metric_type) {
     pq->encode_vectors(precomputer_table, n, x, false);
 
     if (MetricType::L2 == metric_type) {
         std::vector<float> term2s(n, 0);
+
+        // these codes are local, one for each cluster
         const U* c = pq->get_codes();
-        const float* ivf_c = ivf_centroids;
         float* r = new float[d];
+        const float* ivf_c = ivf_cen + bucket_cnt * d;
 
         // precompute term2
-        for (int i = 0; i < n; ++i, c += m, ivf_c += d) {
-            pq->reconstruct(r, c);
-            term2s[i] += norm_L2sqr<const float, float>(r, d);
-            term2s[i] += 2.0f * IP<const float, const float, float>(ivf_c, r, d);
+        for (int i = 0; i < buckets.size(); ++i, ivf_c += d) {
+            for (int j = 0; j < buckets[i]; ++j, c += m) {
+                pq->reconstruct(r, c);
+                term2s[i] += norm_L2sqr<const float, float>(r, d);
+                term2s[i] += 2.0f * IP<const float, const float, float>(ivf_c, r, d);
+            }
+            ++bucket_cnt;
         }
 
         uint32_t wm = m + sizeof(float);
@@ -111,7 +120,7 @@ void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
 
         code_writer.close();
         delete[] r;
-        std::cout << "PQResidualQuantizer encode " << n << " vectors with m = " << m << "and term2 into file "
+        std::cout << "PQResidualQuantizer encode " << n << " vectors with m = " << m << " and term2 into file "
                   << file_path << std::endl;
     } else if (MetricType::IP == metric_type) {
         std::ofstream code_writer(file_path, std::ios::binary | std::ios::out);
@@ -122,6 +131,7 @@ void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
         code_writer.write((char*)c, n * m * sizeof(U));
 
         code_writer.close();
+
         std::cout << "ProductQuantizer encode " << n << " vectors with m = " << m << " into file "
                   << file_path << std::endl;
     } else {
