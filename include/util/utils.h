@@ -37,7 +37,7 @@ inline void get_bin_metadata(const std::string& bin_file, uint32_t& nrows, uint3
 }
 
 inline void set_bin_metadata(const std::string& bin_file, const uint32_t& nrows, const uint32_t& ncols) {
-    int fd = open(bin_file.c_str(), O_WRONLY);
+    int fd = open(bin_file.c_str(), O_RDWR);
     lseek(fd, 0, SEEK_SET);
     write(fd, (char*) &nrows, sizeof(uint32_t));
     write(fd, (char*) &ncols, sizeof(uint32_t));
@@ -77,7 +77,7 @@ template<typename T>
 inline void write_bin_file(const std::string& file_name, T* data, uint32_t n,
                     uint32_t dim) {
     assert(data != nullptr);
-    int fd = open(file_name.c_str(), O_WRONLY);
+    int fd = open(file_name.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0664);
 
     write(fd, (char*)&n, sizeof(uint32_t));
     write(fd, (char*)&dim, sizeof(uint32_t));

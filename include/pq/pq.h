@@ -143,7 +143,7 @@ public:
     void save_centroids(const std::string& save_file) {
         uint32_t num_centroids = m * K;
         uint32_t dim_centroids = dsub;
-        int fd = open(save_file.c_str(), O_WRONLY);
+        int fd = open(save_file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0664);
         write(fd, (char*)&num_centroids, sizeof(uint32_t));
         write(fd, (char*)&dim_centroids, sizeof(uint32_t));
         write(fd, (char*)centroids, sizeof(float) * K * d);
@@ -322,7 +322,7 @@ void ProductQuantizer<C, T, U>::encode_vectors_and_save(float*& precomputer_tabl
 
     uint32_t wn = n;
     uint32_t wm = m;
-    int fd = open(save_file.c_str(), O_WRONLY);
+    int fd = open(save_file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0664);
     write(fd, (char*)&wn, sizeof(uint32_t));
     write(fd, (char*)&wm, sizeof(uint32_t));
     write(fd, (char*)codes, n * m * sizeof(U));

@@ -29,7 +29,7 @@ void train_cluster(const std::string& raw_data_bin_file,
     sample_data = new DATAT[sample_num * dim];
     reservoir_sampling(raw_data_bin_file, sample_num, sample_data);
     rc.RecordSection("reservoir sample with sample rate: " + std::to_string(K1_SAMPLE_RATE) + " done");
-    kmeans<DATAT>(sample_num, sample_data, dim, K1, *centroids, true);
+    kmeans<DATAT>(sample_num, sample_data, dim, K1, *centroids, false);
     rc.RecordSection("kmeans done");
     assert((*centroids) != nullptr);
 
@@ -60,8 +60,8 @@ void divide_raw_data(const std::string& raw_data_bin_file,
     for (int i = 0; i < K1; i ++) {
         std::string cluster_raw_data_file_name = output_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
         std::string cluster_ids_data_file_name = output_path + CLUSTER + std::to_string(i) + GLOBAL_IDS + BIN;
-        cluster_dat_writer[i] = open(cluster_raw_data_file_name.c_str(), O_WRONLY);
-        cluster_ids_writer[i] = open(cluster_ids_data_file_name.c_str(), O_WRONLY);
+        cluster_dat_writer[i] = open(cluster_raw_data_file_name.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0664);
+        cluster_ids_writer[i] = open(cluster_ids_data_file_name.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0664);
         write(cluster_dat_writer[i], (char*)&placeholder, sizeof(uint32_t));
         write(cluster_dat_writer[i], (char*)&dim, sizeof(uint32_t));
         write(cluster_ids_writer[i], (char*)&placeholder, sizeof(uint32_t));
@@ -142,8 +142,8 @@ void conquer_clusters(const std::string& output_path,
     std::string bucket_centroids_file = output_path + BUCKET + CENTROIDS + BIN;
     std::string bucket_ids_file = output_path + CLUSTER + COMBINE_IDS + BIN;
 
-    int bucket_ids_writer = open(bucket_ids_file.c_str(), O_WRONLY);
-    int bucket_ctd_writer = open(bucket_centroids_file.c_str(), O_WRONLY);
+    int bucket_ids_writer = open(bucket_ids_file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0664);
+    int bucket_ctd_writer = open(bucket_centroids_file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0664);
     write(bucket_ctd_writer, (char*)&placeholder, sizeof(uint32_t));
     write(bucket_ctd_writer, (char*)&placeholder, sizeof(uint32_t));
     write(bucket_ids_writer, (char*)&placeholder, sizeof(uint32_t));
@@ -1148,7 +1148,7 @@ void save_sift_answer(const std::string& answer_bin_file,
                   const uint32_t nq,
                   DISTT*& answer_dists,
                   uint32_t*& answer_ids) {
-    int answer_writer = open(answer_bin_file.c_str(), O_WRONLY);
+    int answer_writer = open(answer_bin_file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0664);
     for (int i = 0; i < nq; i ++) {
         auto ans_disi = answer_dists + topk * i;
         auto ans_idsi = answer_ids + topk * i;
@@ -1168,7 +1168,7 @@ void save_comp_answer(const std::string& answer_bin_file,
                   const uint32_t nq,
                   DISTT*& answer_dists,
                   uint32_t*& answer_ids) {
-    int answer_writer = open(answer_bin_file.c_str(), O_WRONLY);
+    int answer_writer = open(answer_bin_file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0664);
     write(answer_writer, (char*)&nq, sizeof(uint32_t));
     write(answer_writer, (char*)&topk, sizeof(uint32_t));
 
