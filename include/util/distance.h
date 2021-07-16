@@ -56,8 +56,8 @@ R IP(T1 *a, T2 *b, size_t n) {
 }
 
 template<typename T1, typename T2, typename R>
-void compute_residual(T1* c, T2* x, R* res, size_t d) {
+void compute_residual(T1* x, T2* c, R* res, size_t d) {
     for (int i = 0; i < d; ++i) {
-        res[i] = (R)(c[i]) - (R)(x[i]);
+        res[i] = (R)(x[i]) - (R)(c[i]);
     }
 }

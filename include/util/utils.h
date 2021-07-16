@@ -127,16 +127,16 @@ void reservoir_sampling_residual(
         const uint32_t dim, 
         const uint32_t sample_num,
         T* sample_data,
-        float* residuals,
+        float* sample_ivf_cen,
         const int K1) {
-    assert(residuals != nullptr);
+    assert(sample_ivf_cen != nullptr);
     assert(sample_data != nullptr);
 
     std::random_device rd;
     std::mt19937 generator((unsigned)(rd()));
     uint32_t cluster_size, cluster_dim, bucket_cnt = 0, filled_cnt = 0, global_cnt = 0;
     std::vector<T> cluster_data;
-    std::vector<uint32_t> centroid_offsets(sample_num);
+    std::vector<uint32_t> ivf_cen_offsets(sample_num);
 
     for (int i = 0; i < K1; ++i) {
         std::string data_file = output_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
@@ -158,14 +158,14 @@ void reservoir_sampling_residual(
                 // for filling the resulting array
                 if (filled_cnt < sample_num) {
                     memcpy(sample_data + cluster_dim * filled_cnt, vec, cluster_dim * sizeof(T));
-                    centroid_offsets[filled_cnt] = bucket_cnt;
+                    ivf_cen_offsets[filled_cnt] = bucket_cnt;
                     ++filled_cnt;
                 } else {
                     std::uniform_int_distribution<size_t> distribution(0, global_cnt);
                     size_t rand = (size_t)distribution(generator);
                     if (rand < sample_num) {
                         memcpy(sample_data + cluster_dim * rand, vec, cluster_dim * sizeof(T));
-                        centroid_offsets[rand] = bucket_cnt;
+                        ivf_cen_offsets[rand] = bucket_cnt;
                     }
                 }
 
@@ -177,9 +177,10 @@ void reservoir_sampling_residual(
     }
 
     for (int i = 0; i < sample_num; ++i) {
-        const float *c = ivf_cen + centroid_offsets[i] * dim;
-        compute_residual<const float, const T, float>(c, sample_data, residuals, dim);
-        sample_data += dim, residuals += dim;
+        memcpy(
+            sample_ivf_cen + i * dim,
+            ivf_cen + ivf_cen_offsets[i] * dim,
+            dim * sizeof(float));
     }
 }
 

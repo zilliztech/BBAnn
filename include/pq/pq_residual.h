@@ -85,25 +85,32 @@ void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
         uint64_t& bucket_cnt,
         const std::string& file_path,
         MetricType metric_type) {
-    pq->encode_vectors(precomputer_table, n, x, false);
+    assert(ivf_cen != nullptr);
+
+    pq->encode_vectors(precomputer_table, n, x, false, true, ivf_cen);
 
     if (MetricType::L2 == metric_type) {
         std::vector<float> term2s(n, 0);
 
-        // these codes are local, one for each cluster
+        // these codes are local, for each cluster
         const U* c = pq->get_codes();
         float* r = new float[d];
         const float* ivf_c = ivf_cen + bucket_cnt * d;
 
         // precompute term2
+        int64_t cnt = 0;
         for (int i = 0; i < buckets.size(); ++i, ivf_c += d) {
             for (int j = 0; j < buckets[i]; ++j, c += m) {
                 pq->reconstruct(r, c);
-                term2s[i] += norm_L2sqr<const float, float>(r, d);
-                term2s[i] += 2.0f * IP<const float, const float, float>(ivf_c, r, d);
+                term2s[cnt] += norm_L2sqr<const float, float>(r, d);
+                term2s[cnt] += 2.0f * IP<const float, const float, float>(ivf_c, r, d);
+
+
+                ++cnt;
             }
             ++bucket_cnt;
         }
+        assert(cnt == n);
 
         uint32_t wm = m + sizeof(float);
         std::ofstream code_writer(file_path, std::ios::binary | std::ios::out);
@@ -111,11 +118,10 @@ void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
         code_writer.write((char*)&wm, sizeof(uint32_t));
 
         c = pq->get_codes();
-        const float* t2 = term2s.data();
         const size_t c_size = m * sizeof(U);
-        for (int i = 0; i < n; ++i, c += m, ++t2) {
+        for (int i = 0; i < n; ++i, c += m) {
             code_writer.write((char*)c, c_size);
-            code_writer.write((char*)t2, sizeof(float));
+            code_writer.write((char*)&term2s[i], sizeof(float));
         }
 
         code_writer.close();
@@ -167,13 +173,13 @@ void PQResidualQuantizer<C, T, U>::search(
         heap_heapify<C>(topk, val_, ids_);
     const U* c = pcodes;
 
+
+    // term 1
+    float term1 = L2sqr<const T, const float, float>(q, centroid, d);
+
     if (MetricType::L2 == metric_type) {
         for (int j = 0; j < n; ++j) {
-            // term 1
-            float dis = L2sqr<const T, const float, float>(q, centroid, d);
-
-            // term 2
-            dis += *reinterpret_cast<const float *>(pcodes + m);
+            float dis = term1;
 
             // term 3
             const float* __restrict dt = dis_tab;
@@ -182,6 +188,13 @@ void PQResidualQuantizer<C, T, U>::search(
                 term3 += dt[*c++];
             }
             dis -= 2.0f * term3;
+
+            // term 2
+            dis += *reinterpret_cast<const float *>(c);
+
+
+            c += sizeof(float);
+
 
             if (C::cmp(val_[0], dis)) {
                 heap_swap_top<C>(topk, val_, ids_, dis, gen_refine_id(cid, off + j, qid));

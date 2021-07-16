@@ -400,11 +400,11 @@ void train_pq_residual_quantizer(
 
     int64_t pq_sample_num = (nb * PQ_SAMPLE_RATE);
 
-    float* residuals = new float[pq_sample_num * dim];
-    assert(residuals != nullptr);
-
     DATAT* sample_data = new DATAT[pq_sample_num * dim];
     assert(sample_data != nullptr);
+
+    float* sample_ivf_cen = new float[pq_sample_num * dim];
+    assert(sample_ivf_cen != nullptr);
 
     std::vector<std::vector<uint32_t> > metas(K1);
     load_meta_impl(output_path, metas, K1);
@@ -415,13 +415,17 @@ void train_pq_residual_quantizer(
     uint32_t ivf_n, ivf_dim;
     read_bin_file<float>(output_path + BUCKET + CENTROIDS + BIN, ivf_cen, ivf_n, ivf_dim);
     assert(ivf_dim == dim);
+    assert(ivf_cen != nullptr);
 
-    reservoir_sampling_residual<DATAT>(output_path, metas, ivf_cen, dim, pq_sample_num, sample_data, residuals, K1);
+    reservoir_sampling_residual<DATAT>(output_path, metas, ivf_cen, dim, pq_sample_num, sample_data, sample_ivf_cen, K1);
     rc.RecordSection("reservoir_sampling_residual for pq training set done");
 
     PQResidualQuantizer<HEAPT, DATAT, uint8_t> quantizer(dim, PQM, PQnbits);
-    quantizer.pq->train_residual(pq_sample_num, residuals);
+    quantizer.pq->train(pq_sample_num, sample_data, sample_ivf_cen);
     rc.RecordSection("pq residual quantizer train done");
+
+    delete[] sample_data;
+    delete[] sample_ivf_cen;
 
     quantizer.pq->save_centroids(output_path + PQ_CENTROIDS + BIN);
     rc.RecordSection("pq residual quantizer save centroids done");
@@ -444,8 +448,6 @@ void train_pq_residual_quantizer(
     }
 
     delete[] precompute_table;
-    delete[] sample_data;
-    delete[] residuals;
     delete[] ivf_cen;
 
     rc.ElapseFromBegin("train pq residual quantizer totally done.");
@@ -800,7 +802,7 @@ void search_pq_residual_quantizer(
                 assert(cid < K1);
                 const float* cen = ivf_centroids + cid * dq;
                 quantizer.search(precompute_table, pquery + i * dq, cen,
-                        pq_codebook[cid].data() + off * pqm, meta[cid][bid],
+                        pq_codebook[cid].data() + (uint64_t)off * pqm, meta[cid][bid],
                         refine_topk, pq_distancei, pq_offseti, pq_cmp,
                         j + 1 == nprobe, j == 0, cid, off, i, metric_type);
             }
