@@ -102,7 +102,7 @@ void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
         for (int i = 0; i < buckets.size(); ++i, ivf_c += d) {
             for (int j = 0; j < buckets[i]; ++j, c += m) {
                 pq->reconstruct(r, c);
-                term2s[cnt] += norm_L2sqr<const float, float>(r, d);
+                term2s[cnt] += IP<const float, float>(r, r, d);
                 term2s[cnt] += 2.0f * IP<const float, const float, float>(ivf_c, r, d);
 
 

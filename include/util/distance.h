@@ -25,16 +25,6 @@ R L2sqr(T1 *a, T2 *b, size_t n) {
     return dis;
 }
 
-template<typename T, typename R>
-R norm_L2sqr(T* x, size_t n) {
-    // will it overflow?
-    R rst = 0;
-    for (size_t i = 0; i < n; ++i) {
-        rst += x[i] * x[i];
-    }
-    return rst;
-}
-
 template<typename T1, typename T2, typename R>
 R IP(T1 *a, T2 *b, size_t n) {
     size_t i = 0;
