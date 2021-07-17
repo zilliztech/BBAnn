@@ -794,18 +794,18 @@ void refine(const std::string& index_path,
         uint32_t meta_bytes = 8; // pass meta
         DATAT* data_bufi = new DATAT[dq];
         uint32_t global_id;
-        raw_data_file_handlers[i].seekg(meta_bytes + pre_off * dq * sizeof(DATAT));
+        raw_data_file_handlers[i].seekg(meta_bytes + pre_off * dq * sizeof(DATAT), raw_data_file_handlers[i].beg);
         raw_data_file_handlers[i].read((char*)data_bufi, dq * sizeof(DATAT));
-        ids_data_file_handlers[i].seekg(meta_bytes + pre_off * sizeof(uint32_t));
+        ids_data_file_handlers[i].seekg(meta_bytes + pre_off * sizeof(uint32_t), ids_data_file_handlers[i].beg);
         ids_data_file_handlers[i].read((char*)&global_id, sizeof(uint32_t));
         load_vectors[i] ++;
         // for debug
         for (int j = 0; j < refine_records[i].size(); j ++) {
             if (refine_records[i][j].first != pre_off) {
                 pre_off = refine_records[i][j].first;
-                raw_data_file_handlers[i].seekg(meta_bytes + pre_off * dq * sizeof(DATAT));
+                raw_data_file_handlers[i].seekg(meta_bytes + pre_off * dq * sizeof(DATAT), raw_data_file_handlers[i].beg);
                 raw_data_file_handlers[i].read((char*)data_bufi, dq * sizeof(DATAT));
-                ids_data_file_handlers[i].seekg(meta_bytes + pre_off * sizeof(uint32_t));
+                ids_data_file_handlers[i].seekg(meta_bytes + pre_off * sizeof(uint32_t), ids_data_file_handlers[i].beg);
                 ids_data_file_handlers[i].read((char*)&global_id, sizeof(uint32_t));
                 assert(global_id >= 0);
                 load_vectors[i] ++;
@@ -955,9 +955,9 @@ void aligned_refine(const std::string& index_path,
         char* dat_bufi = new char[page_size];
         char* ids_bufi = new char[page_size];
         uint32_t global_id;
-        raw_data_file_handlers[i].seekg((pv + 1) * page_size);
+        raw_data_file_handlers[i].seekg((pv + 1) * page_size, raw_data_file_handlers[i].beg);
         raw_data_file_handlers[i].read(dat_bufi, page_size);
-        ids_data_file_handlers[i].seekg((pi + 1) * page_size);
+        ids_data_file_handlers[i].seekg((pi + 1) * page_size, ids_data_file_handlers[i].beg);
         ids_data_file_handlers[i].read(ids_bufi, page_size);
         refine_statastics[i].vector_load_cnt = 1;
         refine_statastics[i].id_load_cnt = 1;
@@ -967,17 +967,17 @@ void aligned_refine(const std::string& index_path,
                 refine_statastics[i].different_offset_cnt ++;
             }
             pre_off = refine_off;
-            if (refine_off > pv * nvpp) {
+            if (refine_off >= (pv + 1) * nvpp) {
                 pv = refine_off / nvpp;
-                raw_data_file_handlers[i].seekg((pv + 1) * page_size);
+                raw_data_file_handlers[i].seekg((pv + 1) * page_size, raw_data_file_handlers[i].beg);
                 raw_data_file_handlers[i].read(dat_bufi, page_size);
                 refine_statastics[i].vector_load_cnt ++;
             } else {
                 refine_statastics[i].vector_page_hit_cnt ++;
             }
-            if (refine_off > pi * nipp) {
+            if (refine_off >= (pi + 1) * nipp) {
                 pi = refine_off / nipp;
-                ids_data_file_handlers[i].seekg((pi + 1) * page_size);
+                ids_data_file_handlers[i].seekg((pi + 1) * page_size, ids_data_file_handlers[i].beg);
                 ids_data_file_handlers[i].read(ids_bufi, page_size);
                 refine_statastics[i].id_load_cnt ++;
             } else {
