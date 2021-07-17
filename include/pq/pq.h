@@ -80,15 +80,6 @@ public:
         return m;
     }
 
-    float* reconstruct(float* r, const U* c) {
-        for (uint32_t i = 0; i < m; ++i, ++c) {
-            memcpy(
-                r + i * dsub,
-                centroids + (i * K + (*c)) * dsub,
-                dsub * sizeof(float));
-        }
-    }
-
     void show_centroids() {
         std::cout << "show pq.centroids:" << std::endl;
         auto pc = centroids;
@@ -130,11 +121,11 @@ public:
         }
     }
 
-    void train(int64_t n, const T* x, const float* sample_ivf_cen = nullptr);
+    void train(int64_t n, const T* x);
 
     void encode_vectors(float*& precomputer_table,
                         int64_t n, const T* x,
-                        bool append = false, const float* ivf_cen = nullptr);
+                        bool append = false);
 
     void encode_vectors_and_save(float*& precomputer_table,
                                  int64_t n, const T *x,
@@ -182,29 +173,14 @@ void ProductQuantizer<C, T, U>::compute_dis_tab(const T* q, float* dis_tab,
 }
 
 template<class C, typename T, typename U>
-void ProductQuantizer<C, T, U>::train(int64_t n, const T* x, const float* sample_ivf_cen) {
-    size_t sub_code_size;
-    T* xs = nullptr;
-    float* rs = nullptr;
-
-    if (sample_ivf_cen) {
-        sub_code_size = dsub * sizeof(float);
-        rs = new float[n * dsub];
-    } else {
-        sub_code_size = dsub * sizeof(T);
-        xs = new T[n * dsub];
-    }
+void ProductQuantizer<C, T, U>::train(int64_t n, const T* x) {
+    const size_t sub_code_size = dsub * sizeof(T);
+    T* xs = new T[n * dsub];
 
     bool remove_dup = false;
     if (sub_code_size <= 4) {
-        printf("Remove duplicates dsub %d * sizeof(Type) %d\n", (int)dsub, (int)(sample_ivf_cen ? sizeof(float) : sizeof(T)));
+        printf("Remove duplicates dsub %d * sizeof(Type) %d\n", (int)dsub, (int)sizeof(T));
         remove_dup = true;
-    }
-
-    if (remove_dup && sample_ivf_cen) {
-        printf("PQ residual and remove duplication not supported yet\n");
-        printf("Exit ...\n");
-        return ;
     }
 
     for (int64_t i = 0; i < m; ++i) {
@@ -247,31 +223,22 @@ void ProductQuantizer<C, T, U>::train(int64_t n, const T* x, const float* sample
 
         } else {
             auto xd = x + i * dsub;
-            auto cd = sample_ivf_cen + i * dsub;
-            for (int64_t j = 0; j < n; ++j, xd += d, cd += d) {
-                if (sample_ivf_cen) {
-                    compute_residual<const T, const float, float>(xd, cd, rs + j * dsub, dsub);
-                } else {
-                    memcpy(xs + j * dsub, xd, sub_code_size);
-                }
+            for (int64_t j = 0; j < n; ++j) {
+                memcpy(xs + j * dsub, xd, sub_code_size);
+                xd += d;
             }
 
-            if (sample_ivf_cen) {
-                kmeans<float>(n, rs, dsub, K, centroids + i * K * dsub);
-            } else {
-                kmeans<T>(n, xs, dsub, K, centroids + i * K * dsub);
-            }
+            kmeans<T>(n, xs, dsub, K, centroids + i * K * dsub);
         }
     }
 
-    if (xs != nullptr) delete[] xs;
-    if (rs != nullptr) delete[] rs;
+    delete[] xs;
 };
 
 template<class C, typename T, typename U>
 void ProductQuantizer<C, T, U>::encode_vectors(float*& precomputer_table,
                                                int64_t n, const T *x,
-                                               bool append, const float* ivf_cen) {
+                                               bool append) {
     if (!append) {
         npos = 0;
     }
@@ -295,9 +262,6 @@ void ProductQuantizer<C, T, U>::encode_vectors(float*& precomputer_table,
         precomputer_table = new float[(int64_t)m * K * (K - 1) / 2];
         new_precomputer_table = true;
     }
-
-    float* r = new float[dsub];
-    assert(r != nullptr);
 
     for (int64_t loop = 0; loop < m; loop++) {
         float *data = precomputer_table + loop * K * (K - 1) / 2;
@@ -327,34 +291,15 @@ void ProductQuantizer<C, T, U>::encode_vectors(float*& precomputer_table,
         for (int64_t i = 0; i < n; i++) {
             const T* x_i = x + i * d + loop * dsub;
 
-            if (ivf_cen) {
-                assert(ivf_cen != nullptr);
-                compute_residual<const T, const float, float>(x_i, ivf_cen + loop * dsub, r, dsub);
-            }
-
             int64_t ids_i = 0;
-
-            float val_i;
-            if (ivf_cen) {
-                val_i = L2sqr<const float,const float,float>(r, cen, dsub);
-            } else {
-                val_i = L2sqr<const T,const float,float>(x_i, cen, dsub);
-            }
-
+            float val_i = L2sqr<const T,const float,float>(x_i, cen, dsub);
             float val_i_time_4 = val_i * 4;
             for (int64_t j = 1; j < K; j++) {
                 if (val_i_time_4 <= Y(ids_i, j)) {
                     continue;
                 }
                 const float *y_j = cen + j * dsub;
-
-                float disij;
-                if (ivf_cen) {
-                    disij = L2sqr<const float,const float,float>(r, y_j, dsub);
-                } else {
-                    disij = L2sqr<const T,const float,float>(x_i, y_j, dsub);
-                }
-
+                float disij = L2sqr<const T,const float,float>(x_i, y_j, dsub);
                 if (disij < val_i) {
                     ids_i = j;
                     val_i = disij;
@@ -367,7 +312,6 @@ void ProductQuantizer<C, T, U>::encode_vectors(float*& precomputer_table,
     }
 
     npos += n;
-    delete[] r;
 }
 
 template<class C, typename T, typename U>
@@ -462,4 +406,3 @@ void ProductQuantizer<C, T, U>::search(float* precompute_table, const T* q, cons
             heap_reorder<C>(topk, val_, ids_);
     }
 }
-
