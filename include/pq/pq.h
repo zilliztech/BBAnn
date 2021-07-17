@@ -33,7 +33,6 @@ private:
     float* centroids = nullptr;
     U* codes = nullptr;
 
-    void compute_dis_tab(const T* q, float* dis_tab, PQ_Computer<T> computer);
 public:
     // in-memory
     ProductQuantizer(int64_t _ntotal, int64_t _d, uint32_t _m, uint32_t _nbits)
@@ -159,18 +158,6 @@ public:
         centroids_reader.close();
     }
 };
-
-template<class C, typename T, typename U>
-void ProductQuantizer<C, T, U>::compute_dis_tab(const T* q, float* dis_tab,
-                                     PQ_Computer<T> computer)
-{
-    const float* c = centroids;
-    for (int64_t i = 0; i < m; ++i, q += dsub) {
-        for (int64_t j = 0; j < K; ++j, c += dsub) {
-            *dis_tab++ = computer(q, c, dsub);
-        }
-    }
-}
 
 template<class C, typename T, typename U>
 void ProductQuantizer<C, T, U>::train(int64_t n, const T* x) {
@@ -341,7 +328,7 @@ void ProductQuantizer<C, T, U>::search(int64_t nq, const T* q, int64_t topk,
 
 #pragma omp parallel for
     for (int64_t i = 0; i < nq; ++i) {
-        compute_dis_tab(q + i * d, dis_tabs + i * m * K, computer);
+        calc_precompute_table(dis_tabs + i * m * K, q + i * d, computer);
     }
 
     // search
