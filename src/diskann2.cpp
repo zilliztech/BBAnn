@@ -10,7 +10,8 @@ template<typename DATAT>
 void train_cluster(const std::string& raw_data_bin_file,
                    const std::string& output_path,
                    const int32_t K1,
-                   float** centroids) {
+                   float** centroids,
+                   double& avg_len) {
     TimeRecorder rc("train cluster");
     std::cout << "train_cluster parameters:" << std::endl;
     std::cout << " raw_data_bin_file: " << raw_data_bin_file
@@ -29,7 +30,11 @@ void train_cluster(const std::string& raw_data_bin_file,
     sample_data = new DATAT[sample_num * dim];
     reservoir_sampling(raw_data_bin_file, sample_num, sample_data);
     rc.RecordSection("reservoir sample with sample rate: " + std::to_string(K1_SAMPLE_RATE) + " done");
-    kmeans<DATAT>(sample_num, sample_data, dim, K1, *centroids, true);
+    double mxl, mnl;
+    stat_length<DATAT>(sample_data, 1000000, dim, mxl, mnl, avg_len);
+    rc.RecordSection("calculate " + std::to_string(1000000) + " vectors from sample_data done");
+    std::cout << "max len: " << mxl << ", min len: " << mnl << ", average len: " << avg_len << std::endl;
+    kmeans<DATAT>(sample_num, sample_data, dim, K1, *centroids, false, avg_len);
     rc.RecordSection("kmeans done");
     assert((*centroids) != nullptr);
 
@@ -131,10 +136,11 @@ void divide_raw_data(const std::string& raw_data_bin_file,
 
 template<typename DATAT, typename DISTT, typename HEAPT>
 void conquer_clusters(const std::string& output_path,
-                      const int K1, const int threshold) {
+                      const int K1, const double avg_len, const int threshold) {
     TimeRecorder rc("conquer clusters");
     std::cout << "conquer clusters parameters:" << std::endl;
     std::cout << " output_path: " << output_path
+              << " vector avg length: " << avg_len
               << std::endl;
     std::vector<int64_t> cluster_id;
     std::vector<DISTT> dists;
@@ -172,7 +178,7 @@ void conquer_clusters(const std::string& output_path,
         int64_t K2 = (cluster_size - 1) / threshold + 1;
         std::cout << "cluster-" << i << " will split into " << K2 << " buckets." << std::endl;
         float* centroids_i = new float[K2 * cluster_dim];
-        kmeans<DATAT>(cluster_size, datai, (int32_t)cluster_dim, K2, centroids_i);
+        kmeans<DATAT>(cluster_size, datai, (int32_t)cluster_dim, K2, centroids_i, false, avg_len);
         rci.RecordSection("kmeans done");
         cluster_id.resize(cluster_size);
         dists.resize(cluster_size);
@@ -376,7 +382,7 @@ void train_quantizer(const std::string& raw_data_bin_file,
 
     uint32_t nb, dim;
     get_bin_metadata(raw_data_bin_file, nb, dim);
-    int64_t pq_sample_num = (nb * PQ_SAMPLE_RATE);
+    int64_t pq_sample_num = 100000;
     DATAT* pq_sample_data = new DATAT[pq_sample_num * dim];
     reservoir_sampling(raw_data_bin_file, pq_sample_num, pq_sample_data);
     rc.RecordSection("reservoir_sampling 4 pq train set done");
@@ -522,15 +528,16 @@ void build_bigann(const std::string& raw_data_bin_file,
               << std::endl;
 
     float* centroids = nullptr;
+    double avg_len;
     // sampling and do K1-means to get the first round centroids
-    train_cluster<DATAT>(raw_data_bin_file, output_path, K1, &centroids);
+    train_cluster<DATAT>(raw_data_bin_file, output_path, K1, &centroids, avg_len);
     assert(centroids != nullptr);
     rc.RecordSection("train cluster to get " + std::to_string(K1) + " centroids done.");
 
     divide_raw_data<DATAT, DISTT, HEAPT>(raw_data_bin_file, output_path, centroids, K1);
     rc.RecordSection("divide raw data into " + std::to_string(K1) + " clusters done");
 
-    conquer_clusters<DATAT, DISTT, HEAPT>(output_path, K1, threshold);
+    conquer_clusters<DATAT, DISTT, HEAPT>(output_path, K1, avg_len, threshold);
     rc.RecordSection("conquer each cluster into buckets done");
 
     // page_align<DATAT>(raw_data_bin_file, output_path, K1);
@@ -732,7 +739,7 @@ void refine(const std::string& index_path,
               << " answer_ids:" << answer_ids
               << std::endl;
     std::vector<std::vector<std::pair<uint32_t, uint32_t>>> refine_records(K1);
-    for (int i = 0; i < nq; i ++) {
+    for (int64_t i = 0; i < nq; i ++) {
         auto pq_offseti = pq_offsets + i * refine_topk;
         for (int j = 0; j < refine_topk; j ++) {
             if (pq_offseti[j] == (uint64_t)(-1))
@@ -857,7 +864,7 @@ void aligned_refine(const std::string& index_path,
               << " answer_ids:" << answer_ids
               << std::endl;
     std::vector<std::vector<std::pair<uint32_t, uint32_t>>> refine_records(K1);
-    for (int i = 0; i < nq; i ++) {
+    for (int64_t i = 0; i < nq; i ++) {
         auto pq_offseti = pq_offsets + i * refine_topk;
         for (int j = 0; j < refine_topk; j ++) {
             if (pq_offseti[j] == (uint64_t)(-1))
@@ -932,6 +939,7 @@ void aligned_refine(const std::string& index_path,
 
     uint32_t vector_size = dq * sizeof(DATAT);
 
+    std::vector<refine_stat> refine_statastics(K1);
     std::vector<std::mutex> mtx(nq);
 #pragma omp parallel for
     for (int i = 0; i < K1; i ++) {
@@ -951,18 +959,29 @@ void aligned_refine(const std::string& index_path,
         raw_data_file_handlers[i].read(dat_bufi, page_size);
         ids_data_file_handlers[i].seekg((pi + 1) * page_size);
         ids_data_file_handlers[i].read(ids_bufi, page_size);
-        // for debug
+        refine_statastics[i].vector_load_cnt = 1;
+        refine_statastics[i].id_load_cnt = 1;
         for (int j = 0; j < refine_records[i].size(); j ++) {
             int64_t refine_off = refine_records[i][j].first;
+            if (pre_off != refine_off) {
+                refine_statastics[i].different_offset_cnt ++;
+            }
+            pre_off = refine_off;
             if (refine_off > pv * nvpp) {
                 pv = refine_off / nvpp;
                 raw_data_file_handlers[i].seekg((pv + 1) * page_size);
                 raw_data_file_handlers[i].read(dat_bufi, page_size);
+                refine_statastics[i].vector_load_cnt ++;
+            } else {
+                refine_statastics[i].vector_page_hit_cnt ++;
             }
             if (refine_off > pi * nipp) {
                 pi = refine_off / nipp;
                 ids_data_file_handlers[i].seekg((pi + 1) * page_size);
                 ids_data_file_handlers[i].read(ids_bufi, page_size);
+                refine_statastics[i].id_load_cnt ++;
+            } else {
+                refine_statastics[i].id_page_hit_cnt ++;
             }
             uint32_t qid = refine_records[i][j].second;
             auto dis = dis_computer((DATAT*)(dat_bufi + (refine_off % nvpp) * vector_size), pquery + qid * dq, dq);
@@ -975,6 +994,22 @@ void aligned_refine(const std::string& index_path,
         delete[] dat_bufi;
         delete[] ids_bufi;
     }
+    int64_t vector_load_tot = 0;
+    int64_t id_load_tot = 0;
+    int64_t vector_page_hit_tot = 0;
+    int64_t id_page_hit_tot = 0;
+    int64_t different_offset_tot = 0;
+    for (auto i = 0; i < K1; i ++) {
+        vector_load_tot += refine_statastics[i].vector_load_cnt;
+        id_load_tot += refine_statastics[i].id_load_cnt;
+        vector_page_hit_tot += refine_statastics[i].vector_page_hit_cnt - 1;
+        id_page_hit_tot += refine_statastics[i].id_page_hit_cnt - 1;
+        different_offset_tot += refine_statastics[i].different_offset_cnt;
+    }
+    std::cout << "total refine vectors: " << (int64_t)nq * refine_topk
+              << ", load vector pages: " << vector_load_tot << ", load ids pages: " << id_load_tot
+              << ", vector page hit: " << vector_page_hit_tot << ", ids page hit: " << id_page_hit_tot
+              << ", different offsets: " << different_offset_tot << std::endl;
     rc.RecordSection("calculate done.");
 
     for (int i = 0; i < K1; i ++) {
@@ -1015,7 +1050,7 @@ void refine_c(const std::string& index_path,
               << " answer_ids:" << answer_ids
               << std::endl;
     std::vector<std::vector<std::pair<uint32_t, uint32_t>>> refine_records(K1);
-    for (int i = 0; i < nq; i ++) {
+    for (int64_t i = 0; i < nq; i ++) {
         auto pq_offseti = pq_offsets + i * refine_topk;
         for (int j = 0; j < refine_topk; j ++) {
             if (pq_offseti[j] == (uint64_t)(-1))
@@ -1561,19 +1596,22 @@ template
 void train_cluster<float>(const std::string& raw_data_bin_file,
                    const std::string& output_path,
                    const int K1,
-                   float** centroids);
+                   float** centroids,
+                   double& avg_len);
 
 template
 void train_cluster<uint8_t>(const std::string& raw_data_bin_file,
                    const std::string& output_path,
                    const int K1,
-                   float** centroids);
+                   float** centroids,
+                   double& avg_len);
 
 template
 void train_cluster<int8_t>(const std::string& raw_data_bin_file,
                    const std::string& output_path,
                    const int K1,
-                   float** centroids);
+                   float** centroids,
+                   double& avg_len);
 
 
 
