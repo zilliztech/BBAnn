@@ -206,7 +206,7 @@ void PQResidualQuantizer<C, T, U>::encode_vectors(float*& precomputer_table,
         new_precomputer_table = true;
     }
 
-    float* r = new float[dsub];
+    float* r = new float[dsub * omp_get_max_threads()];
     assert(r != nullptr);
 
     for (int64_t loop = 0; loop < m; loop++) {
@@ -233,33 +233,38 @@ void PQResidualQuantizer<C, T, U>::encode_vectors(float*& precomputer_table,
             }
         }
 
-#pragma omp parallel for
-        for (int64_t i = 0; i < n; i++) {
-            const T* x_i = x + i * d + loop * dsub;
+#pragma omp parallel
+        {
+            int64_t rank = omp_get_thread_num();
+            float* rd = r + rank * dsub;
+#pragma omp for
+            for (int64_t i = 0; i < n; i++) {
+                const T* x_i = x + i * d + loop * dsub;
 
-            compute_residual<const T, const float, float>(x_i, ivf_cen + loop * dsub, r, dsub);
+                compute_residual<const T, const float, float>(x_i, ivf_cen + loop * dsub, rd, dsub);
 
-            int64_t ids_i = 0;
+                int64_t ids_i = 0;
 
-            float val_i = L2sqr<const float,const float,float>(r, cen, dsub);
+                float val_i = L2sqr<const float,const float,float>(rd, cen, dsub);
 
-            float val_i_time_4 = val_i * 4;
-            for (int64_t j = 1; j < K; j++) {
-                if (val_i_time_4 <= Y(ids_i, j)) {
-                    continue;
+                float val_i_time_4 = val_i * 4;
+                for (int64_t j = 1; j < K; j++) {
+                    if (val_i_time_4 <= Y(ids_i, j)) {
+                        continue;
+                    }
+                    const float *y_j = cen + j * dsub;
+
+                    float disij = L2sqr<const float,const float,float>(rd, y_j, dsub);
+
+                    if (disij < val_i) {
+                        ids_i = j;
+                        val_i = disij;
+                        val_i_time_4 = val_i * 4;
+                    }
                 }
-                const float *y_j = cen + j * dsub;
 
-                float disij = L2sqr<const float,const float,float>(r, y_j, dsub);
-
-                if (disij < val_i) {
-                    ids_i = j;
-                    val_i = disij;
-                    val_i_time_4 = val_i * 4;
-                }
+                c[i * m + loop] = ids_i;
             }
-
-            c[i * m + loop] = ids_i;
         }
     }
 
