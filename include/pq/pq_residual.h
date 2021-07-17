@@ -257,17 +257,7 @@ template<class C, typename T, typename U>
 void PQResidualQuantizer<C, T, U>::encode_vectors(float*& precomputer_table,
                                                int64_t n, const T *x,
                                                const float* ivf_cen) {
-    if (npos + n > ntotal) {
-        ntotal = npos + n;
-        U* new_codes = new U[ntotal * m];
-        if (npos != 0) {
-            memcpy(new_codes, codes, npos * m * sizeof(U));
-        }
-        if (codes != nullptr) {
-            delete[] codes;
-        }
-        codes = new_codes;
-    }
+    assert(npos + n <= ntotal);
 
     U* c = codes + npos * m;
 
@@ -354,7 +344,6 @@ void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
     const float* ivf_c = ivf_cen + bucket_cnt * d;
     const T* xd = x;
     for (int i = 0; i < buckets.size(); ivf_c += d, xd += buckets[i] * d, ++i) {
-        // encode append resulting code array too many copies
         encode_vectors(precomputer_table, buckets[i], xd, ivf_c);
     }
 
