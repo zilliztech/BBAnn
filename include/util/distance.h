@@ -47,7 +47,18 @@ R IP(T1 *a, T2 *b, size_t n) {
 
 template<typename T1, typename T2, typename R>
 void compute_residual(T1* x, T2* c, R* res, size_t d) {
-    for (int i = 0; i < d; ++i) {
-        res[i] = (R)(x[i]) - (R)(c[i]);
+    size_t i = 0;
+    switch(d & 7) {
+        default:
+            while (d > 7) {
+                d -= 8; res[i]=(R)x[i]-(R)c[i]; i++;
+                case 7: res[i]=(R)x[i]-(R)c[i]; i++;
+                case 6: res[i]=(R)x[i]-(R)c[i]; i++;
+                case 5: res[i]=(R)x[i]-(R)c[i]; i++;
+                case 4: res[i]=(R)x[i]-(R)c[i]; i++;
+                case 3: res[i]=(R)x[i]-(R)c[i]; i++;
+                case 2: res[i]=(R)x[i]-(R)c[i]; i++;
+                case 1: res[i]=(R)x[i]-(R)c[i]; i++;
+            }
     }
 }

@@ -348,10 +348,10 @@ void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
 template <class C, typename T, typename U>
 void PQResidualQuantizer<C, T, U>::search(
         float* precompute_table,
-        const T* q,
-        const float* centroid,
-        const U* pcodes,
-        int64_t n,
+        const T* q,             // one query
+        const float* centroid,  // one centroid
+        const U* pcodes,        // bucket code begin
+        int64_t n,              // row count in bucket
         int64_t topk,
         typename C::T* values,
         typename C::TI* labels,
@@ -374,17 +374,17 @@ void PQResidualQuantizer<C, T, U>::search(
 
     const U* c = pcodes;
 
-    // term 1
-    float term1 = L2sqr<const T, const float, float>(q, centroid, d);
-
     if (MetricType::L2 == metric_type) {
-        for (int j = 0; j < n; ++j) {
+        // term 1
+        float term1 = L2sqr<const T, const float, float>(q, centroid, d);
+
+        for (int64_t j = 0; j < n; ++j) {
             float dis = term1;
 
             // term 3
             const float* __restrict dt = dis_tab;
             float term3 = 0;
-            for (int mm = 0; mm < m; ++mm, dt += K) {
+            for (uint32_t mm = 0; mm < m; ++mm, dt += K) {
                 term3 += dt[*c++];
             }
             dis -= 2.0f * term3;
@@ -402,11 +402,11 @@ void PQResidualQuantizer<C, T, U>::search(
         // compute qc
         float qc = IP<const T, const float, float>(q, centroid, d);
 
-        for (int j = 0; j < n; ++j) {
+        for (int64_t j = 0; j < n; ++j) {
             float dis = qc;
             // compute qr
             const float* __restrict dt = dis_tab;
-            for (int mm = 0; mm < m; ++mm, dt += K) {
+            for (uint32_t mm = 0; mm < m; ++mm, dt += K) {
                 dis += dt[*c++];
             }
 
@@ -416,6 +416,7 @@ void PQResidualQuantizer<C, T, U>::search(
         }
     }
 
-    if (reorder)
+    if (reorder) {
         heap_reorder<C>(topk, val_, ids_);
+    }
 }
