@@ -196,7 +196,7 @@ void PQResidualQuantizer<C, T, U>::train(int64_t n, const T* x, const float* sam
 
     bool remove_dup = false;
     if (sub_code_size <= 4) {
-        printf("Remove duplicates dsub %d * sizeof(Type) %d\n", (int)dsub, (int)(sample_ivf_cen ? sizeof(float) : sizeof(T)));
+        printf("Remove duplicates dsub %d * sizeof(Type) %d\n", (int)dsub, (int)sizeof(float));
         remove_dup = true;
     }
 
@@ -258,6 +258,7 @@ void PQResidualQuantizer<C, T, U>::encode_vectors(float*& precomputer_table,
                                                int64_t n, const T *x,
                                                const float* ivf_cen) {
     assert(npos + n <= ntotal);
+    assert(ivf_cen != nullptr);
 
     U* c = codes + npos * m;
 
@@ -298,7 +299,6 @@ void PQResidualQuantizer<C, T, U>::encode_vectors(float*& precomputer_table,
         for (int64_t i = 0; i < n; i++) {
             const T* x_i = x + i * d + loop * dsub;
 
-            assert(ivf_cen != nullptr);
             compute_residual<const T, const float, float>(x_i, ivf_cen + loop * dsub, r, dsub);
 
             int64_t ids_i = 0;
@@ -429,8 +429,8 @@ void PQResidualQuantizer<C, T, U>::search(
 
     if (heapify)
         heap_heapify<C>(topk, val_, ids_);
-    const U* c = pcodes;
 
+    const U* c = pcodes;
 
     // term 1
     float term1 = L2sqr<const T, const float, float>(q, centroid, d);
@@ -450,9 +450,7 @@ void PQResidualQuantizer<C, T, U>::search(
             // term 2
             dis += *reinterpret_cast<const float *>(c);
 
-
             c += sizeof(float);
-
 
             if (C::cmp(val_[0], dis)) {
                 heap_swap_top<C>(topk, val_, ids_, dis, gen_refine_id(cid, off + j, qid));

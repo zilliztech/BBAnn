@@ -138,42 +138,42 @@ void reservoir_sampling_residual(
     std::vector<T> cluster_data;
     std::vector<uint32_t> ivf_cen_offsets(sample_num);
 
-    for (int i = 0; i < K1; ++i) {
-        std::string data_file = output_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
+    uint32_t i = 0; // default choose
 
-        IOReader data_reader(data_file);
-        data_reader.read((char*)&cluster_size, sizeof(uint32_t));
-        data_reader.read((char*)&cluster_dim, sizeof(uint32_t));
-        assert(cluster_dim == dim);
+    std::string data_file = output_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
 
-        // read vectors in each cluster
-        const uint64_t total_size = cluster_size * cluster_dim;
-        cluster_data.resize(total_size);
-        data_reader.read((char*)(cluster_data.data()), total_size * sizeof(T));
+    IOReader data_reader(data_file);
+    data_reader.read((char*)&cluster_size, sizeof(uint32_t));
+    data_reader.read((char*)&cluster_dim, sizeof(uint32_t));
+    assert(cluster_dim == dim);
 
-        const T* vec = cluster_data.data();
-        for (int j = 0; j < metas[i].size(); ++j) {
-            for (int k = 0; k < metas[i][j]; ++k) {
-                // deal with the situation when one bucket is not enough
-                // for filling the resulting array
-                if (filled_cnt < sample_num) {
-                    memcpy(sample_data + cluster_dim * filled_cnt, vec, cluster_dim * sizeof(T));
-                    ivf_cen_offsets[filled_cnt] = bucket_cnt;
-                    ++filled_cnt;
-                } else {
-                    std::uniform_int_distribution<size_t> distribution(0, global_cnt);
-                    size_t rand = (size_t)distribution(generator);
-                    if (rand < sample_num) {
-                        memcpy(sample_data + cluster_dim * rand, vec, cluster_dim * sizeof(T));
-                        ivf_cen_offsets[rand] = bucket_cnt;
-                    }
+    // read vectors in each cluster
+    const uint64_t total_size = cluster_size * cluster_dim;
+    cluster_data.resize(total_size);
+    data_reader.read((char*)(cluster_data.data()), total_size * sizeof(T));
+
+    const T* vec = cluster_data.data();
+    for (int j = 0; j < metas[i].size(); ++j) {
+        for (int k = 0; k < metas[i][j]; ++k) {
+            // deal with the situation when one bucket is not enough
+            // for filling the resulting array
+            if (filled_cnt < sample_num) {
+                memcpy(sample_data + cluster_dim * filled_cnt, vec, cluster_dim * sizeof(T));
+                ivf_cen_offsets[filled_cnt] = bucket_cnt;
+                ++filled_cnt;
+            } else {
+                std::uniform_int_distribution<size_t> distribution(0, global_cnt);
+                size_t rand = (size_t)distribution(generator);
+                if (rand < sample_num) {
+                    memcpy(sample_data + cluster_dim * rand, vec, cluster_dim * sizeof(T));
+                    ivf_cen_offsets[rand] = bucket_cnt;
                 }
-
-                vec += cluster_dim;
-                ++global_cnt;
             }
-            ++bucket_cnt;
+
+            vec += cluster_dim;
+            ++global_cnt;
         }
+        ++bucket_cnt;
     }
 
     for (int i = 0; i < sample_num; ++i) {

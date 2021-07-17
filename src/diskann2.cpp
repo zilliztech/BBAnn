@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <algorithm>
 #include <cstdio>
 
 template<typename DATAT>
@@ -398,17 +399,22 @@ void train_pq_residual_quantizer(
     uint32_t nb, dim;
     get_bin_metadata(raw_data_bin_file, nb, dim);
 
-    int64_t pq_sample_num = (nb * PQ_SAMPLE_RATE);
+
+    std::vector<std::vector<uint32_t> > metas(K1);
+    load_meta_impl(output_path, metas, K1);
+    assert(metas.size() == K1);
+
+    int64_t pq_sample_num = std::min(
+                                65536, 
+                                std::min(
+                                    static_cast<int>(nb * PQ_SAMPLE_RATE),
+                                    std::accumulate(metas[0].begin(), metas[0].end(), 0)));
 
     DATAT* sample_data = new DATAT[pq_sample_num * dim];
     assert(sample_data != nullptr);
 
     float* sample_ivf_cen = new float[pq_sample_num * dim];
     assert(sample_ivf_cen != nullptr);
-
-    std::vector<std::vector<uint32_t> > metas(K1);
-    load_meta_impl(output_path, metas, K1);
-    assert(metas.size() == K1);
 
     // read ivf centroids
     float *ivf_cen = nullptr;
@@ -805,10 +811,22 @@ void search_pq_residual_quantizer(
                 assert(cid < K1);
                 const float* cen = ivf_centroids + cid * dq;
 
-                quantizer.search(precompute_table, pquery + i * dq, cen,
-                        pq_codebook[cid].data() + (uint64_t)off * pqm, meta[cid][bid],
-                        refine_topk, pq_distancei, pq_offseti, pq_cmp,
-                        j + 1 == nprobe, j == 0, cid, off, i, metric_type);
+                quantizer.search(
+                        precompute_table,
+                        pquery + i * dq,
+                        cen,
+                        pq_codebook[cid].data() + (uint64_t)off * pqm,
+                        meta[cid][bid],
+                        refine_topk,
+                        pq_distancei,
+                        pq_offseti,
+                        pq_cmp,
+                        j + 1 == nprobe,
+                        j == 0,
+                        cid,
+                        off,
+                        i,
+                        metric_type);
             }
         }
         delete[] precompute_table;
