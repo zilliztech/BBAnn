@@ -87,7 +87,12 @@ void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
         MetricType metric_type) {
     assert(ivf_cen != nullptr);
 
-    pq->encode_vectors(precomputer_table, n, x, false, true, ivf_cen);
+    const float* ivf_c = ivf_cen + bucket_cnt * d;
+    const T* xd = x;
+    for (int i = 0; i < buckets.size(); ivf_c += d, xd += buckets[i] * d, ++i) {
+        // encode append resulting code array too many copies
+        pq->encode_vectors(precomputer_table, buckets[i], xd, true, ivf_c);
+    }
 
     if (MetricType::L2 == metric_type) {
         std::vector<float> term2s(n, 0);
@@ -95,20 +100,18 @@ void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
         // these codes are local, for each cluster
         const U* c = pq->get_codes();
         float* r = new float[d];
-        const float* ivf_c = ivf_cen + bucket_cnt * d;
+        ivf_c = ivf_cen + bucket_cnt * d;
 
         // precompute term2
         int64_t cnt = 0;
         for (int i = 0; i < buckets.size(); ++i, ivf_c += d) {
             for (int j = 0; j < buckets[i]; ++j, c += m) {
                 pq->reconstruct(r, c);
-                term2s[cnt] += IP<const float, float>(r, r, d);
+                term2s[cnt] += IP<const float, const float, float>(r, r, d);
                 term2s[cnt] += 2.0f * IP<const float, const float, float>(ivf_c, r, d);
-
 
                 ++cnt;
             }
-            ++bucket_cnt;
         }
         assert(cnt == n);
 
@@ -143,6 +146,8 @@ void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
     } else {
         std::cerr << "Unrecognized metric type: " << static_cast<int>(metric_type) << std::endl;
     }
+
+    bucket_cnt += buckets.size();
 }
 
 template <class C, typename T, typename U>

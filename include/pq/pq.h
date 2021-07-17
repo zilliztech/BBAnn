@@ -134,7 +134,7 @@ public:
 
     void encode_vectors(float*& precomputer_table,
                         int64_t n, const T* x,
-                        bool append = false, bool res = false, const float* ivf_cen = nullptr);
+                        bool append = false, const float* ivf_cen = nullptr);
 
     void encode_vectors_and_save(float*& precomputer_table,
                                  int64_t n, const T *x,
@@ -271,7 +271,7 @@ void ProductQuantizer<C, T, U>::train(int64_t n, const T* x, const float* sample
 template<class C, typename T, typename U>
 void ProductQuantizer<C, T, U>::encode_vectors(float*& precomputer_table,
                                                int64_t n, const T *x,
-                                               bool append, bool res, const float* ivf_cen) {
+                                               bool append, const float* ivf_cen) {
     if (!append) {
         npos = 0;
     }
@@ -327,7 +327,7 @@ void ProductQuantizer<C, T, U>::encode_vectors(float*& precomputer_table,
         for (int64_t i = 0; i < n; i++) {
             const T* x_i = x + i * d + loop * dsub;
 
-            if (res) {
+            if (ivf_cen) {
                 assert(ivf_cen != nullptr);
                 compute_residual<const T, const float, float>(x_i, ivf_cen + loop * dsub, r, dsub);
             }
@@ -335,7 +335,7 @@ void ProductQuantizer<C, T, U>::encode_vectors(float*& precomputer_table,
             int64_t ids_i = 0;
 
             float val_i;
-            if (res) {
+            if (ivf_cen) {
                 val_i = L2sqr<const float,const float,float>(r, cen, dsub);
             } else {
                 val_i = L2sqr<const T,const float,float>(x_i, cen, dsub);
@@ -349,7 +349,7 @@ void ProductQuantizer<C, T, U>::encode_vectors(float*& precomputer_table,
                 const float *y_j = cen + j * dsub;
 
                 float disij;
-                if (res) {
+                if (ivf_cen) {
                     disij = L2sqr<const float,const float,float>(r, y_j, dsub);
                 } else {
                     disij = L2sqr<const T,const float,float>(x_i, y_j, dsub);
