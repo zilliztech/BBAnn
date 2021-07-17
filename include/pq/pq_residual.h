@@ -32,8 +32,6 @@ private:
 
     float* centroids = nullptr;
     U* codes = nullptr;
-
-    void compute_dis_tab(const T* q, float* dis_tab, PQ_Computer<T> computer);
 public:
     PQResidualQuantizer(int64_t _d, uint32_t _m, uint32_t _nbits)
     : ntotal(0), d(_d), m(_m), nbits(_nbits), npos(0) {
@@ -177,77 +175,17 @@ public:
 };
 
 template<class C, typename T, typename U>
-void PQResidualQuantizer<C, T, U>::compute_dis_tab(const T* q, float* dis_tab,
-                                     PQ_Computer<T> computer)
-{
-    const float* c = centroids;
-    for (int64_t i = 0; i < m; ++i, q += dsub) {
-        for (int64_t j = 0; j < K; ++j, c += dsub) {
-            *dis_tab++ = computer(q, c, dsub);
-        }
-    }
-}
-
-template<class C, typename T, typename U>
 void PQResidualQuantizer<C, T, U>::train(int64_t n, const T* x, const float* sample_ivf_cen) {
-
-    size_t sub_code_size = dsub * sizeof(float);
     float* rs = new float[n * dsub];
 
-    bool remove_dup = false;
-    if (sub_code_size <= 4) {
-        printf("Remove duplicates dsub %d * sizeof(Type) %d\n", (int)dsub, (int)sizeof(float));
-        remove_dup = true;
-    }
-
     for (int64_t i = 0; i < m; ++i) {
-        if (remove_dup) {
-            int64_t idx = 0;
-            std::unordered_set<uint32_t> st;
-
-            if (sub_code_size == 4) {
-                auto u_xd = reinterpret_cast<const uint32_t*>(x) + i;
-                auto u_xs = reinterpret_cast<uint32_t*>(rs);
-                for (int64_t j = 0; j < n; j++) {
-                    if (st.find(*u_xd) == st.end()) {
-                        st.insert(*u_xd);
-                        u_xs[idx++] = *u_xd;
-                    }
-                    u_xd += m;
-                }
-            } else {
-                uint32_t val = 0;
-                auto xd = x + i * dsub;
-                auto cd = sample_ivf_cen + i * dsub;
-                for (int64_t j = 0; j < n; j++){
-                    memcpy(&val, xd, sub_code_size);
-                    if (st.find(val) == st.end()) {
-                        st.insert(val);
-                        compute_residual<const T, const float, float>(xd, cd, rs + idx * dsub, dsub);
-                        idx++;
-                    }
-                    xd += d;
-                }
-            }
-
-            if (idx < K) {
-                printf("Unable to find %ld points from %ld training data, found %ld.\n", K, n, idx);
-                // todo: add some random data into xs
-            } else {
-                printf("Duplicate points removed, n from %ld to %ld\n", n , idx);
-            }
-
-            kmeans<float>(idx, rs, dsub, K, centroids + i * K * dsub);
-
-        } else {
-            auto xd = x + i * dsub;
-            auto cd = sample_ivf_cen + i * dsub;
-            for (int64_t j = 0; j < n; ++j, xd += d, cd += d) {
-                compute_residual<const T, const float, float>(xd, cd, rs + j * dsub, dsub);
-            }
-
-            kmeans<float>(n, rs, dsub, K, centroids + i * K * dsub);
+        auto xd = x + i * dsub;
+        auto cd = sample_ivf_cen + i * dsub;
+        for (int64_t j = 0; j < n; ++j, xd += d, cd += d) {
+            compute_residual<const T, const float, float>(xd, cd, rs + j * dsub, dsub);
         }
+
+        kmeans(n, rs, dsub, K, centroids + i * K * dsub);
     }
 
     delete[] rs;
