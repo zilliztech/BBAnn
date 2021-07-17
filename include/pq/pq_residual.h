@@ -66,9 +66,15 @@ public:
         return m;
     }
 
-    void set_ntotal_and_allocate_codes_mem(int64_t _ntotal) {
-        ntotal = _ntotal;
-        codes = new U[ntotal * m];
+    void init_codes(int64_t _ntotal) {
+        if (ntotal < _ntotal) {
+            ntotal = _ntotal;
+            if (codes != nullptr) {
+                delete[] codes;
+            }
+            codes = new U[ntotal * m];
+        }
+        npos = 0;
     }
 
     float* reconstruct(float* r, const U* c) {
@@ -133,7 +139,6 @@ public:
             const T* x,
             const float* ivf_cen,
             const std::vector<uint32_t>& buckets,
-            uint64_t& bucket_cnt,
             const std::string& file_path,
             MetricType metric_type);
 
@@ -240,22 +245,17 @@ void PQResidualQuantizer<C, T, U>::encode_vectors(float*& precomputer_table,
 #pragma omp for
             for (int64_t i = 0; i < n; i++) {
                 const T* x_i = x + i * d + loop * dsub;
-
                 compute_residual<const T, const float, float>(x_i, ivf_cen + loop * dsub, rd, dsub);
 
                 int64_t ids_i = 0;
-
                 float val_i = L2sqr<const float,const float,float>(rd, cen, dsub);
-
                 float val_i_time_4 = val_i * 4;
                 for (int64_t j = 1; j < K; j++) {
                     if (val_i_time_4 <= Y(ids_i, j)) {
                         continue;
                     }
                     const float *y_j = cen + j * dsub;
-
                     float disij = L2sqr<const float,const float,float>(rd, y_j, dsub);
-
                     if (disij < val_i) {
                         ids_i = j;
                         val_i = disij;
@@ -279,14 +279,15 @@ void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
         const T* x,
         const float* ivf_cen,
         const std::vector<uint32_t>& buckets,
-        uint64_t& bucket_cnt,
         const std::string& file_path,
         MetricType metric_type) {
     assert(ivf_cen != nullptr);
 
-    const float* ivf_c = ivf_cen + bucket_cnt * d;
+    init_codes(n);
+
+    const float* ivf_c = ivf_cen;
     const T* xd = x;
-    for (int i = 0; i < buckets.size(); ivf_c += d, xd += buckets[i] * d, ++i) {
+    for (size_t i = 0; i < buckets.size(); ivf_c += d, xd += buckets[i] * d, ++i) {
         encode_vectors(precomputer_table, buckets[i], xd, ivf_c);
     }
 
@@ -296,12 +297,12 @@ void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
         // these codes are local, for each cluster
         const U* c = get_codes();
         float* r = new float[d];
-        ivf_c = ivf_cen + bucket_cnt * d;
+        ivf_c = ivf_cen;
 
         // precompute term2
         int64_t cnt = 0;
-        for (int i = 0; i < buckets.size(); ++i, ivf_c += d) {
-            for (int j = 0; j < buckets[i]; ++j, c += m) {
+        for (size_t i = 0; i < buckets.size(); ++i, ivf_c += d) {
+            for (uint32_t j = 0; j < buckets[i]; ++j, c += m) {
                 reconstruct(r, c);
                 term2s[cnt] += IP<const float, const float, float>(r, r, d);
                 term2s[cnt] += 2.0f * IP<const float, const float, float>(ivf_c, r, d);
@@ -342,8 +343,6 @@ void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
     } else {
         std::cerr << "Unrecognized metric type: " << static_cast<int>(metric_type) << std::endl;
     }
-
-    bucket_cnt += buckets.size();
 }
 
 template <class C, typename T, typename U>

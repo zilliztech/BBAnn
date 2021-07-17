@@ -438,7 +438,6 @@ void train_pq_residual_quantizer(
 
     float* precompute_table = nullptr;
     uint64_t bucket_cnt = 0;
-    quantizer.set_ntotal_and_allocate_codes_mem(nb);
     for (int i = 0; i < K1; ++i) {
         std::string data_file = output_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
         std::string pq_codebook_file = output_path + CLUSTER + std::to_string(i) + PQ + CODEBOOK + BIN;
@@ -450,7 +449,10 @@ void train_pq_residual_quantizer(
 
         DATAT* datai = new DATAT[cluster_size * cluster_dim];
         data_reader.read((char*)datai, cluster_size * cluster_dim * sizeof(DATAT));
-        quantizer.encode_vectors_and_save(precompute_table, cluster_size, datai, ivf_cen, metas[i], bucket_cnt, pq_codebook_file, metric_type);
+        quantizer.encode_vectors_and_save(precompute_table, cluster_size, datai,
+                                          ivf_cen + bucket_cnt * cluster_dim, metas[i],
+                                          pq_codebook_file, metric_type);
+        bucket_cnt += metas[i].size();
 
         delete[] datai;
         rc.RecordSection("the " + std::to_string(i) + "th cluster encode and save codebook done.");
