@@ -421,21 +421,23 @@ void train_pq_residual_quantizer(
     rc.RecordSection("reservoir_sampling_residual for pq training set done");
 
     PQResidualQuantizer<HEAPT, DATAT, uint8_t> quantizer(dim, PQM, PQnbits);
-    quantizer.pq->train(pq_sample_num, sample_data, sample_ivf_cen);
+    quantizer.train(pq_sample_num, sample_data, sample_ivf_cen);
     rc.RecordSection("pq residual quantizer train done");
 
     delete[] sample_data;
     delete[] sample_ivf_cen;
 
-    quantizer.pq->save_centroids(output_path + PQ_CENTROIDS + BIN);
+    quantizer.save_centroids(output_path + PQ_CENTROIDS + BIN);
     rc.RecordSection("pq residual quantizer save centroids done");
 
     float* precompute_table = nullptr;
     uint64_t bucket_cnt = 0;
+    quantizer.set_ntotal_and_allocate_codes_mem(nb);
     for (int i = 0; i < K1; ++i) {
         std::string data_file = output_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
         std::string pq_codebook_file = output_path + CLUSTER + std::to_string(i) + PQ + CODEBOOK + BIN;
         uint32_t cluster_size, cluster_dim;
+
         IOReader data_reader(data_file);
         data_reader.read((char*)&cluster_size, sizeof(uint32_t));
         data_reader.read((char*)&cluster_dim, sizeof(uint32_t));
@@ -443,6 +445,7 @@ void train_pq_residual_quantizer(
         DATAT* datai = new DATAT[cluster_size * cluster_dim];
         data_reader.read((char*)datai, cluster_size * cluster_dim * sizeof(DATAT));
         quantizer.encode_vectors_and_save(precompute_table, cluster_size, datai, ivf_cen, metas[i], bucket_cnt, pq_codebook_file, metric_type);
+
         delete[] datai;
         rc.RecordSection("the " + std::to_string(i) + "th cluster encode and save codebook done.");
     }
@@ -792,7 +795,7 @@ void search_pq_residual_quantizer(
         float* precompute_table = nullptr;
 #pragma omp for
         for (auto i = 0; i < nq; i ++) {
-            quantizer.pq->calc_precompute_table(precompute_table, pquery + i * dq, pq_cmp);
+            quantizer.calc_precompute_table(precompute_table, pquery + i * dq, pq_cmp);
             auto p_labeli = buckets_label + i * nprobe;
             auto pq_offseti = pq_offsets + i * refine_topk;
             auto pq_distancei = pq_distance + i * refine_topk;
@@ -801,6 +804,7 @@ void search_pq_residual_quantizer(
                 parse_id(p_labeli[j], cid, bid, off);
                 assert(cid < K1);
                 const float* cen = ivf_centroids + cid * dq;
+
                 quantizer.search(precompute_table, pquery + i * dq, cen,
                         pq_codebook[cid].data() + (uint64_t)off * pqm, meta[cid][bid],
                         refine_topk, pq_distancei, pq_offseti, pq_cmp,
