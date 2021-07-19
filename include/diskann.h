@@ -10,6 +10,7 @@
 #include "util/defines.h"
 #include "util/constants.h"
 #include "util/utils.h"
+#include "util/statistics.h"
 #include "util/heap.h"
 #include "hnswlib/hnswlib.h"
 #include "pq/pq.h"

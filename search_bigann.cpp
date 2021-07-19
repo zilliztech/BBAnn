@@ -162,7 +162,7 @@ int main(int argc, char** argv) {
             }
         }
         // calculate_recall<float>(ground_truth_file, answer_file, topk);
-        recall<float, uint32_t>(ground_truth_file, answer_file, false);
+        recall<float, uint32_t>(ground_truth_file, answer_file, metric_type, true, false);
     } else if (argv[1] == std::string("uint8")) {
         PQ_Computer<uint8_t> pq_cmp; // pq computer
         Computer<uint8_t, uint8_t, uint32_t> dis_computer; // refine computer
@@ -203,7 +203,7 @@ int main(int argc, char** argv) {
             }
         }
         // calculate_recall<uint32_t>(ground_truth_file, answer_file, topk);
-        recall<uint32_t, uint32_t>(ground_truth_file, answer_file);
+        recall<uint32_t, uint32_t>(ground_truth_file, answer_file, metric_type, true, false);
     } else if (argv[1] == std::string("int8")) {
         PQ_Computer<int8_t> pq_cmp; // pq computer
         Computer<int8_t, int8_t, int32_t> dis_computer; // refine computer
@@ -244,7 +244,7 @@ int main(int argc, char** argv) {
             }
         }
         // calculate_recall<uint32_t>(ground_truth_file, answer_file, topk);
-        recall<int32_t, uint32_t>(ground_truth_file, answer_file);
+        recall<int32_t, uint32_t>(ground_truth_file, answer_file, metric_type, true, false);
     }
 
     rc.ElapseFromBegin(" totally done.");
