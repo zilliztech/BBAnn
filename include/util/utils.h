@@ -67,7 +67,7 @@ inline void write_bin_file(const std::string& file_name, T* data, uint32_t n,
 
     writer.write((char*)&n, sizeof(uint32_t));
     writer.write((char*)&dim, sizeof(uint32_t));
-    writer.write((char*)data, sizeof(T) * n * dim);
+    writer.write((char*)data, sizeof(T) * (uint64_t)n * dim);
 
     writer.close();
     std::cout << "write binary file to " << file_name << " done in ... seconds, n = "
@@ -82,9 +82,9 @@ inline void read_bin_file(const std::string& file_name, T*& data, uint32_t& n,
     reader.read((char*)&n, sizeof(uint32_t));
     reader.read((char*)&dim, sizeof(uint32_t));
     if (data == nullptr) {
-        data = new T[n * dim];
+        data = new T[(uint64_t)n * (uint64_t)dim];
     }
-    reader.read((char*)data, sizeof(T) * n * dim);
+    reader.read((char*)data, sizeof(T) * (uint64_t)n * dim);
 
     reader.close();
     std::cout << "read binary file from " << file_name << " done in ... seconds, n = "
