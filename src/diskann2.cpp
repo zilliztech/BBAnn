@@ -32,8 +32,9 @@ void train_cluster(const std::string& raw_data_bin_file,
     reservoir_sampling(raw_data_bin_file, sample_num, sample_data);
     rc.RecordSection("reservoir sample with sample rate: " + std::to_string(K1_SAMPLE_RATE) + " done");
     double mxl, mnl;
-    stat_length<DATAT>(sample_data, 1000000, dim, mxl, mnl, avg_len);
-    rc.RecordSection("calculate " + std::to_string(1000000) + " vectors from sample_data done");
+    int64_t stat_n = std::min(static_cast<int64_t>(1000000), sample_num);
+    stat_length<DATAT>(sample_data, stat_n, dim, mxl, mnl, avg_len);
+    rc.RecordSection("calculate " + std::to_string(stat_n) + " vectors from sample_data done");
     std::cout << "max len: " << mxl << ", min len: " << mnl << ", average len: " << avg_len << std::endl;
     kmeans<DATAT>(sample_num, sample_data, dim, K1, *centroids, false, avg_len);
     rc.RecordSection("kmeans done");
@@ -414,7 +415,7 @@ void train_pq_residual_quantizer(
     int64_t pq_sample_num = std::min(
                                 65536, 
                                 std::min(
-                                    static_cast<int>(nb * PQ_SAMPLE_RATE),
+                                    static_cast<int64_t>(nb * PQ_SAMPLE_RATE),
                                     std::accumulate(metas[0].begin(), metas[0].end(), 0)));
 
     DATAT* sample_data = new DATAT[pq_sample_num * dim];
