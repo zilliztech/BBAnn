@@ -794,8 +794,12 @@ void search_pq_residual_quantizer(
               << std::endl;
 
 
-    auto pqm = quantizer.getM() + sizeof(float);
-    rc.RecordSection("pqm + sizeof(float) = " + std::to_string(pqm));
+    auto pqm = quantizer.getM();
+    
+    if (metric_type == MetricType::L2) {
+        pqm += sizeof(float);
+    }
+    rc.RecordSection("pqm = " + std::to_string(pqm));
 
 
 #pragma omp parallel
