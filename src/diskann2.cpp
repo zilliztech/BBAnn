@@ -777,7 +777,6 @@ void search_pq_residual_quantizer(
         std::vector<std::vector<uint32_t>>& meta,
         DISTT*& pq_distance,
         uint64_t*& pq_offsets,
-        PQ_Computer<DATAT>& pq_cmp,
         MetricType metric_type) {
     TimeRecorder rc("search pq residual quantizer");
     std::cout << "search quantizer parameters:" << std::endl;
@@ -807,7 +806,7 @@ void search_pq_residual_quantizer(
         float* precompute_table = nullptr;
 #pragma omp for
         for (auto i = 0; i < nq; i ++) {
-            quantizer.calc_precompute_table(precompute_table, pquery + i * dq, pq_cmp);
+            quantizer.calc_precompute_table(precompute_table, pquery + i * dq);
             auto p_labeli = buckets_label + i * nprobe;
             auto pq_offseti = pq_offsets + i * refine_topk;
             auto pq_distancei = pq_distance + i * refine_topk;
@@ -826,7 +825,6 @@ void search_pq_residual_quantizer(
                         refine_topk,
                         pq_distancei,
                         pq_offseti,
-                        pq_cmp,
                         j + 1 == nprobe,
                         j == 0,
                         cid,
@@ -1378,7 +1376,6 @@ void search_bigann(const std::string& index_path,
                    std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
                    PQResidualQuantizer<HEAPTT, DATAT, uint8_t>& quantizer,
                    const int K1,
-                   PQ_Computer<DATAT>& pq_cmp,
                    std::vector<std::vector<uint8_t>>& pq_codebook,
                    std::vector<std::vector<uint32_t>>& meta,
                    Computer<DATAT, DATAT, DISTT>& dis_computer,
@@ -1425,7 +1422,7 @@ void search_bigann(const std::string& index_path,
     read_bin_file<float>(index_path + BUCKET + CENTROIDS + BIN, ivf_centroids, c_n, c_dim);
     search_pq_residual_quantizer<DATAT, DISTT, HEAPTT>(quantizer, nq, dq, ivf_centroids, p_labels, nprobe, 
                      refine_topk, K1, pquery, pq_codebook, 
-                     meta, pq_distance, pq_offsets, pq_cmp, metric_type);
+                     meta, pq_distance, pq_offsets, metric_type);
     delete[] ivf_centroids;
 
     rc.RecordSection("pq residual search done.");
@@ -1572,7 +1569,6 @@ void search_bigann<float, float, CMax<float, uint32_t>, CMax<float, uint64_t>>(c
                    std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
                    PQResidualQuantizer<CMax<float, uint64_t>, float, uint8_t>& pq_quantizer,
                    const int K1,
-                   PQ_Computer<float>& pq_cmp,
                    std::vector<std::vector<uint8_t>>& pq_codebook,
                    std::vector<std::vector<uint32_t>>& meta,
                    Computer<float, float, float>& dis_computer,
@@ -1589,7 +1585,6 @@ void search_bigann<float, float, CMin<float, uint32_t>, CMin<float, uint64_t>>(c
                    std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
                    PQResidualQuantizer<CMin<float, uint64_t>, float, uint8_t>& pq_quantizer,
                    const int K1,
-                   PQ_Computer<float>& pq_cmp,
                    std::vector<std::vector<uint8_t>>& pq_codebook,
                    std::vector<std::vector<uint32_t>>& meta,
                    Computer<float, float, float>& dis_computer,
@@ -1606,7 +1601,6 @@ void search_bigann<uint8_t, uint32_t, CMax<uint32_t, uint32_t>, CMax<uint32_t, u
                    std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
                    PQResidualQuantizer<CMax<uint32_t, uint64_t>, uint8_t, uint8_t>& pq_quantizer,
                    const int K1,
-                   PQ_Computer<uint8_t>& pq_cmp,
                    std::vector<std::vector<uint8_t>>& pq_codebook,
                    std::vector<std::vector<uint32_t>>& meta,
                    Computer<uint8_t, uint8_t, uint32_t>& dis_computer,
@@ -1623,7 +1617,6 @@ void search_bigann<uint8_t, uint32_t, CMin<uint32_t, uint32_t>, CMin<uint32_t, u
                    std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
                    PQResidualQuantizer<CMin<uint32_t, uint64_t>, uint8_t, uint8_t>& pq_quantizer,
                    const int K1,
-                   PQ_Computer<uint8_t>& pq_cmp,
                    std::vector<std::vector<uint8_t>>& pq_codebook,
                    std::vector<std::vector<uint32_t>>& meta,
                    Computer<uint8_t, uint8_t, uint32_t>& dis_computer,
@@ -1640,7 +1633,6 @@ void search_bigann<int8_t, int32_t, CMax<int32_t, uint32_t>, CMax<int32_t, uint6
                    std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
                    PQResidualQuantizer<CMax<int32_t, uint64_t>, int8_t, uint8_t>& pq_quantizer,
                    const int K1,
-                   PQ_Computer<int8_t>& pq_cmp,
                    std::vector<std::vector<uint8_t>>& pq_codebook,
                    std::vector<std::vector<uint32_t>>& meta,
                    Computer<int8_t, int8_t, int32_t>& dis_computer,
@@ -1657,7 +1649,6 @@ void search_bigann<int8_t, int32_t, CMin<int32_t, uint32_t>, CMin<int32_t, uint6
                    std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
                    PQResidualQuantizer<CMin<int32_t, uint64_t>, int8_t, uint8_t>& pq_quantizer,
                    const int K1,
-                   PQ_Computer<int8_t>& pq_cmp,
                    std::vector<std::vector<uint8_t>>& pq_codebook,
                    std::vector<std::vector<uint32_t>>& meta,
                    Computer<int8_t, int8_t, int32_t>& dis_computer,

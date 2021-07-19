@@ -141,7 +141,7 @@ int main(int argc, char** argv) {
                 pq_quantizer.load_centroids(pq_centroids_file);
                 rc.RecordSection("load pq centroids done.");
                 search_bigann<float, float, CMax<float, uint32_t>, CMax<float, uint64_t>>
-                    (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer, metric_type);
+                    (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_codebook, meta, dis_computer, metric_type);
             }
         } else if (MetricType::IP == metric_type) {
             pq_cmp = IP<const float, const float, float>;
@@ -158,7 +158,7 @@ int main(int argc, char** argv) {
                 pq_quantizer.load_centroids(pq_centroids_file);
                 rc.RecordSection("load pq centroids done.");
                 search_bigann<float, float, CMin<float, uint32_t>, CMin<float, uint64_t>>
-                    (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer, metric_type);
+                    (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_codebook, meta, dis_computer, metric_type);
             }
         }
         // calculate_recall<float>(ground_truth_file, answer_file, topk);
@@ -182,7 +182,7 @@ int main(int argc, char** argv) {
                 pq_quantizer.load_centroids(pq_centroids_file);
                 rc.RecordSection("load pq centroids done.");
                 search_bigann<uint8_t, uint32_t, CMax<uint32_t, uint32_t>, CMax<uint32_t, uint64_t>>
-                    (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer, metric_type);
+                    (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_codebook, meta, dis_computer, metric_type);
             }
         } else if (MetricType::IP == metric_type) {
             pq_cmp = IP<const uint8_t, const float, float>;
@@ -199,7 +199,7 @@ int main(int argc, char** argv) {
                 pq_quantizer.load_centroids(pq_centroids_file);
                 rc.RecordSection("load pq centroids done.");
                 search_bigann<uint8_t, uint32_t, CMin<uint32_t, uint32_t>, CMin<uint32_t, uint64_t>>
-                    (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer, metric_type);
+                    (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_codebook, meta, dis_computer, metric_type);
             }
         }
         // calculate_recall<uint32_t>(ground_truth_file, answer_file, topk);
@@ -223,7 +223,7 @@ int main(int argc, char** argv) {
                 pq_quantizer.load_centroids(pq_centroids_file);
                 rc.RecordSection("load pq centroids done.");
                 search_bigann<int8_t, int32_t, CMax<int32_t, uint32_t>, CMax<int32_t, uint64_t>>
-                    (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer, metric_type);
+                    (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_codebook, meta, dis_computer, metric_type);
             }
         } else if (MetricType::IP == metric_type) {
             pq_cmp = IP<const int8_t, const float, float>;
@@ -240,7 +240,7 @@ int main(int argc, char** argv) {
                 pq_quantizer.load_centroids(pq_centroids_file);
                 rc.RecordSection("load pq centroids done.");
                 search_bigann<int8_t, int32_t, CMin<int32_t, uint32_t>, CMin<int32_t, uint64_t>>
-                    (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_cmp, pq_codebook, meta, dis_computer, metric_type);
+                    (index_path, query_file, answer_file, nprobe, refine_nprobe, topk, refine_topk, index_hnsw, pq_quantizer, K1, pq_codebook, meta, dis_computer, metric_type);
             }
         }
         // calculate_recall<uint32_t>(ground_truth_file, answer_file, topk);

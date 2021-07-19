@@ -113,7 +113,7 @@ public:
         }
     }
 
-    void calc_precompute_table(float*& precompute_table, const T* q, PQ_Computer<T> computer) {
+    void calc_precompute_table(float*& precompute_table, const T* q) {
         if (precompute_table == nullptr) {
             precompute_table = new float[K * m];
         }
@@ -122,7 +122,7 @@ public:
         float* dis_tab = precompute_table;
         for (int64_t i = 0; i < m; ++i, q += dsub) {
             for (int64_t j = 0; j < K; ++j, c += dsub) {
-                *dis_tab++ = computer(q, c, dsub);
+                *dis_tab++ = IP<const T, const float, float>(q, c, dsub);
             }
         }
     }
@@ -151,7 +151,6 @@ public:
             int64_t topk,
             typename C::T* values,
             typename C::TI* labels,
-            PQ_Computer<T> computer,
             bool reorder, 
             bool heapify,
             const uint32_t& cid, 
@@ -319,7 +318,7 @@ void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
 
         c = get_codes();
         const size_t c_size = m * sizeof(U);
-        for (int i = 0; i < n; ++i, c += m) {
+        for (int64_t i = 0; i < n; ++i, c += m) {
             code_writer.write((char*)c, c_size);
             code_writer.write((char*)&term2s[i], sizeof(float));
         }
@@ -355,7 +354,6 @@ void PQResidualQuantizer<C, T, U>::search(
         int64_t topk,
         typename C::T* values,
         typename C::TI* labels,
-        PQ_Computer<T> computer,
         bool reorder, 
         bool heapify,
         const uint32_t& cid, 
@@ -369,8 +367,9 @@ void PQResidualQuantizer<C, T, U>::search(
     auto* __restrict val_ = values;
     auto* __restrict ids_ = labels;
 
-    if (heapify)
+    if (heapify) {
         heap_heapify<C>(topk, val_, ids_);
+    }
 
     const U* c = pcodes;
 
