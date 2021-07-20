@@ -154,8 +154,8 @@ void reservoir_sampling_residual(
     data_reader.read((char*)(cluster_data.data()), total_size * sizeof(T));
 
     const T* vec = cluster_data.data();
-    for (int j = 0; j < metas[i].size(); ++j) {
-        for (int k = 0; k < metas[i][j]; ++k) {
+    for (size_t j = 0; j < metas[i].size(); ++j) {
+        for (uint32_t k = 0; k < metas[i][j]; ++k) {
             // deal with the situation when one bucket is not enough
             // for filling the resulting array
             if (filled_cnt < sample_num) {
@@ -177,7 +177,7 @@ void reservoir_sampling_residual(
         ++bucket_cnt;
     }
 
-    for (int i = 0; i < sample_num; ++i) {
+    for (uint32_t i = 0; i < sample_num; ++i) {
         memcpy(
             sample_ivf_cen + i * dim,
             ivf_cen + ivf_cen_offsets[i] * dim,

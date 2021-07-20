@@ -413,10 +413,10 @@ void train_pq_residual_quantizer(
     assert(metas.size() == K1);
 
     int64_t pq_sample_num = std::min(
-                                65536, 
+                                static_cast<int64_t>(65536), 
                                 std::min(
                                     static_cast<int64_t>(nb * PQ_SAMPLE_RATE),
-                                    std::accumulate(metas[0].begin(), metas[0].end(), 0)));
+                                    static_cast<int64_t>(std::accumulate(metas[0].begin(), metas[0].end(), 0))));
 
     DATAT* sample_data = new DATAT[pq_sample_num * dim];
     assert(sample_data != nullptr);
