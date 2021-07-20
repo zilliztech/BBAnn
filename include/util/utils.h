@@ -135,7 +135,7 @@ void reservoir_sampling_residual(
 
     std::random_device rd;
     std::mt19937 generator((unsigned)(rd()));
-    uint32_t cluster_size, cluster_dim, bucket_cnt = 0, filled_cnt = 0, global_cnt = 0;
+    uint32_t cluster_size, cluster_dim, global_cnt = 0;
     std::vector<T> cluster_data;
     std::vector<uint32_t> ivf_cen_offsets(sample_num);
 
@@ -158,23 +158,21 @@ void reservoir_sampling_residual(
         for (uint32_t k = 0; k < metas[i][j]; ++k) {
             // deal with the situation when one bucket is not enough
             // for filling the resulting array
-            if (filled_cnt < sample_num) {
-                memcpy(sample_data + cluster_dim * filled_cnt, vec, cluster_dim * sizeof(T));
-                ivf_cen_offsets[filled_cnt] = bucket_cnt;
-                ++filled_cnt;
+            if (global_cnt < sample_num) {
+                memcpy(sample_data + cluster_dim * global_cnt, vec, cluster_dim * sizeof(T));
+                ivf_cen_offsets[global_cnt] = j;
             } else {
                 std::uniform_int_distribution<size_t> distribution(0, global_cnt);
                 size_t rand = (size_t)distribution(generator);
                 if (rand < sample_num) {
                     memcpy(sample_data + cluster_dim * rand, vec, cluster_dim * sizeof(T));
-                    ivf_cen_offsets[rand] = bucket_cnt;
+                    ivf_cen_offsets[rand] = j;
                 }
             }
 
             vec += cluster_dim;
             ++global_cnt;
         }
-        ++bucket_cnt;
     }
 
     for (uint32_t i = 0; i < sample_num; ++i) {
