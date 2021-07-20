@@ -185,11 +185,23 @@ void PQResidualQuantizer<C, T, U>::train(int64_t n, const T* x, const float* sam
     for (int64_t i = 0; i < m; ++i) {
         auto xd = x + i * dsub;
         auto cd = sample_ivf_cen + i * dsub;
+        int64_t code_cnt = 0;
         for (int64_t j = 0; j < n; ++j, xd += d, cd += d) {
-            compute_residual<const T, const float, float>(xd, cd, rs + j * dsub, dsub);
+            compute_residual<const T, const float, float>(xd, cd, rs + code_cnt * dsub, dsub);
+
+            // check
+            int64_t k;
+            for (k = 0; k < code_cnt; ++k) {
+                if (memcmp(rs + code_cnt * dsub, rs + k * dsub, dsub * sizeof(float)) == 0) {
+                    break;
+                }
+            }
+            if (k == code_cnt) {
+                code_cnt++;
+            }
         }
 
-        kmeans(n, rs, dsub, K, centroids + i * K * dsub);
+        kmeans(code_cnt, rs, dsub, K, centroids + i * K * dsub);
     }
 
     delete[] rs;
