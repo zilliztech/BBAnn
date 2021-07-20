@@ -809,6 +809,10 @@ void search_pq_residual_quantizer(
     }
     rc.RecordSection("pqm = " + std::to_string(pqm));
 
+    std::vector<uint32_t> pre(K1);
+    for (int i = 0; i < K1; ++i) {
+        pre[i] = (i == 0 ? 0 : pre[i-1] + meta[i-1].size());
+    }
 
 #pragma omp parallel
     {
@@ -823,7 +827,7 @@ void search_pq_residual_quantizer(
             for (auto j = 0; j < nprobe; j ++) {
                 parse_id(p_labeli[j], cid, bid, off);
                 assert(cid < K1);
-                const float* cen = ivf_centroids + cid * dq;
+                const float* cen = ivf_centroids + (pre[cid] + bid) * dq;
 
                 quantizer.search(
                         precompute_table,
