@@ -153,7 +153,11 @@ public:
             typename C::TI* labels,
             bool reorder, 
             bool heapify,
-            const uint32_t& cid, 
+#ifndef TEST_RPQ
+            const uint32_t& cid,
+#else
+            const uint64_t cid,
+#endif
             const uint32_t& off,
             const uint32_t& qid,
             MetricType metric_type);
@@ -201,7 +205,7 @@ void PQResidualQuantizer<C, T, U>::train(int64_t n, const T* x, const float* sam
             }
         }
 
-        kmeans(code_cnt, rs, dsub, K, centroids + i * K * dsub);
+        kmeans(code_cnt, rs, dsub, K, centroids + i * K * dsub, true);
     }
 
     delete[] rs;
@@ -321,8 +325,10 @@ void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
                 ++cnt;
             }
         }
+        delete[] r;
         assert(cnt == n);
 
+#ifndef TEST_RPQ
         uint32_t wm = m + sizeof(float);
         std::ofstream code_writer(file_path, std::ios::binary | std::ios::out);
         code_writer.write((char*)&n, sizeof(uint32_t));
@@ -336,7 +342,22 @@ void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
         }
 
         code_writer.close();
-        delete[] r;
+#else
+        U* old_c = get_codes();
+        U* new_c = new U[n * (m + sizeof(float))];
+        codes = new_c;
+        auto delete_old = old_c;
+
+        for (int64_t i=0; i<n; i++){
+            memcpy(new_c, old_c, m);
+            new_c += m;
+            old_c += m;
+            memcpy(new_c, &term2s[i], sizeof(float));
+            new_c += sizeof(float);
+        }
+        delete[] delete_old;
+#endif
+
         std::cout << "PQResidualQuantizer encode " << n << " vectors with m = " << m << " and term2 into file "
                   << file_path << std::endl;
     } else if (MetricType::IP == metric_type) {
@@ -368,7 +389,11 @@ void PQResidualQuantizer<C, T, U>::search(
         typename C::TI* labels,
         bool reorder, 
         bool heapify,
-        const uint32_t& cid, 
+#ifndef TEST_RPQ
+        const uint32_t& cid,
+#else
+        const uint64_t cid,
+#endif
         const uint32_t& off,
         const uint32_t& qid,
         MetricType metric_type) {
@@ -406,7 +431,12 @@ void PQResidualQuantizer<C, T, U>::search(
             c += sizeof(float);
 
             if (C::cmp(val_[0], dis)) {
+#ifndef TEST_RPQ
                 heap_swap_top<C>(topk, val_, ids_, dis, gen_refine_id(cid, off + j, qid));
+#else
+                int32_t* id = (int32_t*)cid;
+                heap_swap_top<C>(topk, val_, ids_, dis, id[j]);
+#endif
             }
         }
     } else {
@@ -422,7 +452,12 @@ void PQResidualQuantizer<C, T, U>::search(
             }
 
             if (C::cmp(val_[0], dis)) {
+#ifndef TEST_RPQ
                 heap_swap_top<C>(topk, val_, ids_, dis, gen_refine_id(cid, off + j, qid));
+#else
+                int32_t* id = (int32_t*)cid;
+                heap_swap_top<C>(topk, val_, ids_, dis, id[j]);
+#endif
             }
         }
     }
