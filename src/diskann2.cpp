@@ -434,7 +434,7 @@ void train_pq_residual_quantizer(
     reservoir_sampling_residual<DATAT>(output_path, metas, ivf_cen, dim, pq_sample_num, sample_data, sample_ivf_cen, K1);
     rc.RecordSection("reservoir_sampling_residual for pq training set done");
 
-    PQResidualQuantizer<HEAPT, DATAT, uint8_t> quantizer(dim, PQM, PQnbits);
+    PQResidualQuantizer<HEAPT, DATAT, uint8_t> quantizer(dim, PQM, PQnbits, metric_type);
     quantizer.train(pq_sample_num, sample_data, sample_ivf_cen);
     rc.RecordSection("pq residual quantizer train done");
 
@@ -459,7 +459,7 @@ void train_pq_residual_quantizer(
         data_reader.read((char*)datai, cluster_size * cluster_dim * sizeof(DATAT));
         quantizer.encode_vectors_and_save(precompute_table, cluster_size, datai,
                                           ivf_cen + bucket_cnt * cluster_dim, metas[i],
-                                          pq_codebook_file, metric_type);
+                                          pq_codebook_file);
         bucket_cnt += metas[i].size();
 
         delete[] datai;
@@ -785,8 +785,7 @@ void search_pq_residual_quantizer(
         std::vector<std::vector<uint8_t>>& pq_codebook,
         std::vector<std::vector<uint32_t>>& meta,
         DISTT*& pq_distance,
-        uint64_t*& pq_offsets,
-        MetricType metric_type) {
+        uint64_t*& pq_offsets) {
     TimeRecorder rc("search pq residual quantizer");
     std::cout << "search quantizer parameters:" << std::endl;
     std::cout << " quantizer:" << &quantizer
@@ -802,12 +801,10 @@ void search_pq_residual_quantizer(
               << std::endl;
 
 
-    auto pqm = quantizer.getM();
-    
-    if (metric_type == MetricType::L2) {
-        pqm += sizeof(float);
-    }
-    rc.RecordSection("pqm = " + std::to_string(pqm));
+
+    auto code_size = quantizer.getCodeSize();
+
+    rc.RecordSection("pq code size = " + std::to_string(code_size));
 
     std::vector<uint32_t> pre(K1);
     for (int i = 0; i < K1; ++i) {
@@ -833,7 +830,7 @@ void search_pq_residual_quantizer(
                         precompute_table,
                         pquery + i * dq,
                         cen,
-                        pq_codebook[cid].data() + (uint64_t)off * pqm,
+                        pq_codebook[cid].data() + (uint64_t)off * code_size,
                         meta[cid][bid],
                         refine_topk,
                         pq_distancei,
@@ -842,8 +839,7 @@ void search_pq_residual_quantizer(
                         j == 0,
                         cid,
                         off,
-                        i,
-                        metric_type);
+                        i);
             }
         }
         delete[] precompute_table;
@@ -1419,8 +1415,7 @@ void search_bigann(const std::string& index_path,
                    const int K1,
                    std::vector<std::vector<uint8_t>>& pq_codebook,
                    std::vector<std::vector<uint32_t>>& meta,
-                   Computer<DATAT, DATAT, DISTT>& dis_computer,
-                   MetricType metric_type) {
+                   Computer<DATAT, DATAT, DISTT>& dis_computer) {
     TimeRecorder rc("search bigann");
 
     std::cout << "search bigann parameters:" << std::endl;
@@ -1463,7 +1458,7 @@ void search_bigann(const std::string& index_path,
     read_bin_file<float>(index_path + BUCKET + CENTROIDS + BIN, ivf_centroids, c_n, c_dim);
     search_pq_residual_quantizer<DATAT, DISTT, HEAPTT>(quantizer, nq, dq, ivf_centroids, p_labels, nprobe, 
                      refine_topk, K1, pquery, pq_codebook, 
-                     meta, pq_distance, pq_offsets, metric_type);
+                     meta, pq_distance, pq_offsets);
     delete[] ivf_centroids;
 
     rc.RecordSection("pq residual search done.");
@@ -1613,8 +1608,7 @@ void search_bigann<float, float, CMax<float, uint32_t>, CMax<float, uint64_t>>(c
                    const int K1,
                    std::vector<std::vector<uint8_t>>& pq_codebook,
                    std::vector<std::vector<uint32_t>>& meta,
-                   Computer<float, float, float>& dis_computer,
-                   MetricType metric_type);
+                   Computer<float, float, float>& dis_computer);
 
 template 
 void search_bigann<float, float, CMin<float, uint32_t>, CMin<float, uint64_t>>(const std::string& index_path,
@@ -1629,8 +1623,7 @@ void search_bigann<float, float, CMin<float, uint32_t>, CMin<float, uint64_t>>(c
                    const int K1,
                    std::vector<std::vector<uint8_t>>& pq_codebook,
                    std::vector<std::vector<uint32_t>>& meta,
-                   Computer<float, float, float>& dis_computer,
-                   MetricType metric_type);
+                   Computer<float, float, float>& dis_computer);
 
 template 
 void search_bigann<uint8_t, uint32_t, CMax<uint32_t, uint32_t>, CMax<uint32_t, uint64_t>>(const std::string& index_path,
@@ -1645,8 +1638,7 @@ void search_bigann<uint8_t, uint32_t, CMax<uint32_t, uint32_t>, CMax<uint32_t, u
                    const int K1,
                    std::vector<std::vector<uint8_t>>& pq_codebook,
                    std::vector<std::vector<uint32_t>>& meta,
-                   Computer<uint8_t, uint8_t, uint32_t>& dis_computer,
-                   MetricType metric_type);
+                   Computer<uint8_t, uint8_t, uint32_t>& dis_computer);
 
 template 
 void search_bigann<uint8_t, uint32_t, CMin<uint32_t, uint32_t>, CMin<uint32_t, uint64_t>>(const std::string& index_path,
@@ -1661,8 +1653,7 @@ void search_bigann<uint8_t, uint32_t, CMin<uint32_t, uint32_t>, CMin<uint32_t, u
                    const int K1,
                    std::vector<std::vector<uint8_t>>& pq_codebook,
                    std::vector<std::vector<uint32_t>>& meta,
-                   Computer<uint8_t, uint8_t, uint32_t>& dis_computer,
-                   MetricType metric_type);
+                   Computer<uint8_t, uint8_t, uint32_t>& dis_computer);
 
 template 
 void search_bigann<int8_t, int32_t, CMax<int32_t, uint32_t>, CMax<int32_t, uint64_t>>(const std::string& index_path,
@@ -1677,8 +1668,7 @@ void search_bigann<int8_t, int32_t, CMax<int32_t, uint32_t>, CMax<int32_t, uint6
                    const int K1,
                    std::vector<std::vector<uint8_t>>& pq_codebook,
                    std::vector<std::vector<uint32_t>>& meta,
-                   Computer<int8_t, int8_t, int32_t>& dis_computer,
-                   MetricType metric_type);
+                   Computer<int8_t, int8_t, int32_t>& dis_computer);
 
 template 
 void search_bigann<int8_t, int32_t, CMin<int32_t, uint32_t>, CMin<int32_t, uint64_t>>(const std::string& index_path,
@@ -1693,8 +1683,7 @@ void search_bigann<int8_t, int32_t, CMin<int32_t, uint32_t>, CMin<int32_t, uint6
                    const int K1,
                    std::vector<std::vector<uint8_t>>& pq_codebook,
                    std::vector<std::vector<uint32_t>>& meta,
-                   Computer<int8_t, int8_t, int32_t>& dis_computer,
-                   MetricType metric_type);
+                   Computer<int8_t, int8_t, int32_t>& dis_computer);
 
 template 
 void search_bigann<float, float, CMax<float, uint32_t>, CMax<float, uint64_t>>(const std::string& index_path,

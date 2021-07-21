@@ -29,12 +29,13 @@ class PQResidualQuantizer {
 private:
     int64_t d, dsub, K, ntotal, npos;
     uint32_t m, nbits;
+    MetricType metric_type;
 
     float* centroids = nullptr;
     U* codes = nullptr;
 public:
-    PQResidualQuantizer(int64_t _d, uint32_t _m, uint32_t _nbits)
-    : ntotal(0), d(_d), m(_m), nbits(_nbits), npos(0) {
+    PQResidualQuantizer(int64_t _d, uint32_t _m, uint32_t _nbits, MetricType _metric_type)
+    : d(_d), m(_m), nbits(_nbits), metric_type(_metric_type), ntotal(0), npos(0) {
         assert(d % m == 0);
 
         dsub = d / m;
@@ -64,6 +65,14 @@ public:
 
     uint32_t getM() {
         return m;
+    }
+
+    int64_t getCodeSize() {
+        if (metric_type == MetricType::L2) {
+            return m * sizeof(U) + sizeof(float);
+        } else {
+            return m * sizeof(U);
+        }
     }
 
     void init_codes(int64_t _ntotal) {
@@ -139,8 +148,7 @@ public:
             const T* x,
             const float* ivf_cen,
             const std::vector<uint32_t>& buckets,
-            const std::string& file_path,
-            MetricType metric_type);
+            const std::string& file_path);
 
     void search(
             float* precompute_table,
@@ -159,8 +167,7 @@ public:
             const uint64_t cid,
 #endif
             const uint32_t& off,
-            const uint32_t& qid,
-            MetricType metric_type);
+            const uint32_t& qid);
 
     void save_centroids(const std::string& save_file) {
         uint32_t num_centroids = m * K;
@@ -294,8 +301,7 @@ void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
         const T* x,
         const float* ivf_cen,
         const std::vector<uint32_t>& buckets,
-        const std::string& file_path,
-        MetricType metric_type) {
+        const std::string& file_path) {
     assert(ivf_cen != nullptr);
 
     init_codes(n);
@@ -395,8 +401,7 @@ void PQResidualQuantizer<C, T, U>::search(
         const uint64_t cid,
 #endif
         const uint32_t& off,
-        const uint32_t& qid,
-        MetricType metric_type) {
+        const uint32_t& qid) {
 
     assert(precompute_table != nullptr);
     const float* dis_tab = precompute_table;

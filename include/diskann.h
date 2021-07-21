@@ -188,8 +188,7 @@ void search_bigann(const std::string& index_path,
                    const int K1,
                    std::vector<std::vector<uint8_t>>& pq_codebook,
                    std::vector<std::vector<uint32_t>>& meta,
-                   Computer<DATAT, DATAT, DISTT>& dis_computer,
-                   MetricType metric_type);
+                   Computer<DATAT, DATAT, DISTT>& dis_computer);
 
 template<typename DATAT, typename DISTT, typename HEAPT, typename HEAPTT>
 void search_bigann(const std::string& index_path,

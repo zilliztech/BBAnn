@@ -100,7 +100,7 @@ int main() {
     // return 0;
 
     // pq
-    PQResidualQuantizer<Dis_Compare, CODE_T, uint8_t> pq(dim, m, nbits);
+    PQResidualQuantizer<Dis_Compare, CODE_T, uint8_t> pq(dim, m, nbits, MetricType::L2);
 
     int32_t train_size = std::min(65536, Base_Batch);
     gettimeofday(&t1, 0);
@@ -163,8 +163,8 @@ int main() {
     printf("pq.train cost %ldms\n", getTime(t1,t2));
 
     float *precomputer_table = nullptr;
-    pq.encode_vectors_and_save(precomputer_table, batch_num, xb2, centroids, buckets,
-                               "xxx", MetricType::L2);
+    pq.encode_vectors_and_save(precomputer_table, batch_num, xb2, centroids, buckets, "");
+
     delete[] xb2;
     delete[] precomputer_table;
 
@@ -192,7 +192,7 @@ int main() {
         for (int32_t i=0; i<nlist; i++){
             pq.search(precomputer_table, xq+q*dim, cent_tmp, pcodes, buckets[i],
                       topk, tmp_dis+q*topk, tmp_lab+q*topk,
-                      (i==nlist-1), (i==0), (uint64_t)id_tmp, 0 , 0, MetricType::L2);
+                      (i==nlist-1), (i==0), (uint64_t)id_tmp, 0 , 0);
             cent_tmp += dim;
             id_tmp += buckets[i];
             pcodes += buckets[i] * (m + sizeof(float));
