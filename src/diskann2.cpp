@@ -802,9 +802,9 @@ void search_pq_residual_quantizer(
 
 
 
-    auto code_size = quantizer.getCodeSize();
+    auto code_num = quantizer.getCodeNum();
 
-    rc.RecordSection("pq code size = " + std::to_string(code_size));
+    rc.RecordSection("pq code num = " + std::to_string(code_num));
 
     std::vector<uint32_t> pre(K1);
     for (int i = 0; i < K1; ++i) {
@@ -830,7 +830,7 @@ void search_pq_residual_quantizer(
                         precompute_table,
                         pquery + i * dq,
                         cen,
-                        pq_codebook[cid].data() + (uint64_t)off * code_size,
+                        pq_codebook[cid].data() + (uint64_t)off * code_num,
                         meta[cid][bid],
                         refine_topk,
                         pq_distancei,

@@ -36,6 +36,7 @@ private:
 public:
     PQResidualQuantizer(int64_t _d, uint32_t _m, uint32_t _nbits, MetricType _metric_type)
     : d(_d), m(_m), nbits(_nbits), metric_type(_metric_type), ntotal(0), npos(0) {
+        assert(sizeof(float) % sizeof(U) == 0);
         assert(d % m == 0);
 
         dsub = d / m;
@@ -67,11 +68,12 @@ public:
         return m;
     }
 
-    int64_t getCodeSize() {
+    // Code Size = Code Num * sizeof(U)
+    int64_t getCodeNum() {
         if (metric_type == MetricType::L2) {
-            return m * sizeof(U) + sizeof(float);
+            return m + sizeof(float) / sizeof(U);
         } else {
-            return m * sizeof(U);
+            return m;
         }
     }
 
@@ -81,11 +83,12 @@ public:
             if (codes != nullptr) {
                 delete[] codes;
             }
-            codes = new U[ntotal * m];
+            codes = new U[ntotal * getCodeNum()];
         }
         npos = 0;
     }
 
+    // get one vector centroid
     float* reconstruct(float* r, const U* c) {
         for (uint32_t i = 0; i < m; ++i, ++c) {
             memcpy(
@@ -225,7 +228,8 @@ void PQResidualQuantizer<C, T, U>::encode_vectors(float*& precomputer_table,
     assert(npos + n <= ntotal);
     assert(ivf_cen != nullptr);
 
-    U* c = codes + npos * m;
+    auto code_num = getCodeNum();
+    U* c = codes + npos * code_num;
 
     bool new_precomputer_table = false;
     if (precomputer_table == nullptr) {
@@ -285,7 +289,7 @@ void PQResidualQuantizer<C, T, U>::encode_vectors(float*& precomputer_table,
                     }
                 }
 
-                c[i * m + loop] = ids_i;
+                c[i * code_num + loop] = ids_i;
             }
         }
     }
@@ -304,6 +308,7 @@ void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
         const std::string& file_path) {
     assert(ivf_cen != nullptr);
 
+    auto code_num = getCodeNum();
     init_codes(n);
 
     const float* ivf_c = ivf_cen;
@@ -313,21 +318,19 @@ void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
     }
 
     if (MetricType::L2 == metric_type) {
-        std::vector<float> term2s(n, 0);
-
         // these codes are local, for each cluster
-        const U* c = get_codes();
+        U* c = get_codes();
         float* r = new float[d];
         ivf_c = ivf_cen;
 
         // precompute term2
         int64_t cnt = 0;
         for (size_t i = 0; i < buckets.size(); ++i, ivf_c += d) {
-            for (uint32_t j = 0; j < buckets[i]; ++j, c += m) {
+            for (uint32_t j = 0; j < buckets[i]; ++j, c += code_num) {
                 reconstruct(r, c);
-                term2s[cnt] += IP<const float, const float, float>(r, r, d);
-                term2s[cnt] += 2.0f * IP<const float, const float, float>(ivf_c, r, d);
-
+                float term2 = IP<const float, const float, float>(r, r, d) +
+                              2.0f * IP<const float, const float, float>(ivf_c, r, d);
+                *reinterpret_cast<float*>(c + m) = term2;
                 ++cnt;
             }
         }
@@ -335,45 +338,22 @@ void PQResidualQuantizer<C, T, U>::encode_vectors_and_save(
         assert(cnt == n);
 
 #ifndef TEST_RPQ
-        uint32_t wm = m + sizeof(float);
+        uint32_t wm = code_num;
         std::ofstream code_writer(file_path, std::ios::binary | std::ios::out);
         code_writer.write((char*)&n, sizeof(uint32_t));
         code_writer.write((char*)&wm, sizeof(uint32_t));
-
-        c = get_codes();
-        const size_t c_size = m * sizeof(U);
-        for (int64_t i = 0; i < n; ++i, c += m) {
-            code_writer.write((char*)c, c_size);
-            code_writer.write((char*)&term2s[i], sizeof(float));
-        }
-
+        code_writer.write((char*)get_codes(), n * code_num * sizeof(U));
         code_writer.close();
-#else
-        U* old_c = get_codes();
-        U* new_c = new U[n * (m + sizeof(float))];
-        codes = new_c;
-        auto delete_old = old_c;
-
-        for (int64_t i=0; i<n; i++){
-            memcpy(new_c, old_c, m);
-            new_c += m;
-            old_c += m;
-            memcpy(new_c, &term2s[i], sizeof(float));
-            new_c += sizeof(float);
-        }
-        delete[] delete_old;
 #endif
 
         std::cout << "PQResidualQuantizer encode " << n << " vectors with m = " << m << " and term2 into file "
                   << file_path << std::endl;
+
     } else if (MetricType::IP == metric_type) {
         std::ofstream code_writer(file_path, std::ios::binary | std::ios::out);
-        const U* c = get_codes();
-
         code_writer.write((char*)&n, sizeof(uint32_t));
         code_writer.write((char*)&m, sizeof(uint32_t));
-        code_writer.write((char*)c, n * m * sizeof(U));
-
+        code_writer.write((char*)get_codes(), n * m * sizeof(U));
         code_writer.close();
 
         std::cout << "ProductQuantizer encode " << n << " vectors with m = " << m << " into file "
