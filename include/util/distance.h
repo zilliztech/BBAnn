@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <immintrin.h>
 #include <stdint.h>
+#include <assert.h>
 
 // Data type: T1, T2
 // Distance type: R
@@ -259,7 +260,7 @@ float IP<float, float, float>(float* a, float* b, size_t n) {
         }
     }
 
-    return  dis;
+    return dis;
 }
 
 // compute X*R, when sub_dim <= 8
@@ -271,10 +272,14 @@ float IP<float, float, float>(float* a, float* b, size_t n) {
 // m: the number of centroids, m is divisible by 32.
 template<typename T1>
 void compute_lookuptable(T1* a, float* b, float* c, size_t n, size_t m) {
-    for (int i = 0; i < m; i++) {
-        c[i] = IP<T1, float, float>(a, b + i*n, n);
+    float* a_buffer = new float[n];
+    for (int i=0; i<n; i++) {
+        a_buffer[i] = (float) a[i];
     }
-    return ;
+
+    compute_lookuptable<float>(a_buffer, b, c, n, m);
+
+    delete[] a_buffer;
 }
 
 template<>
@@ -310,37 +315,22 @@ void compute_lookuptable<float>(float* a, float* b, float* c, size_t n, size_t m
             dim ++;
         }
 
-        _mm256_stream_ps(c, msum1);
-        _mm256_stream_ps(c + 8,  msum2);
-        _mm256_stream_ps(c + 16, msum3);
-        _mm256_stream_ps(c + 24, msum4);
+        _mm256_storeu_ps(c, msum1);
+        _mm256_storeu_ps(c + 8,  msum2);
+        _mm256_storeu_ps(c + 16, msum3);
+        _mm256_storeu_ps(c + 24, msum4);
         offest = offest + 32;
         c += 32;
     }
-    return ;
 }
 
-template<>
-void compute_lookuptable<uint8_t>(uint8_t* a, float* b, float* c, size_t n, size_t m) {
+void matrix_transpose(const float* src, float* des, int64_t row, int64_t col) {
+    assert(src != nullptr);
+    assert(des != nullptr);
 
-    float* a_buffer = new float[n];
-    for (int i=0; i<n; i++) {
-        a_buffer[i] = (float) a[i];
+    for (int64_t i = 0; i < row; ++i) {
+        for (int64_t j = 0; j < col; ++j) {
+            *(des + j * row + i) = *(src + i * col + j);
+        }
     }
-
-    compute_lookuptable<float>(a_buffer, b, c, n, m);
-    return ;
 }
-
-template<>
-void compute_lookuptable<int8_t>(int8_t* a, float* b, float* c, size_t n, size_t m) {
-
-    float* a_buffer = new float[n];
-    for (int i=0; i<n; i++) {
-        a_buffer[i] = (float) a[i];
-    }
-
-    compute_lookuptable<float>(a_buffer, b, c, n, m);
-    return ;
-}
-

@@ -44,6 +44,10 @@ public:
 
         centroids = new float[m * K * dsub];
         codes = nullptr;
+
+        // avx2 assertion
+        assert(K % 32 == 0);
+        assert(dsub <= 8);
     };
 
     ~PQResidualQuantizer() {
@@ -130,13 +134,22 @@ public:
             precompute_table = new float[K * m];
         }
 
-        const float* c = centroids;
-        float* dis_tab = precompute_table;
-        for (int64_t i = 0; i < m; ++i, q += dsub) {
-            for (int64_t j = 0; j < K; ++j, c += dsub) {
-                *dis_tab++ = IP<const T, const float, float>(q, c, dsub);
-            }
+        for (int64_t i = 0; i < m; ++i) {
+            compute_lookuptable<const T>(
+                q + i * dsub,
+                centroids + i * K * dsub,
+                precompute_table + i * K,
+                dsub,
+                K);
         }
+
+        // const float* c = centroids;
+        // float* dis_tab = precompute_table;
+        // for (int64_t i = 0; i < m; ++i, q += dsub) {
+        //     for (int64_t j = 0; j < K; ++j, c += dsub) {
+        //         *dis_tab++ = IP<const T, const float, float>(q, c, dsub);
+        //     }
+        // }
     }
 
     void train(int64_t n, const T* x, const float* sample_ivf_cen);
@@ -188,6 +201,17 @@ public:
         centroids_reader.read((char*)&num_centroids, sizeof(uint32_t));
         centroids_reader.read((char*)&dim_centroids, sizeof(uint32_t));
         centroids_reader.read((char*)centroids, sizeof(float) * K * d);
+
+        float* new_centroids = new float[m * K * dsub];
+        assert(new_centroids != nullptr);
+
+        for (uint32_t i = 0; i < m; ++i) {
+            const auto t = i * K * dsub;
+            matrix_transpose(centroids + t, new_centroids + t, K, dsub);
+        }
+        delete[] centroids;
+        centroids = new_centroids;
+
         centroids_reader.close();
     }
 };
