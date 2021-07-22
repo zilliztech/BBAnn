@@ -618,6 +618,7 @@ void build_bigann(const std::string& raw_data_bin_file,
     rc.RecordSection("train quantizer done.");
 
     page_align<DATAT>(raw_data_bin_file, output_path, K1);
+    rc.RecordSection("page align done.");
 
     delete[] centroids;
     rc.ElapseFromBegin("build bigann totally done.");
