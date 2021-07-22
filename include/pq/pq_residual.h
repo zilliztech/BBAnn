@@ -142,14 +142,6 @@ public:
                 dsub,
                 K);
         }
-
-        // const float* c = centroids;
-        // float* dis_tab = precompute_table;
-        // for (int64_t i = 0; i < m; ++i, q += dsub) {
-        //     for (int64_t j = 0; j < K; ++j, c += dsub) {
-        //         *dis_tab++ = IP<const T, const float, float>(q, c, dsub);
-        //     }
-        // }
     }
 
     void train(int64_t n, const T* x, const float* sample_ivf_cen);
@@ -201,6 +193,7 @@ public:
         centroids_reader.read((char*)&num_centroids, sizeof(uint32_t));
         centroids_reader.read((char*)&dim_centroids, sizeof(uint32_t));
         centroids_reader.read((char*)centroids, sizeof(float) * K * d);
+        centroids_reader.close();
 
         float* new_centroids = new float[m * K * dsub];
         assert(new_centroids != nullptr);
@@ -211,8 +204,6 @@ public:
         }
         delete[] centroids;
         centroids = new_centroids;
-
-        centroids_reader.close();
     }
 };
 

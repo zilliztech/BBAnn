@@ -29,14 +29,15 @@ class ProductQuantizer {
 private:
     int64_t d, dsub, K, ntotal, npos;
     uint32_t m, nbits;
+    MetricType metric_type;
 
     float* centroids = nullptr;
     U* codes = nullptr;
 
 public:
     // in-memory
-    ProductQuantizer(int64_t _ntotal, int64_t _d, uint32_t _m, uint32_t _nbits)
-    : ntotal(_ntotal), d(_d), m(_m), nbits(_nbits), npos(0) {
+    ProductQuantizer(int64_t _ntotal, int64_t _d, uint32_t _m, uint32_t _nbits, MetricType _metric_type)
+    : ntotal(_ntotal), d(_d), m(_m), nbits(_nbits), npos(0), metric_type(_metric_type) {
         assert(d % m == 0);
 
         dsub = d / m;
@@ -46,8 +47,8 @@ public:
         codes = new U[ntotal * m];
     };
 
-    ProductQuantizer(int64_t _d, uint32_t _m, uint32_t _nbits)
-    : ntotal(0), d(_d), m(_m), nbits(_nbits), npos(0) {
+    ProductQuantizer(int64_t _d, uint32_t _m, uint32_t _nbits, MetricType _metric_type)
+    : ntotal(0), d(_d), m(_m), nbits(_nbits), npos(0), metric_type(_metric_type) {
         assert(d % m == 0);
 
         dsub = d / m;
@@ -106,16 +107,28 @@ public:
         }
     }
 
-    void calc_precompute_table(float*& precompute_table, const T* q, PQ_Computer<T> computer) {
+    void calc_precompute_table(float*& precompute_table, const T* q) {
         if (precompute_table == nullptr) {
             precompute_table = new float[K * m];
         }
 
-        const float* c = centroids;
-        float* dis_tab = precompute_table;
-        for (int64_t i = 0; i < m; ++i, q += dsub) {
-            for (int64_t j = 0; j < K; ++j, c += dsub) {
-                *dis_tab++ = computer(q, c, dsub);
+        if (MetricType::L2 == metric_type) {
+            for (int64_t i = 0; i < m; ++i) {
+                compute_lookuptable_L2<const T>(
+                    q + i * dsub,
+                    centroids + i * K * dsub,
+                    precompute_table + i * K,
+                    dsub,
+                    K);
+            }
+        } else {
+            for (int64_t i = 0; i < m; ++i) {
+                compute_lookuptable_IP<const T>(
+                    q + i * dsub,
+                    centroids + i * K * dsub,
+                    precompute_table + i * K,
+                    dsub,
+                    K);
             }
         }
     }
@@ -131,12 +144,10 @@ public:
                                  const std::string& save_file);
 
     void search(int64_t nq, const T* q, int64_t topk,
-                   typename C::T* values, typename C::TI* labels,
-                   PQ_Computer<T> computer);
+                   typename C::T* values, typename C::TI* labels);
 
     void search(float* precompute_table, const T* q, const U* pcodes, int64_t len, int64_t topk,
-                typename C::T* values, typename C::TI* labels,
-                PQ_Computer<T> computer, bool reorder, bool heapify,
+                typename C::T* values, typename C::TI* labels, bool reorder, bool heapify,
                 const uint32_t& cid, const uint32_t& off, const uint32_t& qid);
 
     void save_centroids(const std::string& save_file) {
@@ -156,6 +167,16 @@ public:
         centroids_reader.read((char*)&dim_centroids, sizeof(uint32_t));
         centroids_reader.read((char*)centroids, sizeof(float) * K * d);
         centroids_reader.close();
+
+        float* new_centroids = new float[m * K * dsub];
+        assert(new_centroids != nullptr);
+
+        for (uint32_t i = 0; i < m; ++i) {
+            const auto t = i * K * dsub;
+            matrix_transpose(centroids + t, new_centroids + t, K, dsub);
+        }
+        delete[] centroids;
+        centroids = new_centroids;
     }
 };
 
@@ -320,15 +341,14 @@ void ProductQuantizer<C, T, U>::encode_vectors_and_save(float*& precomputer_tabl
 
 template<class C, typename T, typename U>
 void ProductQuantizer<C, T, U>::search(int64_t nq, const T* q, int64_t topk,
-            typename C::T* values, typename C::TI* labels,
-            PQ_Computer<T> computer) {
+            typename C::T* values, typename C::TI* labels) {
     
     // precompute distance tables
     float* dis_tabs = new float[nq * m * K];
 
 #pragma omp parallel for
     for (int64_t i = 0; i < nq; ++i) {
-        calc_precompute_table(dis_tabs + i * m * K, q + i * d, computer);
+        calc_precompute_table(dis_tabs + i * m * K, q + i * d);
     }
 
     // search
@@ -362,7 +382,7 @@ template<class C, typename T, typename U>
 void ProductQuantizer<C, T, U>::search(float* precompute_table, const T* q, const U* pcodes,
                          int64_t codebook_len, int64_t topk,
                          typename C::T* values, typename C::TI* labels,
-                         PQ_Computer<T> computer, bool reorder, bool heapify,
+                         bool reorder, bool heapify,
                          const uint32_t& cid, const uint32_t& off, const uint32_t& qid) {
     
     // search

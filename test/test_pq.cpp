@@ -16,7 +16,7 @@
     const char* Query_Path = "../../data/BIGANN/query.public.10K.u8bin";
     #define Dis_Compare     CMax<int,int>
     #define Dis_Computer    L2sqr<const CODE_T, const CODE_T, DIS_T>
-    #define PQ_DIS_Computer L2sqr<const CODE_T, const float, float>
+    #define METRIC_TYPE     MetricType::L2
     #define OUT_PUT         "bigann"
 #endif
 
@@ -27,7 +27,7 @@
     const char* Query_Path = "../../data/Yandex-Text-to-Image/query.public.100K.fbin";
     #define Dis_Compare     CMin<float,int>
     #define Dis_Computer    IP<const CODE_T, const CODE_T, DIS_T>
-    #define PQ_DIS_Computer IP<const CODE_T, const float, float>
+    #define METRIC_TYPE     MetricType::IP
     #define OUT_PUT         "yandex_text_to_image"
 #endif
 
@@ -103,7 +103,7 @@ int main() {
     // return 0;
 
     // pq
-    ProductQuantizer<Dis_Compare, CODE_T, uint8_t> pq(batch_num, dim, m, nbits);
+    ProductQuantizer<Dis_Compare, CODE_T, uint8_t> pq(batch_num, dim, m, nbits, METRIC_TYPE);
 
 
     int32_t train_size = 65536;
@@ -126,13 +126,12 @@ int main() {
         float* precompute_table = nullptr;
 #pragma omp for
         for (auto i = 0; i < nq; i ++) {
-            pq.calc_precompute_table(precompute_table, xq + i * dim, PQ_DIS_Computer);
+            pq.calc_precompute_table(precompute_table, xq + i * dim);
             // pq_quantizer.show_pretab(precompute_table);
             for (int j=0;j<Base_Batch;j++){
                 pq.search(precompute_table, xq + i * dim,
                         pq.get_codes() + j * m, 1, topk,
                         global_dis + i * topk, global_lab +  + i * topk,
-                        PQ_DIS_Computer,
                         false, j==0, 0, 0, j);
             }
         }

@@ -5,7 +5,6 @@
 #include <stdint.h>
 #include <assert.h>
 
-
 // Data type: T1, T2
 // Distance type: R
 
@@ -261,7 +260,7 @@ float IP<float, float, float>(float* a, float* b, size_t n) {
         }
     }
 
-    return  dis;
+    return dis;
 }
 
 // A vector multiply a matrix
@@ -323,7 +322,6 @@ void compute_lookuptable_IP<float>(float* a, float* b, float* c, size_t n, size_
         offest = offest + 32;
         c += 32;
     }
-    return ;
 }
 
 template<typename T1>
