@@ -262,6 +262,7 @@ void test_uint8_uint8_l2() {
     delete [] xq;
 
 }
+
 void test_float_float_ip() {
 	int d = 200;      // dimension
     int nb = 10000; // database size
@@ -304,9 +305,7 @@ void test_float_float_ip() {
     delete [] xq;
 }
 
-
-float result2[10000];
-void test_uint8_compute_lookuptable() {
+void test_uint8_compute_lookuptable_ip() {
     size_t d = 8;             // dimension
     int m = 32;
     int nb =  256;      // database size
@@ -367,7 +366,7 @@ void test_uint8_compute_lookuptable() {
     t0 = elapsed();
     for (int i=0;i<nq;i++)
         for(int j=0;j<m;j++) {
-            compute_lookuptable<uint8_t>(xq+i*j*d, ytransform+j*256*d,&result2[j*256],d,256);
+            compute_lookuptable_IP<uint8_t>(xq+i*j*d, ytransform+j*256*d,result2+j*256,d,256);
         }
     cout<< "avx2 search time"<<elapsed()-t0<<endl;
     float average2 = 0.0;
@@ -377,15 +376,17 @@ void test_uint8_compute_lookuptable() {
     average2 = average2/(1.0*nb*m);
     cout<<"the average ip reuslt:"<<endl;
     cout<<"gt"<<average<<" "<<average2<<endl;
+
     delete [] xb;
     delete [] xq;
     delete [] ytransform;
-  //  delete [] result2;
+    delete [] result2;
+
 
 
 }
 
-void test_int8_compute_lookuptable() {
+void test_int8_compute_lookuptable_ip() {
     size_t d = 8;             // dimension
     int m = 32;
     int nb =  256;      // database size
@@ -444,7 +445,7 @@ void test_int8_compute_lookuptable() {
     t0 = elapsed();
     for (int i=0;i<nq;i++)
         for(int j=0;j<m;j++) {
-            compute_lookuptable<int8_t>(xq+i*j*d, ytransform+j*256*d,result2+j*256,d,256);
+            compute_lookuptable_IP<int8_t>(xq+i*j*d, ytransform+j*256*d,result2+j*256,d,256);
         }
     cout<<"avx2 search time"<<elapsed()-t0<<endl;
     float average2 = 0.0;
@@ -454,14 +455,17 @@ void test_int8_compute_lookuptable() {
     average2 = average2/(1.0*nb*m);
     cout<<"the average ip reuslt:"<<endl;
     cout<<"gt"<<average<<" "<<average2<<endl;
+
     delete [] xb;
     delete [] xq;
+
     delete [] ytransform;
     delete [] result2;
 
 }
 
-void test_float_compute_lookuptable() {
+void test_float_compute_lookuptable_ip() {
+
     int d = 4;             // dimension
     int m = 32;
     int nb =  256;      // database size
@@ -493,7 +497,7 @@ void test_float_compute_lookuptable() {
     for (int i=0; i<nq; i++) {
         for (int j=0;j<m;j++) {
             for(int k=0;k<nb;k++) {
-                result[j*256+k] = IP<float, float, float>(xq+i*j*d, xb+(j*256+k)*d, d);
+                result[j*256+k] = get_ip_gt<float, float, float>(xq+i*j*d, xb+(j*256+k)*d, d);
             }
         }
     }
@@ -521,7 +525,7 @@ void test_float_compute_lookuptable() {
     t0 = elapsed();
     for (int i=0;i<nq;i++)
         for(int j=0;j<m;j++) {
-            compute_lookuptable<float>(xq+i*j*d, ytransform+j*256*d,result2+j*256,d,256);
+            compute_lookuptable_IP<float>(xq+i*j*d, ytransform+j*256*d,result2+j*256,d,256);
         }
     cout<< "avx2 search time"<<elapsed()-t0<<endl;
     float average2 = 0.0;
@@ -531,13 +535,92 @@ void test_float_compute_lookuptable() {
     average2 = average2/(1.0*nb*m);
     cout<<"the average ip result:"<<endl;
     cout<<"gt"<<average<<" "<<average2<<endl;
-
     delete [] xb;
     delete [] xq;
     delete [] ytransform;
     delete [] result2;
 
 }
+
+
+void test_float_compute_lookuptable_l2() {
+
+    int d = 4;             // dimension
+    int m = 32;
+    int nb =  256;      // database size
+    int nq =  10000;  // nb of queries
+    //init :
+    std::mt19937 rng;
+    std::uniform_real_distribution<> distrib;
+    srand(time(0));
+    //init:
+    float* xb = new float[d * nb*m];
+    float* xq = new float[d * nq*m];
+
+    for (int i = 0; i < nq*m; i++) {
+        for (int j = 0; j < d; j++)
+            xq[d * i + j] = distrib(rng);
+    }
+
+    for (int i = 0; i < nb*m; i++) {
+        for (int j = 0; j < d; j++)
+            xb[d * i + j] = distrib(rng);
+        xb[d * i] += i / 1000.;
+    }
+
+    double t0 = elapsed();
+    float average = 0.0;
+    float* result = new float[nb*m];
+    float temp ;
+    cout<<"test gt"<<endl;
+    for (int i=0; i<nq; i++) {
+        for (int j=0;j<m;j++) {
+            for(int k=0;k<nb;k++) {
+                result[j*256+k] = get_l2_gt<float, float, float>(xq+i*j*d, xb+(j*256+k)*d, d);
+            }
+        }
+    }
+    cout<< "normal search time"<<elapsed()-t0<<endl;
+
+    for(int i=0;i<nb*m;i++) {
+        average += result[i];
+    }
+    average = average/(1.0*nb*m);
+    delete [] result ;
+
+    //using compute_looktable
+    float* ytransform = new float[nb*m*d];
+    float* result2 = new float[nb*m];
+    for (int i = 0; i<m; i++) {
+        int begin = i*nb*d;
+        for (int j=0; j<nb;j++) {
+            for(int k=0;k<d;k++) {
+                ytransform[begin+k*nb+j] = xb[begin+d*j+k];
+            }
+        }
+    }
+
+
+    t0 = elapsed();
+    for (int i=0;i<nq;i++)
+        for(int j=0;j<m;j++) {
+            compute_lookuptable_L2<float>(xq+i*j*d, ytransform+j*256*d,result2+j*256,d,256);
+        }
+    cout<< "avx2 search time"<<elapsed()-t0<<endl;
+    float average2 = 0.0;
+    for(int i=0;i<nb*m;i++) {
+        average2 += result2[i];
+    }
+    average2 = average2/(1.0*nb*m);
+    cout<<"the average ip result:"<<endl;
+    cout<<"gt"<<average<<" "<<average2<<endl;
+    delete [] xb;
+    delete [] xq;
+    delete [] ytransform;
+    delete [] result2;
+
+}
+
 void base_test() {
 
     cout<<endl<<"testing l2sqrt<float, float, float>:"<<endl;
@@ -555,17 +638,21 @@ void base_test() {
 }
 void matrix_test() {
 
-    cout<<endl<<"testing compute_looktable<uint8>: "<<endl;
-  //  test_uint8_compute_lookuptable();
-    cout<<endl<<"testing compute_looktable<int8>: "<<endl;
-   // test_int8_compute_lookuptable();
-    cout<<endl<<"testing compute_looktable<float>: "<<endl;
-    test_float_compute_lookuptable();
+    cout<<endl<<"testing compute_looktable_ip<uint8>: "<<endl;
+    test_uint8_compute_lookuptable_ip();
+    cout<<endl<<"testing compute_looktable_ip<int8>: "<<endl;
+    test_int8_compute_lookuptable_ip();
+    cout<<endl<<"testing compute_looktable_ip<float>: "<<endl;
+    test_float_compute_lookuptable_ip();
+    cout<<endl<<"testing compute_looktable_l2<float>: "<<endl;
+    test_float_compute_lookuptable_l2();
 
 }
 
 int main() {
+
    // base_test();
     matrix_test();
+
 
 }

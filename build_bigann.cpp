@@ -19,7 +19,7 @@
  */
 
 int main(int argc, char** argv) {
-    if (argc != 11) {
+    if (argc != 12) {
         std::cout << "Usage: << " << argv[0]
                   << " data_type(float or uint8 or int8)"
                   << " binary raw data file"
@@ -31,6 +31,7 @@ int main(int argc, char** argv) {
                   << " metric type(L2 or IP)"
                   << " K1"
                   << " bucket split threshold"
+                  << " quantizer type(PQ | PQRes)"
                   << std::endl;
         return 1;
     }
@@ -44,6 +45,7 @@ int main(int argc, char** argv) {
     auto metric_type = get_metric_type_by_name(std::string(argv[8]));
     int K1 = std::stoi(argv[9]);
     int threshold = std::stoi(argv[10]);
+    auto quantizer_type = get_quantizer_type_by_name(std::string(argv[11]));
     assert(PQnbits == 8);
 
     if ('/' != *output_path.rbegin())
@@ -52,26 +54,26 @@ int main(int argc, char** argv) {
     if (argv[1] == std::string("float")) {
         if (MetricType::L2 == metric_type) {
             build_bigann<float, float, CMax<float, uint32_t>>
-                (raw_data_bin_file, output_path, hnswM, hnswefC, PQM, PQnbits, K1, threshold, metric_type);
+                (raw_data_bin_file, output_path, hnswM, hnswefC, PQM, PQnbits, K1, threshold, metric_type, quantizer_type);
         } else if (MetricType::IP == metric_type) {
             build_bigann<float, float, CMin<float, uint32_t>>
-                (raw_data_bin_file, output_path, hnswM, hnswefC, PQM, PQnbits, K1, threshold, metric_type);
+                (raw_data_bin_file, output_path, hnswM, hnswefC, PQM, PQnbits, K1, threshold, metric_type, quantizer_type);
         }
     } else if (argv[1] == std::string("uint8")) {
         if (MetricType::L2 == metric_type) {
             build_bigann<uint8_t, uint32_t, CMax<uint32_t, uint32_t>>
-                (raw_data_bin_file, output_path, hnswM, hnswefC, PQM, PQnbits, K1, threshold, metric_type);
+                (raw_data_bin_file, output_path, hnswM, hnswefC, PQM, PQnbits, K1, threshold, metric_type, quantizer_type);
         } else if (MetricType::IP == metric_type) {
             build_bigann<uint8_t, uint32_t, CMin<uint32_t, uint32_t>>
-                (raw_data_bin_file, output_path, hnswM, hnswefC, PQM, PQnbits, K1, threshold, metric_type);
+                (raw_data_bin_file, output_path, hnswM, hnswefC, PQM, PQnbits, K1, threshold, metric_type, quantizer_type);
         }
     } else if (argv[1] == std::string("int8")) {
         if (MetricType::L2 == metric_type) {
             build_bigann<int8_t, int32_t, CMax<int32_t, uint32_t>>
-                (raw_data_bin_file, output_path, hnswM, hnswefC, PQM, PQnbits, K1, threshold, metric_type);
+                (raw_data_bin_file, output_path, hnswM, hnswefC, PQM, PQnbits, K1, threshold, metric_type, quantizer_type);
         } else if (MetricType::IP == metric_type) {
             build_bigann<int8_t, int32_t, CMin<int32_t, uint32_t>>
-                (raw_data_bin_file, output_path, hnswM, hnswefC, PQM, PQnbits, K1, threshold, metric_type);
+                (raw_data_bin_file, output_path, hnswM, hnswefC, PQM, PQnbits, K1, threshold, metric_type, quantizer_type);
         }
     }
     return 0;

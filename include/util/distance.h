@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <immintrin.h>
 #include <stdint.h>
+#include <assert.h>
+
 
 // Data type: T1, T2
 // Distance type: R
@@ -205,6 +207,24 @@ R IP(T1 *a, T2 *b, size_t n) {
     return dis;
 }
 
+template<typename T1, typename T2, typename R>
+void compute_residual(T1* x, T2* c, R* res, size_t d) {
+    size_t i = 0;
+    switch(d & 7) {
+        default:
+            while (d > 7) {
+                d -= 8; res[i]=(R)x[i]-(R)c[i]; i++;
+                case 7: res[i]=(R)x[i]-(R)c[i]; i++;
+                case 6: res[i]=(R)x[i]-(R)c[i]; i++;
+                case 5: res[i]=(R)x[i]-(R)c[i]; i++;
+                case 4: res[i]=(R)x[i]-(R)c[i]; i++;
+                case 3: res[i]=(R)x[i]-(R)c[i]; i++;
+                case 2: res[i]=(R)x[i]-(R)c[i]; i++;
+                case 1: res[i]=(R)x[i]-(R)c[i]; i++;
+            }
+    }
+}
+
 template<>
 float IP<float, float, float>(float* a, float* b, size_t n) {
     __m256 msum1 = _mm256_setzero_ps();
@@ -244,7 +264,7 @@ float IP<float, float, float>(float* a, float* b, size_t n) {
     return  dis;
 }
 
-// compute X*R, when sub_dim <= 8
+// A vector multiply a matrix
 // args:　
 // a: subquery vector;
 // b: m centroids vectors, b is m*n matrix;
@@ -252,15 +272,19 @@ float IP<float, float, float>(float* a, float* b, size_t n) {
 // n: sub_dim;
 // m: the number of centroids, m is divisible by 32.
 template<typename T1>
-void compute_lookuptable(T1* a, float* b, float* c, size_t n, size_t m) {
-    for (int i = 0; i < m; i++) {
-        c[i] = IP<T1, float, float>(a, b + i*n, n);
+void compute_lookuptable_IP(T1* a, float* b, float* c, size_t n, size_t m) {
+    float* a_buffer = new float[n];
+    for (int i=0; i<n; i++) {
+        a_buffer[i] = (float) a[i];
     }
-    return ;
+
+    compute_lookuptable_IP<float>(a_buffer, b, c, n, m);
+
+    delete[] a_buffer;
 }
 
 template<>
-void compute_lookuptable<float>(float* a, float* b, float* c, size_t n, size_t m) {
+void compute_lookuptable_IP<float>(float* a, float* b, float* c, size_t n, size_t m) {
 
     size_t offest = 0;
     __m256 msum1, msum2, msum3, msum4;
@@ -302,27 +326,74 @@ void compute_lookuptable<float>(float* a, float* b, float* c, size_t n, size_t m
     return ;
 }
 
-template<>
-void compute_lookuptable<uint8_t>(uint8_t* a, float* b, float* c, size_t n, size_t m) {
-
+template<typename T1>
+void compute_lookuptable_L2(T1* a, float* b, float* c, size_t n, size_t m) {
     float* a_buffer = new float[n];
     for (int i=0; i<n; i++) {
         a_buffer[i] = (float) a[i];
     }
 
-    compute_lookuptable<float>(a_buffer, b, c, n, m);
-    return ;
+    compute_lookuptable_L2<float>(a_buffer, b, c, n, m);
+
+    delete[] a_buffer;
 }
+
 
 template<>
-void compute_lookuptable<int8_t>(int8_t* a, float* b, float* c, size_t n, size_t m) {
+void compute_lookuptable_L2<float>(float* a, float* b, float* c, size_t n, size_t m) {
 
-    float* a_buffer = new float[n];
-    for (int i=0; i<n; i++) {
-        a_buffer[i] = (float) a[i];
+    size_t offest = 0;
+    __m256 msum1, msum2, msum3, msum4;
+
+    while ( offest < m ) {
+        size_t dim = 0;
+        float* y = b + offest;
+
+        msum1 = _mm256_setzero_ps();
+        msum2 = _mm256_setzero_ps();
+        msum3 = _mm256_setzero_ps();
+        msum4 = _mm256_setzero_ps();
+
+        while ( dim < n ) {
+
+            __m256 mx =  _mm256_set1_ps(*(a+dim));
+
+            __m256 my1 =  _mm256_loadu_ps (y);     //b0-7;
+            __m256 my2 =  _mm256_loadu_ps (y + 8); //b8-15;
+            __m256 my3 =  _mm256_loadu_ps (y + 16);//b16-23;
+            __m256 my4 =  _mm256_loadu_ps (y + 24);//b24-31;
+
+            my1 = _mm256_sub_ps(mx, my1);
+            msum1 = _mm256_fmadd_ps(my1, my1, msum1);
+            my2 = _mm256_sub_ps(mx, my2);
+            msum2 = _mm256_fmadd_ps(my2, my2, msum2);
+            my3 = _mm256_sub_ps(mx, my3);
+            msum3 = _mm256_fmadd_ps(my3, my3, msum3);
+            my4 = _mm256_sub_ps(mx, my4);
+            msum4 = _mm256_fmadd_ps(my4, my4, msum4);
+
+
+            y = y + m;
+            dim ++;
+        }
+
+        _mm256_storeu_ps(c, msum1);
+        _mm256_storeu_ps(c + 8,  msum2);
+        _mm256_storeu_ps(c + 16, msum3);
+        _mm256_storeu_ps(c + 24, msum4);
+        offest = offest + 32;
+        c += 32;
     }
-
-    compute_lookuptable<float>(a_buffer, b, c, n, m);
     return ;
 }
 
+void matrix_transpose(const float* src, float* des, int64_t row, int64_t col) {
+    assert(src != nullptr);
+    assert(des != nullptr);
+
+    for (int64_t i = 0; i < row; ++i) {
+        for (int64_t j = 0; j < col; ++j) {
+            *(des + j * row + i) = *(src + i * col + j);
+        }
+    }
+}

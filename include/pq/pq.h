@@ -393,4 +393,3 @@ void ProductQuantizer<C, T, U>::search(float* precompute_table, const T* q, cons
             heap_reorder<C>(topk, val_, ids_);
     }
 }
-
