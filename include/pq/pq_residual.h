@@ -135,7 +135,7 @@ public:
         }
 
         for (int64_t i = 0; i < m; ++i) {
-            compute_lookuptable<const T>(
+            compute_lookuptable_IP<const T>(
                 q + i * dsub,
                 centroids + i * K * dsub,
                 precompute_table + i * K,
