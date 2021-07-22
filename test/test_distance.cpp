@@ -304,6 +304,8 @@ void test_float_float_ip() {
     delete [] xq;
 }
 
+
+float result2[10000];
 void test_uint8_compute_lookuptable() {
     size_t d = 8;             // dimension
     int m = 32;
@@ -351,6 +353,7 @@ void test_uint8_compute_lookuptable() {
     //using compute_looktable
     float* ytransform = new float[nb*m*d];
     float* result2 = new float[nb*m];
+
     for (int i = 0; i<m; i++) {
         int begin = i*nb*d;
         for (int j=0; j<nb;j++) {
@@ -359,13 +362,12 @@ void test_uint8_compute_lookuptable() {
             }
         }
     }
-    delete [] xb;
-    delete [] xq;
+
     cout<<"test gt"<<endl;
     t0 = elapsed();
     for (int i=0;i<nq;i++)
         for(int j=0;j<m;j++) {
-            compute_lookuptable<uint8_t>(xq+i*j*d, ytransform+j*256*d,result2+j*256,d,256);
+            compute_lookuptable<uint8_t>(xq+i*j*d, ytransform+j*256*d,&result2[j*256],d,256);
         }
     cout<< "avx2 search time"<<elapsed()-t0<<endl;
     float average2 = 0.0;
@@ -375,8 +377,10 @@ void test_uint8_compute_lookuptable() {
     average2 = average2/(1.0*nb*m);
     cout<<"the average ip reuslt:"<<endl;
     cout<<"gt"<<average<<" "<<average2<<endl;
+    delete [] xb;
+    delete [] xq;
     delete [] ytransform;
-    delete [] result2;
+  //  delete [] result2;
 
 
 }
@@ -436,8 +440,7 @@ void test_int8_compute_lookuptable() {
             }
         }
     }
-    delete [] xb;
-    delete [] xq;
+
     t0 = elapsed();
     for (int i=0;i<nq;i++)
         for(int j=0;j<m;j++) {
@@ -451,13 +454,15 @@ void test_int8_compute_lookuptable() {
     average2 = average2/(1.0*nb*m);
     cout<<"the average ip reuslt:"<<endl;
     cout<<"gt"<<average<<" "<<average2<<endl;
+    delete [] xb;
+    delete [] xq;
     delete [] ytransform;
     delete [] result2;
 
 }
 
 void test_float_compute_lookuptable() {
-    int d = 8;             // dimension
+    int d = 4;             // dimension
     int m = 32;
     int nb =  256;      // database size
     int nq =  10000;  // nb of queries
@@ -512,8 +517,7 @@ void test_float_compute_lookuptable() {
         }
     }
 
-    delete [] xb;
-    delete [] xq;
+
     t0 = elapsed();
     for (int i=0;i<nq;i++)
         for(int j=0;j<m;j++) {
@@ -528,6 +532,8 @@ void test_float_compute_lookuptable() {
     cout<<"the average ip result:"<<endl;
     cout<<"gt"<<average<<" "<<average2<<endl;
 
+    delete [] xb;
+    delete [] xq;
     delete [] ytransform;
     delete [] result2;
 
@@ -550,16 +556,16 @@ void base_test() {
 void matrix_test() {
 
     cout<<endl<<"testing compute_looktable<uint8>: "<<endl;
-    test_uint8_compute_lookuptable();
+  //  test_uint8_compute_lookuptable();
     cout<<endl<<"testing compute_looktable<int8>: "<<endl;
-    test_int8_compute_lookuptable();
+   // test_int8_compute_lookuptable();
     cout<<endl<<"testing compute_looktable<float>: "<<endl;
     test_float_compute_lookuptable();
 
 }
 
 int main() {
-    base_test();
-   // matrix_test();
+   // base_test();
+    matrix_test();
 
 }

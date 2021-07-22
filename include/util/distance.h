@@ -245,7 +245,7 @@ float IP<float, float, float>(float* a, float* b, size_t n) {
 }
 
 // compute X*R, when sub_dim <= 8
-// args:
+// args:　
 // a: subquery vector;
 // b: m centroids vectors, b is m*n matrix;
 // c: result;
@@ -292,10 +292,10 @@ void compute_lookuptable<float>(float* a, float* b, float* c, size_t n, size_t m
             dim ++;
         }
 
-        _mm256_stream_ps(c, msum1);
-        _mm256_stream_ps(c + 8,  msum2);
-        _mm256_stream_ps(c + 16, msum3);
-        _mm256_stream_ps(c + 24, msum4);
+        _mm256_storeu_ps(c, msum1);
+        _mm256_storeu_ps(c + 8,  msum2);
+        _mm256_storeu_ps(c + 16, msum3);
+        _mm256_storeu_ps(c + 24, msum4);
         offest = offest + 32;
         c += 32;
     }
