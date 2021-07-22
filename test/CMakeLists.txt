@@ -17,3 +17,6 @@ target_link_libraries(test_refine_id BigAnn)
 
 #add_executable(test_search_bigann search_bigann.cpp)
 #target_link_libraries(test_search_bigann BigAnn)
+
+#add_executable(test_distance test_distance.cpp)
+#target_link_libraries(test_distance BigAnn)
