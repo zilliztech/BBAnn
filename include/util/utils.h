@@ -45,6 +45,53 @@ inline void set_bin_metadata(const std::string& bin_file, const uint32_t& nrows,
     std::cout << "set meta to " << bin_file << ", nrows = " << nrows << ", ncols = " << ncols << std::endl;
 }
 
+void load_meta_impl(const std::string& index_path,
+               std::vector<std::vector<uint32_t>>& meta,
+               const int K1) {
+    for (int i = 0; i < K1; i ++) {
+        std::ifstream reader(index_path + CLUSTER + std::to_string(i) + META + BIN, std::ios::binary);
+        uint32_t nmeta, dmeta;
+        reader.read((char*)&nmeta, sizeof(uint32_t));
+        reader.read((char*)&dmeta, sizeof(uint32_t));
+        assert(1 == dmeta);
+        meta[i].resize(nmeta);
+        reader.read((char*)meta[i].data(), (uint64_t)nmeta * dmeta * sizeof(uint32_t));
+        reader.close();
+    }
+}
+
+template<typename T>
+inline void write_bin_file(const std::string& file_name, T* data, uint32_t n,
+                    uint32_t dim) {
+    assert(data != nullptr);
+    std::ofstream writer(file_name, std::ios::binary);
+
+    writer.write((char*)&n, sizeof(uint32_t));
+    writer.write((char*)&dim, sizeof(uint32_t));
+    writer.write((char*)data, sizeof(T) * (uint64_t)n * dim);
+
+    writer.close();
+    std::cout << "write binary file to " << file_name << " done in ... seconds, n = "
+              << n << ", dim = " << dim << std::endl;
+}
+
+template<typename T>
+inline void read_bin_file(const std::string& file_name, T*& data, uint32_t& n,
+                    uint32_t& dim) {
+    std::ifstream reader(file_name, std::ios::binary);
+
+    reader.read((char*)&n, sizeof(uint32_t));
+    reader.read((char*)&dim, sizeof(uint32_t));
+    if (data == nullptr) {
+        data = new T[(uint64_t)n * (uint64_t)dim];
+    }
+    reader.read((char*)data, sizeof(T) * (uint64_t)n * dim);
+
+    reader.close();
+    std::cout << "read binary file from " << file_name << " done in ... seconds, n = "
+              << n << ", dim = " << dim << std::endl;
+}
+
 template<typename T>
 void reservoir_sampling(const std::string& data_file, const size_t sample_num, T* sample_data) {
     assert(sample_data != nullptr);
@@ -74,35 +121,66 @@ void reservoir_sampling(const std::string& data_file, const size_t sample_num, T
 }
 
 template<typename T>
-inline void write_bin_file(const std::string& file_name, T* data, uint32_t n,
-                    uint32_t dim) {
-    assert(data != nullptr);
-    std::ofstream writer(file_name, std::ios::binary);
+void reservoir_sampling_residual(
+        const std::string& output_path,
+        const std::vector<std::vector<uint32_t> >& metas,
+        const float* ivf_cen,
+        const uint32_t dim, 
+        const uint32_t sample_num,
+        T* sample_data,
+        float* sample_ivf_cen,
+        const int K1) {
+    assert(sample_ivf_cen != nullptr);
+    assert(sample_data != nullptr);
 
-    writer.write((char*)&n, sizeof(uint32_t));
-    writer.write((char*)&dim, sizeof(uint32_t));
-    writer.write((char*)data, sizeof(T) * n * dim);
+    std::random_device rd;
+    std::mt19937 generator((unsigned)(rd()));
+    uint32_t cluster_size, cluster_dim, global_cnt = 0;
+    std::vector<T> cluster_data;
+    std::vector<uint32_t> ivf_cen_offsets(sample_num);
 
-    writer.close();
-    std::cout << "write binary file to " << file_name << " done in ... seconds, n = "
-              << n << ", dim = " << dim << std::endl;
-}
+    uint32_t i = 0; // default choose
 
-template<typename T>
-inline void read_bin_file(const std::string& file_name, T*& data, uint32_t& n,
-                    uint32_t& dim) {
-    std::ifstream reader(file_name, std::ios::binary);
+    std::string data_file = output_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
 
-    reader.read((char*)&n, sizeof(uint32_t));
-    reader.read((char*)&dim, sizeof(uint32_t));
-    if (data == nullptr) {
-        data = new T[(int64_t)n * (int64_t)dim];
+    IOReader data_reader(data_file);
+    data_reader.read((char*)&cluster_size, sizeof(uint32_t));
+    data_reader.read((char*)&cluster_dim, sizeof(uint32_t));
+    assert(cluster_dim == dim);
+
+    // read vectors in each cluster
+    const uint64_t total_size = cluster_size * cluster_dim;
+    cluster_data.resize(total_size);
+    data_reader.read((char*)(cluster_data.data()), total_size * sizeof(T));
+
+    const T* vec = cluster_data.data();
+    for (size_t j = 0; j < metas[i].size(); ++j) {
+        for (uint32_t k = 0; k < metas[i][j]; ++k) {
+            // deal with the situation when one bucket is not enough
+            // for filling the resulting array
+            if (global_cnt < sample_num) {
+                memcpy(sample_data + cluster_dim * global_cnt, vec, cluster_dim * sizeof(T));
+                ivf_cen_offsets[global_cnt] = j;
+            } else {
+                std::uniform_int_distribution<size_t> distribution(0, global_cnt);
+                size_t rand = (size_t)distribution(generator);
+                if (rand < sample_num) {
+                    memcpy(sample_data + cluster_dim * rand, vec, cluster_dim * sizeof(T));
+                    ivf_cen_offsets[rand] = j;
+                }
+            }
+
+            vec += cluster_dim;
+            ++global_cnt;
+        }
     }
-    reader.read((char*)data, sizeof(T) * n * dim);
 
-    reader.close();
-    std::cout << "read binary file from " << file_name << " done in ... seconds, n = "
-              << n << ", dim = " << dim << std::endl;
+    for (uint32_t i = 0; i < sample_num; ++i) {
+        memcpy(
+            sample_ivf_cen + i * dim,
+            ivf_cen + ivf_cen_offsets[i] * dim,
+            dim * sizeof(float));
+    }
 }
 
 inline uint64_t gen_id(const uint32_t cid, const uint32_t bid, const uint32_t off) {
@@ -147,6 +225,15 @@ inline MetricType get_metric_type_by_name(const std::string& mt_name) {
     if (mt_name == std::string("IP"))
         return MetricType::IP;
     return MetricType::None;
+}
+
+inline QuantizerType get_quantizer_type_by_name(const std::string& s) {
+    if (s == "PQ") {
+        return QuantizerType::PQ;
+    } else if (s == "PQRes") {
+        return QuantizerType::PQRES;
+    }
+    return QuantizerType::None;
 }
 
 template<typename DISTT, typename IDT>

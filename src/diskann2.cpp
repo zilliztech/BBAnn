@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <algorithm>
 #include <cstdio>
 
 template<typename DATAT>
@@ -31,8 +32,9 @@ void train_cluster(const std::string& raw_data_bin_file,
     reservoir_sampling(raw_data_bin_file, sample_num, sample_data);
     rc.RecordSection("reservoir sample with sample rate: " + std::to_string(K1_SAMPLE_RATE) + " done");
     double mxl, mnl;
-    stat_length<DATAT>(sample_data, 1000000, dim, mxl, mnl, avg_len);
-    rc.RecordSection("calculate " + std::to_string(1000000) + " vectors from sample_data done");
+    int64_t stat_n = std::min(static_cast<int64_t>(1000000), sample_num);
+    stat_length<DATAT>(sample_data, stat_n, dim, mxl, mnl, avg_len);
+    rc.RecordSection("calculate " + std::to_string(stat_n) + " vectors from sample_data done");
     std::cout << "max len: " << mxl << ", min len: " << mnl << ", average len: " << avg_len << std::endl;
     kmeans<DATAT>(sample_num, sample_data, dim, K1, *centroids, false, avg_len);
     rc.RecordSection("kmeans done");
@@ -341,38 +343,12 @@ void build_graph(const std::string& index_path,
     rc.ElapseFromBegin("create index hnsw totally done");
 }
 
-
-/*
- * residual pq
-{
-    read bucket_centroids_file into bucket_centroids;
-    int bucket_cnt = 0;
-    prepare sample array;
-    for (i = 0; i < K1; i ++) {
-        read metai; => meta_size(bucket num in cluster i), meta_dim(1);
-        read raw_datai; => cluster_size, cluster_dim;
-        for (j = 0; j < meta_size; j ++) {
-            for (k = 0; k < meta[j]; j ++) {
-                read one vector;
-                diff with bucket_centroids[bucket_cnt];
-            }
-            bucket_cnt ++;
-        }
-    }
-
-    pq.train();
-
-    for (i = 0; i < K1; i ++) {
-    }
-}
-*/
-
 template<typename DATAT, typename DISTT, typename HEAPT>
-void train_quantizer(const std::string& raw_data_bin_file,
+void train_pq_quantizer(const std::string& raw_data_bin_file,
                      const std::string& output_path,
                      const int K1,
                      const int PQM, const int PQnbits) {
-    TimeRecorder rc("train quantizer");
+    TimeRecorder rc("train pq quantizer");
     std::cout << "train quantizer parameters:" << std::endl;
     std::cout << " raw_data_bin_file: " << raw_data_bin_file
               << " output_path: " << output_path
@@ -409,6 +385,91 @@ void train_quantizer(const std::string& raw_data_bin_file,
     delete[] pq_sample_data;
     delete[] precomputer_table;
     rc.ElapseFromBegin("train quantizer totally done.");
+}
+
+template<typename DATAT, typename DISTT, typename HEAPT>
+void train_pq_residual_quantizer(
+        const std::string& raw_data_bin_file,
+        const std::string& output_path,
+        const int K1,
+        const int PQM,
+        const int PQnbits,
+        MetricType metric_type) {
+    
+    TimeRecorder rc("train pq quantizer with residual");
+    std::cout << "train quantizer parameters:" << std::endl;
+    std::cout << " raw_data_bin_file: " << raw_data_bin_file
+              << " output_path: " << output_path
+              << " PQM: " << PQM
+              << " PQnbits: " << PQnbits
+              << std::endl;
+
+    uint32_t nb, dim;
+    get_bin_metadata(raw_data_bin_file, nb, dim);
+
+
+    std::vector<std::vector<uint32_t> > metas(K1);
+    load_meta_impl(output_path, metas, K1);
+    assert(metas.size() == K1);
+
+    int64_t pq_sample_num = std::min(
+                                static_cast<int64_t>(65536), 
+                                std::min(
+                                    static_cast<int64_t>(nb * PQ_SAMPLE_RATE),
+                                    static_cast<int64_t>(std::accumulate(metas[0].begin(), metas[0].end(), 0))));
+
+    DATAT* sample_data = new DATAT[pq_sample_num * dim];
+    assert(sample_data != nullptr);
+
+    float* sample_ivf_cen = new float[pq_sample_num * dim];
+    assert(sample_ivf_cen != nullptr);
+
+    // read ivf centroids
+    float *ivf_cen = nullptr;
+    uint32_t ivf_n, ivf_dim;
+    read_bin_file<float>(output_path + BUCKET + CENTROIDS + BIN, ivf_cen, ivf_n, ivf_dim);
+    assert(ivf_dim == dim);
+    assert(ivf_cen != nullptr);
+
+    reservoir_sampling_residual<DATAT>(output_path, metas, ivf_cen, dim, pq_sample_num, sample_data, sample_ivf_cen, K1);
+    rc.RecordSection("reservoir_sampling_residual for pq training set done");
+
+    PQResidualQuantizer<HEAPT, DATAT, uint8_t> quantizer(dim, PQM, PQnbits, metric_type);
+    quantizer.train(pq_sample_num, sample_data, sample_ivf_cen);
+    rc.RecordSection("pq residual quantizer train done");
+
+    delete[] sample_data;
+    delete[] sample_ivf_cen;
+
+    quantizer.save_centroids(output_path + PQ_CENTROIDS + BIN);
+    rc.RecordSection("pq residual quantizer save centroids done");
+
+    float* precompute_table = nullptr;
+    uint64_t bucket_cnt = 0;
+    for (int i = 0; i < K1; ++i) {
+        std::string data_file = output_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
+        std::string pq_codebook_file = output_path + CLUSTER + std::to_string(i) + PQ + CODEBOOK + BIN;
+        uint32_t cluster_size, cluster_dim;
+
+        IOReader data_reader(data_file);
+        data_reader.read((char*)&cluster_size, sizeof(uint32_t));
+        data_reader.read((char*)&cluster_dim, sizeof(uint32_t));
+
+        DATAT* datai = new DATAT[cluster_size * cluster_dim];
+        data_reader.read((char*)datai, cluster_size * cluster_dim * sizeof(DATAT));
+        quantizer.encode_vectors_and_save(precompute_table, cluster_size, datai,
+                                          ivf_cen + bucket_cnt * cluster_dim, metas[i],
+                                          pq_codebook_file);
+        bucket_cnt += metas[i].size();
+
+        delete[] datai;
+        rc.RecordSection("the " + std::to_string(i) + "th cluster encode and save codebook done.");
+    }
+
+    delete[] precompute_table;
+    delete[] ivf_cen;
+
+    rc.ElapseFromBegin("train pq residual quantizer totally done.");
 }
 
 // page alignment 4 raw data and uid in each cluster 4 better refine performance
@@ -514,7 +575,8 @@ void build_bigann(const std::string& raw_data_bin_file,
                   const int hnswM, const int hnswefC,
                   const int PQM, const int PQnbits,
                   const int K1, const int threshold,
-                  MetricType metric_type) {
+                  MetricType metric_type,
+                  QuantizerType quantizer_type) {
     TimeRecorder rc("build bigann");
     std::cout << "build bigann parameters:" << std::endl;
     std::cout << " raw_data_bin_file: " << raw_data_bin_file
@@ -545,7 +607,11 @@ void build_bigann(const std::string& raw_data_bin_file,
     build_graph(output_path, hnswM, hnswefC, metric_type);
     rc.RecordSection("build hnsw done.");
 
-    train_quantizer<DATAT, DISTT, HEAPT>(raw_data_bin_file, output_path, K1, PQM, PQnbits);
+    if (QuantizerType::PQ == quantizer_type) {
+        train_pq_quantizer<DATAT, DISTT, HEAPT>(raw_data_bin_file, output_path, K1, PQM, PQnbits);
+    } else if (QuantizerType::PQRES == quantizer_type) {
+        train_pq_residual_quantizer<DATAT, DISTT, HEAPT>(raw_data_bin_file, output_path, K1, PQM, PQnbits, metric_type);
+    }
     rc.RecordSection("train quantizer done.");
 
     page_align<DATAT>(raw_data_bin_file, output_path, K1);
@@ -584,16 +650,8 @@ void load_meta(const std::string& index_path,
               << " K1: " << K1 
               << std::endl;
 
-    for (int i = 0; i < K1; i ++) {
-        std::ifstream reader(index_path + CLUSTER + std::to_string(i) + META + BIN, std::ios::binary);
-        uint32_t nmeta, dmeta;
-        reader.read((char*)&nmeta, sizeof(uint32_t));
-        reader.read((char*)&dmeta, sizeof(uint32_t));
-        assert(1 == dmeta);
-        meta[i].resize(nmeta);
-        reader.read((char*)meta[i].data(), (uint64_t)nmeta * dmeta * sizeof(uint32_t));
-        reader.close();
-    }
+    load_meta_impl(index_path, meta, K1);
+
     rc.ElapseFromBegin("load meta done.");
 }
 
@@ -613,8 +671,8 @@ void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
               << " dq: " << dq
               << " nprobe: " << nprobe
               << " refine_nprobe: " << refine_nprobe
-              << " pquery: " << pquery
-              << " buckets_label: " << buckets_label
+              << " pquery: " << static_cast<const void *>(pquery)
+              << " buckets_label: " << static_cast<void *>(buckets_label)
               << std::endl;
     index_hnsw->setEf(refine_nprobe);
 #pragma omp parallel for
@@ -636,7 +694,7 @@ void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
 }
 
 template<typename DATAT, typename DISTT, typename HEAPTT>
-void search_quantizer(ProductQuantizer<HEAPTT, DATAT, uint8_t>& pq_quantizer,
+void search_pq_quantizer(ProductQuantizer<HEAPTT, DATAT, uint8_t>& pq_quantizer,
                       const uint32_t nq,
                       const uint32_t dq,
                       uint64_t* buckets_label,
@@ -658,9 +716,9 @@ void search_quantizer(ProductQuantizer<HEAPTT, DATAT, uint8_t>& pq_quantizer,
               << " nprobe: " << nprobe
               << " refine_topk: " << refine_topk
               << " K1: " << K1
-              << " pquery: " << pquery
-              << " pq_distance: " << pq_distance
-              << " pq_offsets: " << pq_offsets
+              << " pquery: " << static_cast<const void *>(pquery)
+              << " pq_distance: " << static_cast<void *>(pq_distance)
+              << " pq_offsets: " << static_cast<void *>(pq_offsets)
               << std::endl;
 
 
@@ -713,6 +771,103 @@ void search_quantizer(ProductQuantizer<HEAPTT, DATAT, uint8_t>& pq_quantizer,
     rc.ElapseFromBegin("search quantizer done.");
 }
 
+template<typename DATAT, typename DISTT, typename HEAPTT>
+void search_pq_residual_quantizer(
+        PQResidualQuantizer<HEAPTT, DATAT, uint8_t>& quantizer,
+        const uint32_t nq,
+        const uint32_t dq,
+        float* ivf_centroids,
+        uint64_t* buckets_label,
+        const int nprobe,
+        const int refine_topk,
+        const int K1,
+        const DATAT* pquery,
+        std::vector<std::vector<uint8_t>>& pq_codebook,
+        std::vector<std::vector<uint32_t>>& meta,
+        DISTT*& pq_distance,
+        uint64_t*& pq_offsets) {
+    TimeRecorder rc("search pq residual quantizer");
+    std::cout << "search quantizer parameters:" << std::endl;
+    std::cout << " quantizer:" << &quantizer
+              << " nq: " << nq
+              << " dq: " << dq
+              << " buckets_label: " << buckets_label
+              << " nprobe: " << nprobe
+              << " refine_topk: " << refine_topk
+              << " K1: " << K1
+              << " pquery: " << static_cast<const void *>(pquery)
+              << " pq_distance: " << static_cast<void *>(pq_distance)
+              << " pq_offsets: " << static_cast<void *>(pq_offsets)
+              << std::endl;
+
+
+
+    auto code_num = quantizer.getCodeNum();
+
+    rc.RecordSection("pq code num = " + std::to_string(code_num));
+
+    std::vector<uint32_t> pre(K1);
+    for (int i = 0; i < K1; ++i) {
+        pre[i] = (i == 0 ? 0 : pre[i-1] + meta[i-1].size());
+    }
+
+#pragma omp parallel
+    {
+        float* precompute_table = nullptr;
+#pragma omp for
+        for (auto i = 0; i < nq; i ++) {
+            quantizer.calc_precompute_table(precompute_table, pquery + i * dq);
+            auto p_labeli = buckets_label + i * nprobe;
+            auto pq_offseti = pq_offsets + i * refine_topk;
+            auto pq_distancei = pq_distance + i * refine_topk;
+            uint32_t cid, bid, off;
+            for (auto j = 0; j < nprobe; j ++) {
+                parse_id(p_labeli[j], cid, bid, off);
+                assert(cid < K1);
+                const float* cen = ivf_centroids + (pre[cid] + bid) * dq;
+
+                quantizer.search(
+                        precompute_table,
+                        pquery + i * dq,
+                        cen,
+                        pq_codebook[cid].data() + (uint64_t)off * code_num,
+                        meta[cid][bid],
+                        refine_topk,
+                        pq_distancei,
+                        pq_offseti,
+                        j + 1 == nprobe,
+                        j == 0,
+                        cid,
+                        off,
+                        i);
+            }
+        }
+        delete[] precompute_table;
+    }
+
+    /*
+#pragma omp parallel for
+    for (auto i = 0; i < nq; i ++) {
+        ProductQuantizer<HEAPTT, DATAT, uint8_t> pq_quantizer_copiesi(pq_quantizer);
+        pq_quantizer_copiesi.cal_precompute_table(pquery + i * dq, pq_cmp);
+        auto p_labeli = buckets_label + i * nprobe;
+        auto pq_offseti = pq_offsets + i * refine_topk;
+        auto pq_distancei = pq_distance + i * refine_topk;
+        uint32_t cid, bid, off;
+        for (auto j = 0; j < nprobe; j ++) {
+            parse_id(p_labeli[j], cid, bid, off);
+            assert(cid < K1);
+            pq_quantizer_copiesi.search(pquery + i * dq,
+                    pq_codebook[cid].data() + off * pqm, meta[cid][bid],
+                    refine_topk, pq_distancei, pq_offseti, pq_cmp,
+                    j + 1 == nprobe, j == 0, cid, off, i);
+        }
+        pq_quantizer_copiesi.reset();
+    }
+    */
+    rc.ElapseFromBegin("search quantizer done.");
+}
+
 template<typename DATAT, typename DISTT, typename HEAPT>
 void refine(const std::string& index_path,
             const int K1,
@@ -733,10 +888,10 @@ void refine(const std::string& index_path,
               << " dim of query: " << dq
               << " topk: " << topk
               << " refine_topk:" << refine_topk
-              << " pq_offsets:" << pq_offsets
-              << " pquery:" << pquery
-              << " answer_dists:" << answer_dists
-              << " answer_ids:" << answer_ids
+              << " pq_offsets:" << static_cast<void *>(pq_offsets)
+              << " pquery:" << static_cast<const void *>(pquery)
+              << " answer_dists:" << static_cast<void *>(answer_dists)
+              << " answer_ids:" << static_cast<void *>(answer_ids)
               << std::endl;
     std::vector<std::vector<std::pair<uint32_t, uint32_t>>> refine_records(K1);
     for (int64_t i = 0; i < nq; i ++) {
@@ -859,9 +1014,9 @@ void aligned_refine(const std::string& index_path,
               << " topk: " << topk
               << " refine_topk:" << refine_topk
               << " pq_offsets:" << pq_offsets
-              << " pquery:" << pquery
-              << " answer_dists:" << answer_dists
-              << " answer_ids:" << answer_ids
+              << " pquery:" << static_cast<const void *>(pquery)
+              << " answer_dists:" << static_cast<void *>(answer_dists)
+              << " answer_ids:" << static_cast<void *>(answer_ids)
               << std::endl;
     std::vector<std::vector<std::pair<uint32_t, uint32_t>>> refine_records(K1);
     for (int64_t i = 0; i < nq; i ++) {
@@ -1045,9 +1200,9 @@ void refine_c(const std::string& index_path,
               << " topk: " << topk
               << " refine_topk:" << refine_topk
               << " pq_offsets:" << pq_offsets
-              << " pquery:" << pquery
-              << " answer_dists:" << answer_dists
-              << " answer_ids:" << answer_ids
+              << " pquery:" << static_cast<const void *>(pquery)
+              << " answer_dists:" << static_cast<void *>(answer_dists)
+              << " answer_ids:" << static_cast<void *>(answer_ids)
               << std::endl;
     std::vector<std::vector<std::pair<uint32_t, uint32_t>>> refine_records(K1);
     for (int64_t i = 0; i < nq; i ++) {
@@ -1256,6 +1411,83 @@ void search_bigann(const std::string& index_path,
                    const int topk,
                    const int refine_topk,
                    std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   PQResidualQuantizer<HEAPTT, DATAT, uint8_t>& quantizer,
+                   const int K1,
+                   std::vector<std::vector<uint8_t>>& pq_codebook,
+                   std::vector<std::vector<uint32_t>>& meta,
+                   Computer<DATAT, DATAT, DISTT>& dis_computer) {
+    TimeRecorder rc("search bigann");
+
+    std::cout << "search bigann parameters:" << std::endl;
+    std::cout << " index_path: " << index_path
+              << " query_bin_file: " << query_bin_file
+              << " answer_bin_file: " << answer_bin_file
+              << " nprobe: " << nprobe
+              << " refine_nprobe: " << nprobe
+              << " topk: " << topk
+              << " refine topk: " << refine_topk
+              << " K1: " << K1
+              << std::endl;
+
+
+    DATAT* pquery = nullptr;
+    DISTT* answer_dists = nullptr;
+    uint32_t* answer_ids = nullptr;
+    DISTT* pq_distance = nullptr;
+    uint64_t* pq_offsets = nullptr;
+    uint64_t* p_labels = nullptr;
+
+    uint32_t nq, dq;
+
+    read_bin_file<DATAT>(query_bin_file, pquery, nq, dq);
+    rc.RecordSection("load query done.");
+
+    std::cout << "query numbers: " << nq << " query dims: " << dq << std::endl;
+
+    pq_distance = new DISTT[nq * refine_topk];
+    answer_dists = new DISTT[nq * topk];
+    answer_ids = new uint32_t[nq * topk];
+    pq_offsets = new uint64_t[nq * refine_topk];
+    p_labels = new uint64_t[nq * nprobe];
+
+    search_graph<DATAT>(index_hnsw, nq, dq, nprobe, refine_nprobe, pquery, p_labels);
+    rc.RecordSection("search buckets done.");
+
+    float* ivf_centroids = nullptr;
+    uint32_t c_n, c_dim;
+    read_bin_file<float>(index_path + BUCKET + CENTROIDS + BIN, ivf_centroids, c_n, c_dim);
+    search_pq_residual_quantizer<DATAT, DISTT, HEAPTT>(quantizer, nq, dq, ivf_centroids, p_labels, nprobe, 
+                     refine_topk, K1, pquery, pq_codebook, 
+                     meta, pq_distance, pq_offsets);
+    delete[] ivf_centroids;
+
+    rc.RecordSection("pq residual search done.");
+
+    // refine<DATAT, DISTT, HEAPT>(index_path, K1, nq, dq, topk, refine_topk, pq_offsets, pquery, answer_dists, answer_ids, dis_computer);
+    aligned_refine<DATAT, DISTT, HEAPT>(index_path, K1, nq, dq, topk, refine_topk, pq_offsets, pquery, answer_dists, answer_ids, dis_computer);  // refine with C++ std::ifstream
+    rc.RecordSection("refine done");
+    // write answers
+    save_answers<DISTT, HEAPT>(answer_bin_file, topk, nq, answer_dists, answer_ids);
+    rc.RecordSection("write answers done");
+
+    delete[] pquery;
+    delete[] p_labels;
+    delete[] pq_distance;
+    delete[] pq_offsets;
+    delete[] answer_ids;
+    delete[] answer_dists;
+    rc.ElapseFromBegin("search bigann totally done");
+}
+
+template<typename DATAT, typename DISTT, typename HEAPT, typename HEAPTT>
+void search_bigann(const std::string& index_path,
+                   const std::string& query_bin_file,
+                   const std::string& answer_bin_file,
+                   const int nprobe,
+                   const int refine_nprobe,
+                   const int topk,
+                   const int refine_topk,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
                    ProductQuantizer<HEAPTT, DATAT, uint8_t>& pq_quantizer,
                    const int K1,
                    PQ_Computer<DATAT>& pq_cmp,
@@ -1323,9 +1555,9 @@ void search_bigann(const std::string& index_path,
     }
     */
 
-    search_quantizer<DATAT, DISTT, HEAPTT>(pq_quantizer, nq, dq, p_labels, nprobe, 
-                     refine_topk, K1, pquery, pq_codebook, 
-                     meta, pq_distance, pq_offsets, pq_cmp);
+    search_pq_quantizer<DATAT, DISTT, HEAPTT>(pq_quantizer, nq, dq, p_labels, nprobe, 
+                         refine_topk, K1, pquery, pq_codebook, 
+                         meta, pq_distance, pq_offsets, pq_cmp);
     rc.RecordSection("pq search done.");
     /*
     {// for debug
@@ -1363,6 +1595,95 @@ void search_bigann(const std::string& index_path,
     rc.ElapseFromBegin("search bigann totally done");
 }
 
+template 
+void search_bigann<float, float, CMax<float, uint32_t>, CMax<float, uint64_t>>(const std::string& index_path,
+                   const std::string& query_bin_file,
+                   const std::string& answer_bin_file,
+                   const int nprobe,
+                   const int refine_nprobe,
+                   const int topk,
+                   const int refine_topk,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   PQResidualQuantizer<CMax<float, uint64_t>, float, uint8_t>& pq_quantizer,
+                   const int K1,
+                   std::vector<std::vector<uint8_t>>& pq_codebook,
+                   std::vector<std::vector<uint32_t>>& meta,
+                   Computer<float, float, float>& dis_computer);
+
+template 
+void search_bigann<float, float, CMin<float, uint32_t>, CMin<float, uint64_t>>(const std::string& index_path,
+                   const std::string& query_bin_file,
+                   const std::string& answer_bin_file,
+                   const int nprobe,
+                   const int refine_nprobe,
+                   const int topk,
+                   const int refine_topk,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   PQResidualQuantizer<CMin<float, uint64_t>, float, uint8_t>& pq_quantizer,
+                   const int K1,
+                   std::vector<std::vector<uint8_t>>& pq_codebook,
+                   std::vector<std::vector<uint32_t>>& meta,
+                   Computer<float, float, float>& dis_computer);
+
+template 
+void search_bigann<uint8_t, uint32_t, CMax<uint32_t, uint32_t>, CMax<uint32_t, uint64_t>>(const std::string& index_path,
+                   const std::string& query_bin_file,
+                   const std::string& answer_bin_file,
+                   const int nprobe,
+                   const int refine_nprobe,
+                   const int topk,
+                   const int refine_topk,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   PQResidualQuantizer<CMax<uint32_t, uint64_t>, uint8_t, uint8_t>& pq_quantizer,
+                   const int K1,
+                   std::vector<std::vector<uint8_t>>& pq_codebook,
+                   std::vector<std::vector<uint32_t>>& meta,
+                   Computer<uint8_t, uint8_t, uint32_t>& dis_computer);
+
+template 
+void search_bigann<uint8_t, uint32_t, CMin<uint32_t, uint32_t>, CMin<uint32_t, uint64_t>>(const std::string& index_path,
+                   const std::string& query_bin_file,
+                   const std::string& answer_bin_file,
+                   const int nprobe,
+                   const int refine_nprobe,
+                   const int topk,
+                   const int refine_topk,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   PQResidualQuantizer<CMin<uint32_t, uint64_t>, uint8_t, uint8_t>& pq_quantizer,
+                   const int K1,
+                   std::vector<std::vector<uint8_t>>& pq_codebook,
+                   std::vector<std::vector<uint32_t>>& meta,
+                   Computer<uint8_t, uint8_t, uint32_t>& dis_computer);
+
+template 
+void search_bigann<int8_t, int32_t, CMax<int32_t, uint32_t>, CMax<int32_t, uint64_t>>(const std::string& index_path,
+                   const std::string& query_bin_file,
+                   const std::string& answer_bin_file,
+                   const int nprobe,
+                   const int refine_nprobe,
+                   const int topk,
+                   const int refine_topk,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   PQResidualQuantizer<CMax<int32_t, uint64_t>, int8_t, uint8_t>& pq_quantizer,
+                   const int K1,
+                   std::vector<std::vector<uint8_t>>& pq_codebook,
+                   std::vector<std::vector<uint32_t>>& meta,
+                   Computer<int8_t, int8_t, int32_t>& dis_computer);
+
+template 
+void search_bigann<int8_t, int32_t, CMin<int32_t, uint32_t>, CMin<int32_t, uint64_t>>(const std::string& index_path,
+                   const std::string& query_bin_file,
+                   const std::string& answer_bin_file,
+                   const int nprobe,
+                   const int refine_nprobe,
+                   const int topk,
+                   const int refine_topk,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   PQResidualQuantizer<CMin<int32_t, uint64_t>, int8_t, uint8_t>& pq_quantizer,
+                   const int K1,
+                   std::vector<std::vector<uint8_t>>& pq_codebook,
+                   std::vector<std::vector<uint32_t>>& meta,
+                   Computer<int8_t, int8_t, int32_t>& dis_computer);
 
 template 
 void search_bigann<float, float, CMax<float, uint32_t>, CMax<float, uint64_t>>(const std::string& index_path,
@@ -1544,7 +1865,8 @@ void build_bigann<float, float, CMax<float, uint32_t>>
                   const int hnswM, const int hnswefC,
                   const int PQM, const int PQnbits,
                   const int K1, const int threshold,
-                  MetricType metric_type);
+                  MetricType metric_type,
+                  QuantizerType quantizer_type);
 
 template
 void build_bigann<float, float, CMin<float, uint32_t>>
@@ -1553,7 +1875,8 @@ void build_bigann<float, float, CMin<float, uint32_t>>
                   const int hnswM, const int hnswefC,
                   const int PQM, const int PQnbits,
                   const int K1, const int threshold,
-                  MetricType metric_type);
+                  MetricType metric_type,
+                  QuantizerType quantizer_type);
 
 template
 void build_bigann<uint8_t, uint32_t, CMax<uint32_t, uint32_t>>
@@ -1562,7 +1885,8 @@ void build_bigann<uint8_t, uint32_t, CMax<uint32_t, uint32_t>>
                   const int hnswM, const int hnswefC,
                   const int PQM, const int PQnbits,
                   const int K1, const int threshold,
-                  MetricType metric_type);
+                  MetricType metric_type,
+                  QuantizerType quantizer_type);
 
 template
 void build_bigann<uint8_t, uint32_t, CMin<uint32_t, uint32_t>>
@@ -1571,7 +1895,8 @@ void build_bigann<uint8_t, uint32_t, CMin<uint32_t, uint32_t>>
                   const int hnswM, const int hnswefC,
                   const int PQM, const int PQnbits,
                   const int K1, const int threshold,
-                  MetricType metric_type);
+                  MetricType metric_type,
+                  QuantizerType quantizer_type);
 
 template
 void build_bigann<int8_t, int32_t, CMax<int32_t, uint32_t>>
@@ -1580,7 +1905,8 @@ void build_bigann<int8_t, int32_t, CMax<int32_t, uint32_t>>
                   const int hnswM, const int hnswefC,
                   const int PQM, const int PQnbits,
                   const int K1, const int threshold,
-                  MetricType metric_type);
+                  MetricType metric_type,
+                  QuantizerType quantizer_type);
 
 template
 void build_bigann<int8_t, int32_t, CMin<int32_t, uint32_t>>
@@ -1589,7 +1915,8 @@ void build_bigann<int8_t, int32_t, CMin<int32_t, uint32_t>>
                   const int hnswM, const int hnswefC,
                   const int PQM, const int PQnbits,
                   const int K1, const int threshold,
-                  MetricType metric_type);
+                  MetricType metric_type,
+                  QuantizerType quantizer_type);
 
 
 template

@@ -17,3 +17,8 @@ enum class DataType {
     FLOAT = 2,
 };
 
+enum class QuantizerType {
+    None = 0,
+    PQ = 1,
+    PQRES = 2,
+};

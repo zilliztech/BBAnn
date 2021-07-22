@@ -5,6 +5,8 @@
 #include <vector>
 #include <mutex>
 #include <algorithm>
+#include <string>
+
 #include "util/defines.h"
 #include "util/constants.h"
 #include "util/utils.h"
@@ -12,7 +14,7 @@
 #include "util/heap.h"
 #include "hnswlib/hnswlib.h"
 #include "pq/pq.h"
-#include <string>
+#include "pq/pq_residual.h"
 #include "flat/flat.h"
 #include "ivf/clustering.h"
 #include "util/TimeRecorder.h"
@@ -84,10 +86,18 @@ void build_graph(const std::string& index_path,
 
 
 template<typename DATAT, typename DISTT, typename HEAPT>
-void train_quantizer(const std::string& raw_data_bin_file,
+void train_pq_quantizer(const std::string& raw_data_bin_file,
                      const std::string& output_path,
                      const int K1,
                      const int PQM, const int PQnbits);
+
+template<typename DATAT, typename DISTT, typename HEAPT>
+void train_pq_residual_quantizer(
+        const std::string& raw_data_bin_file,
+        const std::string& output_path,
+        const int K1,
+        const int PQM, const int PQnbits,
+        MetricType metric_type);
 
 template<typename DATAT, typename DISTT, typename HEAPT>
 void build_bigann(const std::string& raw_data_bin_file,
@@ -95,7 +105,8 @@ void build_bigann(const std::string& raw_data_bin_file,
                   const int hnswM, const int hnswefC,
                   const int PQM, const int PQnbits,
                   const int K1, const int threshold,
-                  MetricType metric_type);
+                  MetricType metric_type,
+                  QuantizerType quantizer_type);
 
 void load_pq_codebook(const std::string& index_path,
                       std::vector<std::vector<uint8_t>>& pq_codebook, 
@@ -115,9 +126,10 @@ void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
                   uint64_t* buckets_label);
 
 template<typename DATAT, typename DISTT, typename HEAPTT>
-void search_quantizer(ProductQuantizer<HEAPTT, DATAT, uint8_t>& pq_quantizer,
+void search_pq_quantizer(ProductQuantizer<HEAPTT, DATAT, uint8_t>& pq_quantizer,
                       const uint32_t nq,
                       const uint32_t dq,
+                      float* ivf_centroids,
                       uint64_t* buckets_label,
                       const int nprobe,
                       const int refine_topk,
@@ -162,6 +174,21 @@ void save_answers(const std::string& answer_bin_file,
                   DISTT*& answer_dists,
                   uint32_t*& answer_ids,
                   bool use_comp_format = true);
+
+template<typename DATAT, typename DISTT, typename HEAPT, typename HEAPTT>
+void search_bigann(const std::string& index_path,
+                   const std::string& query_bin_file,
+                   const std::string& answer_bin_file,
+                   const int nprobe,
+                   const int refine_nprobe,
+                   const int topk,
+                   const int refine_topk,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   PQResidualQuantizer<HEAPTT, DATAT, uint8_t>& pq_quantizer,
+                   const int K1,
+                   std::vector<std::vector<uint8_t>>& pq_codebook,
+                   std::vector<std::vector<uint32_t>>& meta,
+                   Computer<DATAT, DATAT, DISTT>& dis_computer);
 
 template<typename DATAT, typename DISTT, typename HEAPT, typename HEAPTT>
 void search_bigann(const std::string& index_path,

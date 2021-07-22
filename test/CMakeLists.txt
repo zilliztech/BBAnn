@@ -3,6 +3,9 @@ add_executable(test_statistics test_statistics.cpp)
 add_executable(test_pq test_pq.cpp)
 target_link_libraries(test_pq BigAnn)
 
+add_executable(test_rpq test_pq_residual.cpp)
+target_link_libraries(test_rpq BigAnn)
+
 #add_executable(test_diskann1 test_diskann1.cpp)
 #target_link_libraries(test_diskann1 BigAnn)
 
