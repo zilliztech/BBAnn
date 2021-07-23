@@ -1522,12 +1522,6 @@ void search_bigann(const std::string& index_path,
 
     read_bin_file<DATAT>(query_bin_file, pquery, nq, dq);
     rc.RecordSection("load query done.");
-    // for debug
-    // nq = 1;
-    // int topk = 10;
-    // int refine_topk = 20;
-    // int nprobe = 5;
-    // int refine_nprobe = 10;
 
     std::cout << "query numbers: " << nq << " query dims: " << dq << std::endl;
 
@@ -1537,49 +1531,53 @@ void search_bigann(const std::string& index_path,
     pq_offsets = new uint64_t[nq * refine_topk];
     p_labels = new uint64_t[nq * nprobe];
 
-    search_graph<DATAT>(index_hnsw, nq, dq, nprobe, refine_nprobe, pquery, p_labels);
-    rc.RecordSection("search buckets done.");
-    /*
-    {// for debug
-        std::cout << "show details after search_graph:" << std::endl;
-        for (auto i = 0; i < nq; i ++) {
-            auto p_labeli = p_labels + i * nprobe;
-            uint32_t cid, bid, off;
-            std::cout << "cluster info of the " << i << "th query:";
-            for (auto j = 0; j < nprobe; j ++) {
-                parse_id(p_labeli[j], cid, bid, off);
-                assert(cid < K1);
-                std::cout << "(" << cid << ", " << bid << ", " << off << ") ";
-            }
-            std::cout << std::endl;
-        }
 
+    {
+        float* pdata = nullptr;
+        uint64_t* pids = nullptr;
+        float* p_flat_dists = new float[nq * nprobe];
+        int* p_flat_offset = new int[nq * nprobe];
+        uint32_t npts, ndim, nids, nidsdim;
+
+        read_bin_file<float>(index_path + BUCKET + CENTROIDS + BIN, pdata, npts, ndim);
+        rc.RecordSection("load centroids of buckets done");
+        std::cout << "there are " << npts << " of dimension " << ndim << " points of hnsw" << std::endl;
+        assert(pdata != nullptr);
+        read_bin_file<uint64_t>(index_path + CLUSTER + COMBINE_IDS + BIN, pids, nids, nidsdim);
+        rc.RecordSection("load combine ids of buckets done");
+        std::cout << "there are " << nids << " of dimension " << nidsdim << " combine ids of hnsw" << std::endl;
+        assert(pids != nullptr);
+        assert(npts == nids);
+        assert(nidsdim == 1);
+
+        // hard code to test temporayly
+        knn_2<CMax<float, int>, DATAT, float>(pquery, pdata, nq, npts, ndim, nprobe, 
+                p_flat_dists, p_flat_offset, L2sqr<float, float, float>);
+        rc.RecordSection("knn_2 done");
+
+#pragma omp parallel for schedule(static)
+        for (auto i = 0; i < nq; i ++) {
+            auto pli = p_labels + i * nprobe;
+            auto pfoi = p_flat_offset + i * nprobe;
+            for (auto j = 0; j < nprobe; j ++)
+                pli = pids[pfoi[j]];
+        }
+        rc.RecordSection("get buckets combine ids done");
+
+        delete[] pdata;
+        delete[] pids;
+        delete[] p_flat_offset;
+        delete[] p_flat_dists;
     }
-    */
+
+
+    // search_graph<DATAT>(index_hnsw, nq, dq, nprobe, refine_nprobe, pquery, p_labels);
+    rc.RecordSection("search buckets done.");
 
     search_pq_quantizer<DATAT, DISTT, HEAPTT>(pq_quantizer, nq, dq, p_labels, nprobe, 
                          refine_topk, K1, pquery, pq_codebook, 
                          meta, pq_distance, pq_offsets);
     rc.RecordSection("pq search done.");
-    /*
-    {// for debug
-        std::cout << "show details after search quantizer:" << std::endl;
-        for (auto i = 0; i < nq; i ++) {
-            auto pq_offseti = pq_offsets + i * refine_topk;
-            auto pq_distancei = pq_distance + i * refine_topk;
-            std::cout << "refine info of the " << i << "th query:";
-            for (auto j = 0; j < refine_topk; j ++) {
-                if (pq_offseti[j] == (uint64_t)(-1))
-                    continue;
-                uint32_t cid, off, qid;
-                parse_refine_id(pq_offseti[j], cid, off, qid);
-                std::cout << "(" << cid << ", " << off << ", " << qid << ", pqdis: " << pq_distancei[j] << ") " << std::endl;
-            }
-            std::cout << std::endl;
-        }
-    }
-    */
-
 
     aligned_refine<DATAT, DISTT, HEAPT>(index_path, K1, nq, dq, topk, refine_topk, pq_offsets, pquery, answer_dists, answer_ids, dis_computer);  // refine with C++ std::ifstream
 //    refine_c<DATAT, DISTT, HEAPT>(index_path, K1, nq, dq, topk, refine_topk, pq_offsets, pquery, answer_dists, answer_ids, dis_computer);  // refine_c with C open(), pread(), close()
