@@ -353,6 +353,14 @@ void recall(const std::string& groundtruth_file, const std::string& answer_file,
 
     // print_vec_id_dis<DISTT, IDT>(resultset, "show resultset:");
 
+    int max_recall, min_recall;
+    // recall statistics
+    std::vector<int> border = {0, 10, 20, 30, 40, 50, 60, 70, 80, 85, 90, 95, 100};
+    int recall0 = 0;
+    int recall100 = 0;
+    std::vector<int> recall_hist(border.size(), 0);
+    std::vector<int> recalls(gt_nq);
+
     int tot_cnt = 0;
     std::cout << "recall@" << gt_topk << " between groundtruth file:"
               << groundtruth_file << " and answer file:"
@@ -368,6 +376,7 @@ void recall(const std::string& groundtruth_file, const std::string& answer_file,
                 if (hash.find(resultset[i][j].first) != hash.end())
                     cnti ++;
             }
+            recalls[i] = cnti;
             tot_cnt += cnti;
         }
         std::cout << "avg recall@" << gt_topk << " = " << ((double)(tot_cnt)) / gt_topk / gt_nq * 100 << "%." << std::endl;
@@ -379,6 +388,7 @@ void recall(const std::string& groundtruth_file, const std::string& answer_file,
                     if (resultset[i][j].second <= groundtruth[i][gt_topk - 1].second)
                         cnti ++;
                 }
+                recalls[i] = cnti;
                 tot_cnt += cnti;
                 // std::cout << "query " << i << " recall@" << gt_topk << " is: " << ((double)(cnti)) / gt_topk * 100 << "%." << std::endl;
             }
@@ -390,6 +400,7 @@ void recall(const std::string& groundtruth_file, const std::string& answer_file,
                     if (resultset[i][j].second >= groundtruth[i][gt_topk - 1].second)
                         cnti ++;
                 }
+                recalls[i] = cnti;
                 tot_cnt += cnti;
                 // std::cout << "query " << i << " recall@" << gt_topk << " is: " << ((double)(cnti)) / gt_topk * 100 << "%." << std::endl;
             }
@@ -398,4 +409,30 @@ void recall(const std::string& groundtruth_file, const std::string& answer_file,
             std::cout << "invalid metric type: " << (int)metric_type << std::endl;
         }
     }
+
+    for (auto i = 0; i < gt_nq; i ++) {
+        if (recalls[i] == 0) {
+            recall0 ++;
+            continue;
+        }
+        if (recalls[i] == 100 * gt_topk) {
+            recall100 ++;
+            continue;
+        }
+        for (auto j = 0; j < border.size() - 1; j ++) {
+            if (recalls[i] >= border[j] * gt_topk && recalls[i] < border[j + 1] * gt_topk) {
+                recall_hist[j] ++;
+                break;
+            }
+        }
+    }
+    int check_sum = recall0 + recall100;
+    std::cout << "show more details about recall histogram:" << std::endl;
+    std::cout << "recall@" << gt_topk << " in range [0, 0]: " << recall0 << std::endl;
+    for (auto i = 0; i < border.size() - 1; i ++) {
+        std::cout << "recall@" << gt_topk << " in range [" << border[i] << ", " <<  border[i + 1] << "): " << recall_hist[i] << std::endl;
+        check_sum += recall_hist[i];
+    }
+    std::cout << "recall@" << gt_topk << " in range [100, 100]: " << recall100 << std::endl;
+    std::cout << "check sum recall: " << check_sum << ", which should equal nq: " << gt_nq << std::endl;
 }
