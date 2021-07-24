@@ -680,7 +680,7 @@ void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
               << std::endl;
     index_hnsw->setEf(refine_nprobe);
 #pragma omp parallel for
-    for (int i = 0; i < nq; i ++) {
+    for (int64_t i = 0; i < nq; i ++) {
         // auto queryi = pquery + i * dq;
         // todo: hnsw need to support query data is not float
         float* queryi = new float[dq];
@@ -818,7 +818,7 @@ void search_pq_residual_quantizer(
     {
         float* precompute_table = nullptr;
 #pragma omp for
-        for (auto i = 0; i < nq; i ++) {
+        for (int64_t i = 0; i < nq; i ++) {
             quantizer.calc_precompute_table(precompute_table, pquery + i * dq);
             auto p_labeli = buckets_label + i * nprobe;
             auto pq_offseti = pq_offsets + i * refine_topk;
@@ -1447,11 +1447,11 @@ void search_bigann(const std::string& index_path,
 
     std::cout << "query numbers: " << nq << " query dims: " << dq << std::endl;
 
-    pq_distance = new DISTT[nq * refine_topk];
-    answer_dists = new DISTT[nq * topk];
-    answer_ids = new uint32_t[nq * topk];
-    pq_offsets = new uint64_t[nq * refine_topk];
-    p_labels = new uint64_t[nq * nprobe];
+    pq_distance = new DISTT[(int64_t)nq * refine_topk];
+    answer_dists = new DISTT[(int64_t)nq * topk];
+    answer_ids = new uint32_t[(int64_t)nq * topk];
+    pq_offsets = new uint64_t[(int64_t)nq * refine_topk];
+    p_labels = new uint64_t[(int64_t)nq * nprobe];
 
     search_graph<DATAT>(index_hnsw, nq, dq, nprobe, refine_nprobe, pquery, p_labels);
     rc.RecordSection("search buckets done.");
@@ -1531,11 +1531,11 @@ void search_bigann(const std::string& index_path,
 
     std::cout << "query numbers: " << nq << " query dims: " << dq << std::endl;
 
-    pq_distance = new DISTT[nq * refine_topk];
-    answer_dists = new DISTT[nq * topk];
-    answer_ids = new uint32_t[nq * topk];
-    pq_offsets = new uint64_t[nq * refine_topk];
-    p_labels = new uint64_t[nq * nprobe];
+    pq_distance = new DISTT[(int64_t)nq * refine_topk];
+    answer_dists = new DISTT[(int64_t)nq * topk];
+    answer_ids = new uint32_t[(int64_t)nq * topk];
+    pq_offsets = new uint64_t[(int64_t)nq * refine_topk];
+    p_labels = new uint64_t[(int64_t)nq * nprobe];
 
     search_graph<DATAT>(index_hnsw, nq, dq, nprobe, refine_nprobe, pquery, p_labels);
     rc.RecordSection("search buckets done.");
