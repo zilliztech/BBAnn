@@ -415,12 +415,12 @@ void recall(const std::string& groundtruth_file, const std::string& answer_file,
             recall0 ++;
             continue;
         }
-        if (recalls[i] == 100 * gt_topk) {
+        if (recalls[i] == gt_topk) {
             recall100 ++;
             continue;
         }
         for (auto j = 0; j < border.size() - 1; j ++) {
-            if (recalls[i] >= border[j] * gt_topk && recalls[i] < border[j + 1] * gt_topk) {
+            if (recalls[i] * 100 >= border[j] * gt_topk && recalls[i] * 100 < border[j + 1] * gt_topk) {
                 recall_hist[j] ++;
                 break;
             }
