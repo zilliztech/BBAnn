@@ -345,7 +345,7 @@ void recall(const std::string& groundtruth_file, const std::string& answer_file,
         read_sift<DISTT, IDT>(resultset, answer_file, answer_nq, answer_topk);
     }
 
-    if (gt_nq != answer_nq || gt_topk != answer_topk) {
+    if (gt_nq != answer_nq || gt_topk < answer_topk) { // || gt_topk != answer_topk) {
         std::cerr << "Grountdtruth parammeters does not match. GT nq " << gt_nq
         << "(" << answer_nq << "), topk " << gt_topk << "(" << answer_topk << ")" << std::endl;
         return ;
@@ -359,17 +359,17 @@ void recall(const std::string& groundtruth_file, const std::string& answer_file,
     int recall0 = 0;
     int recall100 = 0;
     std::vector<int> recall_hist(border.size(), 0);
-    std::vector<int> recalls(gt_nq);
+    std::vector<int> recalls(answer_nq);
 
     int tot_cnt = 0;
-    std::cout << "recall@" << gt_topk << " between groundtruth file:"
+    std::cout << "recall@" << answer_topk << " between groundtruth file:"
               << groundtruth_file << " and answer file:"
               << answer_file << " is:" << std::endl;
     if (cmp_id) {
-        for (auto i = 0; i < gt_nq; i ++) {
+        for (auto i = 0; i < answer_nq; i ++) {
             std::unordered_map<IDT, bool> hash;
             int cnti = 0;
-            for (auto j = 0; j < gt_topk; j ++) {
+            for (auto j = 0; j < answer_topk; j ++) {
                 hash[groundtruth[i][j].first] = true;
             }
             for (auto j = 0; j < answer_topk; j ++) {
@@ -379,48 +379,48 @@ void recall(const std::string& groundtruth_file, const std::string& answer_file,
             recalls[i] = cnti;
             tot_cnt += cnti;
         }
-        std::cout << "avg recall@" << gt_topk << " = " << ((double)(tot_cnt)) / gt_topk / gt_nq * 100 << "%." << std::endl;
+        std::cout << "avg recall@" << answer_topk << " = " << ((double)(tot_cnt)) / answer_topk / answer_nq * 100 << "%." << std::endl;
     } else {
         if (MetricType::L2 == metric_type) {
-            for (auto i = 0; i < gt_nq; i ++) {
+            for (auto i = 0; i < answer_nq; i ++) {
                 int cnti = 0;
-                for (auto j = 0; j < gt_topk; j ++) {
-                    if (resultset[i][j].second <= groundtruth[i][gt_topk - 1].second)
+                for (auto j = 0; j < answer_topk; j ++) {
+                    if (resultset[i][j].second <= groundtruth[i][answer_topk - 1].second)
                         cnti ++;
                 }
                 recalls[i] = cnti;
                 tot_cnt += cnti;
-                // std::cout << "query " << i << " recall@" << gt_topk << " is: " << ((double)(cnti)) / gt_topk * 100 << "%." << std::endl;
+                // std::cout << "query " << i << " recall@" << answer_topk << " is: " << ((double)(cnti)) / answer_topk * 100 << "%." << std::endl;
             }
-            std::cout << "avg recall@" << gt_topk << " = " << ((double)(tot_cnt)) / gt_topk / gt_nq * 100 << "%." << std::endl;
+            std::cout << "avg recall@" << answer_topk << " = " << ((double)(tot_cnt)) / answer_topk / answer_nq * 100 << "%." << std::endl;
         } else if (MetricType::IP == metric_type) {
-            for (auto i = 0; i < gt_nq; i ++) {
+            for (auto i = 0; i < answer_nq; i ++) {
                 int cnti = 0;
-                for (auto j = 0; j < gt_topk; j ++) {
-                    if (resultset[i][j].second >= groundtruth[i][gt_topk - 1].second)
+                for (auto j = 0; j < answer_topk; j ++) {
+                    if (resultset[i][j].second >= groundtruth[i][answer_topk - 1].second)
                         cnti ++;
                 }
                 recalls[i] = cnti;
                 tot_cnt += cnti;
-                // std::cout << "query " << i << " recall@" << gt_topk << " is: " << ((double)(cnti)) / gt_topk * 100 << "%." << std::endl;
+                // std::cout << "query " << i << " recall@" << answer_topk << " is: " << ((double)(cnti)) / answer_topk * 100 << "%." << std::endl;
             }
-            std::cout << "avg recall@" << gt_topk << " = " << ((double)(tot_cnt)) / gt_topk / gt_nq * 100 << "%." << std::endl;
+            std::cout << "avg recall@" << answer_topk << " = " << ((double)(tot_cnt)) / answer_topk / answer_nq * 100 << "%." << std::endl;
         } else {
             std::cout << "invalid metric type: " << (int)metric_type << std::endl;
         }
     }
 
-    for (auto i = 0; i < gt_nq; i ++) {
+    for (auto i = 0; i < answer_nq; i ++) {
         if (recalls[i] == 0) {
             recall0 ++;
             continue;
         }
-        if (recalls[i] == gt_topk) {
+        if (recalls[i] == answer_topk) {
             recall100 ++;
             continue;
         }
         for (auto j = 0; j < border.size() - 1; j ++) {
-            if (recalls[i] * 100 >= border[j] * gt_topk && recalls[i] * 100 < border[j + 1] * gt_topk) {
+            if (recalls[i] * 100 >= border[j] * answer_topk && recalls[i] * 100 < border[j + 1] * answer_topk) {
                 recall_hist[j] ++;
                 break;
             }
@@ -428,11 +428,11 @@ void recall(const std::string& groundtruth_file, const std::string& answer_file,
     }
     int check_sum = recall0 + recall100;
     std::cout << "show more details about recall histogram:" << std::endl;
-    std::cout << "recall@" << gt_topk << " in range [0, 0]: " << recall0 << std::endl;
+    std::cout << "recall@" << answer_topk << " in range [0, 0]: " << recall0 << std::endl;
     for (auto i = 0; i < border.size() - 1; i ++) {
-        std::cout << "recall@" << gt_topk << " in range [" << border[i] << ", " <<  border[i + 1] << "): " << recall_hist[i] << std::endl;
+        std::cout << "recall@" << answer_topk << " in range [" << border[i] << ", " <<  border[i + 1] << "): " << recall_hist[i] << std::endl;
         check_sum += recall_hist[i];
     }
-    std::cout << "recall@" << gt_topk << " in range [100, 100]: " << recall100 << std::endl;
-    std::cout << "check sum recall: " << check_sum << ", which should equal nq: " << gt_nq << std::endl;
+    std::cout << "recall@" << answer_topk << " in range [100, 100]: " << recall100 << std::endl;
+    std::cout << "check sum recall: " << check_sum << ", which should equal nq: " << answer_nq << std::endl;
 }
