@@ -18,8 +18,8 @@ with open(sys.argv[1]) as f:
         if len(line) == 0:
             continue
 
-        for i in range(5, 20):
-            if i == 10:
+        for i in range(-16, -1):
+            if i == -11:
                 continue
             if not i in rst:
                 rst[i] = line
