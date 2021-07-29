@@ -20,11 +20,13 @@ do
     pkill -f "search_bigann"
 
     DATE_WITH_TIME=`date "+%Y%m%d-%H%M%S"`
-	time ./search_bigann float /home/zilliz/bigann/test/ /mnt/Billion-Scale/Yandex-Text-to-Image/query.public.100K.fbin /home/zilliz/bigann/test/answers/YTI_32_500_50_8_IP_128_500_normalize_${npb}_${rt}_top10_small_rt.answer /mnt/Billion-Scale/Yandex-Text-to-Image/text2image-1B-gt ${npb} ${rnpb} 10 ${rt} 50 8 128 IP PQRes > /home/zilliz/bigann/test/logs/small-rt/search-${npb}-${rnpb}-10-${rt}_${DATE_WITH_TIME}.log &
+    F=search-${npb}-${rnpb}-10-${rt}_${DATE_WITH_TIME}
+	time ./search_bigann float /home/zilliz/bigann/test/ /mnt/Billion-Scale/Yandex-Text-to-Image/query.public.100K.fbin /home/zilliz/bigann/test/answers/YTI_32_500_50_8_IP_128_500_normalize_${npb}_${rt}_top10_small_rt.answer /mnt/Billion-Scale/Yandex-Text-to-Image/text2image-1B-gt ${npb} ${rnpb} 10 ${rt} 50 8 128 IP PQRes > /home/zilliz/bigann/test/logs/small-rt/${F}.log &
 
     pid=$!
-    pidstat -rud -h -t -p $pid 1 > search-${npb}-${rnpb}-10-${rt}_${DATE_WITH_TIME}.stat
+    pidstat -rud -h -t -p $pid 1 > ${F}.stat
     wait $pid
+    python3 analyze_stat.py ${F}.stat > ${F}.max.stat
 
     echo "--------------------------------------------------------"
     done
