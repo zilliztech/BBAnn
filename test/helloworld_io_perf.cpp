@@ -66,12 +66,6 @@ int IO_function() {
 }
 // ----------------------------------------------------------------------------------------------------
 int main() {
-    {
-#if IOPERF
-        Syscr_Counter s;
-#endif
-        auto result = IO_function();
-    }
     std::cout << "------------------------------------------------" << std::endl;
     {
 #if IOPERF
