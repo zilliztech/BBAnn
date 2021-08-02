@@ -75,6 +75,13 @@ int main() {
     std::cout << "------------------------------------------------" << std::endl;
     {
 #if IOPERF
+        PID_IO_Counter s;
+#endif
+        auto result = IO_function();
+    }
+    std::cout << "------------------------------------------------" << std::endl;
+    {
+#if IOPERF
         DiskStat_Read_Counter s;
 #endif
         auto result = IO_function();

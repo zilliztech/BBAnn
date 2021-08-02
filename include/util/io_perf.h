@@ -6,34 +6,93 @@
 #include <fstream>
 #include <array>
 // ----------------------------------------------------------------------------------------------------
-class Syscr_Counter {
+/**
+ * A class parsing a line of file /proc/$PID/io
+ * Might need a super user permission to access: /proc/$PID/io
+ */
+class PID_IO {
  private:
-    uint64_t pre_iamge = 0;
+    pid_t pid;
+    /// rchar + wchar := might in page cache
+    size_t rchar;
+    size_t wchar;
 
-    /**
-     * Need a super user permission to access: /proc/$PID/io
-     * @return the number of read syscalls as an I/O counter.
-     */
-    uint64_t read_pid_syscr() {
-        const pid_t pid = getpid();
+    /// syscr + syscw := real IO
+    size_t syscr;
+    size_t syscw;
+
+    size_t read_bytes;
+    size_t write_bytes;
+    size_t cancelled_write_bytes;
+
+
+ public:
+    PID_IO() {
+        pid = getpid();
         const auto pid_str = std::to_string(pid);
         const auto filename = "/proc/" + pid_str + "/io";
         std::ifstream file(filename);
         assert(!file.bad());
         std::string line;
         while (std::getline(file, line)) {
-            if (line.substr(0, 7) == "syscr: ") {
+            if (line.substr(0, 7) == "rchar: ") {
                 const auto number_str = line.substr(7);
-                return std::stoull(number_str);
+                rchar = std::stoull(number_str);
+            } else if (line.substr(0, 7) == "wchar: ") {
+                const auto number_str = line.substr(7);
+                wchar = std::stoull(number_str);
+            } else if (line.substr(0, 7) == "syscr: ") {
+                const auto number_str = line.substr(7);
+                syscr = std::stoull(number_str);
+            } else if (line.substr(0, 7) == "syscw: ") {
+                const auto number_str = line.substr(7);
+                syscw = std::stoull(number_str);
+            } else if (line.substr(0, 12) == "read_bytes: ") {
+                const auto number_str = line.substr(12);
+                read_bytes = std::stoull(number_str);
+            } else if (line.substr(0, 13) == "write_bytes: ") {
+                const auto number_str = line.substr(13);
+                write_bytes = std::stoull(number_str);
+            } else if (line.substr(0, 23) == "cancelled_write_bytes: ") {
+                const auto number_str = line.substr(23);
+                cancelled_write_bytes = std::stoull(number_str);
             }
         }
-        __builtin_unreachable();
     }
 
- public:
-    Syscr_Counter() : pre_iamge(read_pid_syscr()) {}
-    ~Syscr_Counter() {
-        std::cout << "# read syscall: " << read_pid_syscr() - pre_iamge << std::endl;
+    pid_t getPid() const { return pid; }
+
+    size_t getRchar() const { return rchar; }
+
+    size_t getWchar() const { return wchar; }
+
+    size_t getSyscr() const { return syscr; }
+
+    size_t getSyscw() const { return syscw; }
+
+    size_t getReadBytes() const { return read_bytes; }
+
+    size_t getWriteBytes() const { return write_bytes; }
+
+    size_t getCancelledWriteBytes() const { return cancelled_write_bytes; }
+};
+// ----------------------------------------------------------------------------------------------------
+class PID_IO_Counter {
+private:
+    PID_IO pre_iamge;
+
+public:
+    PID_IO_Counter() : pre_iamge(PID_IO()) {}
+
+    ~PID_IO_Counter() {
+        const PID_IO post_iamge = PID_IO();
+        std::cout << "# rchar: " << post_iamge.getRchar() - pre_iamge.getRchar() << std::endl;
+        std::cout << "# wchar: " << post_iamge.getWchar() - pre_iamge.getWchar() << std::endl;
+        std::cout << "# syscr: " << post_iamge.getSyscr() - pre_iamge.getSyscr() << std::endl;
+        std::cout << "# syscw: " << post_iamge.getSyscw() - pre_iamge.getSyscw() << std::endl;
+        std::cout << "# read_bytes: " << post_iamge.getReadBytes() - pre_iamge.getReadBytes() << std::endl;
+        std::cout << "# write_bytes: " << post_iamge.getWriteBytes() - pre_iamge.getWriteBytes() << std::endl;
+        std::cout << "# cancelled_write_bytes: " << post_iamge.getCancelledWriteBytes() - pre_iamge.getCancelledWriteBytes() << std::endl;
     }
 };
 // ----------------------------------------------------------------------------------------------------
