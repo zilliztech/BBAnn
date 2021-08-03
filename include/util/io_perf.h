@@ -188,10 +188,13 @@ class DiskStat {
 // ----------------------------------------------------------------------------------------------------
 class DiskStat_Read_Counter {
  private:
+    std::string device_name;
     DiskStat pre_iamge;
 
  public:
     DiskStat_Read_Counter() : pre_iamge(DiskStat::read_IO_DiskStat()) {}
+
+    DiskStat_Read_Counter(std::string device_name) : device_name(device_name), pre_iamge(DiskStat::read_IO_DiskStat(device_name)) {}
 
     ~DiskStat_Read_Counter() {
         DiskStat post_iamge = DiskStat::read_IO_DiskStat();
