@@ -14,16 +14,16 @@ class PID_IO {
  private:
     pid_t pid;
     /// rchar + wchar := might in page cache
-    size_t rchar;
-    size_t wchar;
+    uint64_t rchar;
+    uint64_t wchar;
 
     /// syscr + syscw := real IO
-    size_t syscr;
-    size_t syscw;
+    uint64_t syscr;
+    uint64_t syscw;
 
-    size_t read_bytes;
-    size_t write_bytes;
-    size_t cancelled_write_bytes;
+    uint64_t read_bytes;
+    uint64_t write_bytes;
+    uint64_t cancelled_write_bytes;
 
 
  public:
@@ -62,19 +62,19 @@ class PID_IO {
 
     pid_t getPid() const { return pid; }
 
-    size_t getRchar() const { return rchar; }
+    uint64_t getRchar() const { return rchar; }
 
-    size_t getWchar() const { return wchar; }
+    uint64_t getWchar() const { return wchar; }
 
-    size_t getSyscr() const { return syscr; }
+    uint64_t getSyscr() const { return syscr; }
 
-    size_t getSyscw() const { return syscw; }
+    uint64_t getSyscw() const { return syscw; }
 
-    size_t getReadBytes() const { return read_bytes; }
+    uint64_t getReadBytes() const { return read_bytes; }
 
-    size_t getWriteBytes() const { return write_bytes; }
+    uint64_t getWriteBytes() const { return write_bytes; }
 
-    size_t getCancelledWriteBytes() const { return cancelled_write_bytes; }
+    uint64_t getCancelledWriteBytes() const { return cancelled_write_bytes; }
 };
 // ----------------------------------------------------------------------------------------------------
 class PID_IO_Counter {
@@ -188,10 +188,13 @@ class DiskStat {
 // ----------------------------------------------------------------------------------------------------
 class DiskStat_Read_Counter {
  private:
+    std::string device_name;
     DiskStat pre_iamge;
 
  public:
     DiskStat_Read_Counter() : pre_iamge(DiskStat::read_IO_DiskStat()) {}
+
+    DiskStat_Read_Counter(std::string device_name) : device_name(device_name), pre_iamge(DiskStat::read_IO_DiskStat(device_name)) {}
 
     ~DiskStat_Read_Counter() {
         DiskStat post_iamge = DiskStat::read_IO_DiskStat();
