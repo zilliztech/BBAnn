@@ -191,7 +191,17 @@ class DiskStat_Read_Counter {
     std::string device_name;
     DiskStat pre_iamge;
 
- public:
+    int aqu_sz(const DiskStat& post_iamge) { return post_iamge[11] - pre_iamge[11]; }
+
+    double r_wait(const DiskStat& post_iamge) {
+        if (post_iamge[1] -  pre_iamge[1] == 0) {
+            return 0.0;
+        } else {
+            return (post_iamge[4] - pre_iamge[4]) / static_cast<double>(post_iamge[1] - pre_iamge[1]);
+        }
+    }
+
+public:
     DiskStat_Read_Counter() : pre_iamge(DiskStat::read_IO_DiskStat()) {}
 
     DiskStat_Read_Counter(std::string device_name) : device_name(device_name), pre_iamge(DiskStat::read_IO_DiskStat(device_name)) {}
@@ -204,7 +214,7 @@ class DiskStat_Read_Counter {
         std::cout << "# milliseconds spent reading: " << post_iamge[4] - pre_iamge[4] << std::endl;
         std::cout << "# of milliseconds spent doing I/Os: " << post_iamge[10] - pre_iamge[10] << std::endl;
         std::cout << "weighted # of milliseconds spent doing I/Os: " << post_iamge[11] - pre_iamge[11] << std::endl;
-
+        std::cout << "r_wait: " << r_wait(post_iamge) << std::endl;
     }
 };
 // ----------------------------------------------------------------------------------------------------
