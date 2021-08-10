@@ -327,6 +327,14 @@ void read_comp_range_search(
 
 template<typename DISTT, typename IDT>
 void recall(const std::string& groundtruth_file, const std::string& answer_file, MetricType metric_type, bool use_comp_format = true, bool cmp_id = false) {
+    std::cout << "recall parammeters:" << std::endl;
+    std::cout << " groundtruth_file: " << groundtruth_file
+              << " answer_file: " << answer_file
+              << " metric_type: " << (int)metric_type
+              << " use_comp_format: " << use_comp_format
+              << " cmp_id: " << cmp_id
+              << std::endl;
+
     uint32_t gt_nq, gt_topk, answer_nq, answer_topk;
 
     std::vector<std::vector<std::pair<IDT, DISTT>>> groundtruth;
