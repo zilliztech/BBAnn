@@ -1227,8 +1227,14 @@ void aligned_refine_c(const std::string& index_path,
     uint32_t npv = 0;
     uint32_t npi = 0;
 
-    char* dat_buf = new char[page_size];
-    char* ids_buf = new char[page_size];
+    constexpr size_t O_DIRECT_ALIGNMENT = 512;
+    char* dat_buf;
+    int posix_memalign_size = posix_memalign(reinterpret_cast<void **>(&dat_buf), O_DIRECT_ALIGNMENT, page_size);
+    assert(posix_memalign_size == page_size);
+    char* ids_buf;
+    posix_memalign_size = posix_memalign(reinterpret_cast<void **>(&ids_buf), O_DIRECT_ALIGNMENT, page_size);
+    assert(posix_memalign_size == page_size);
+
     memset(dat_buf, 0, page_size);
     memset(ids_buf, 0, page_size);
 
@@ -1239,9 +1245,14 @@ void aligned_refine_c(const std::string& index_path,
     for (int i = 0; i < K1; i ++) {
         std::string aligned_data_filei = index_path + CLUSTER + "-" + std::to_string(i) + RAWDATA + BIN;
         std::string aligned_ids_filei  = index_path + CLUSTER + "-" + std::to_string(i) + GLOBAL_IDS + BIN;
+#if DIRECTIO
+        raw_data_file_fds.emplace_back(open(aligned_data_filei.c_str(), O_RDONLY | O_DIRECT));
+        ids_data_file_fds.emplace_back(open(aligned_ids_filei.c_str(), O_RDONLY | O_DIRECT));
+#else
         raw_data_file_fds.emplace_back(open(aligned_data_filei.c_str(), O_RDONLY));
-        assert(raw_data_file_fds.back() != -1);
         ids_data_file_fds.emplace_back(open(aligned_ids_filei.c_str(), O_RDONLY));
+#endif
+        assert(raw_data_file_fds.back() != -1);
         assert(ids_data_file_fds.back() != -1);
 
         uint32_t clu_size, clu_dim, clu_id_size, clu_id_dim;

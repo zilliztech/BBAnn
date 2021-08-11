@@ -15,11 +15,19 @@ endif()
 set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -march=native -O3 -pthread -fopenmp -mavx2 -mfma" )
 # set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -march=native -O0 -g -pthread -fopenmp -mavx2 -mfma" )
 
+# Log with I/O statistics doing profiling
 set(IOPERF 1)
 if (IOPERF)
     add_compile_options(-DIOPERF=1)
     message(STATUS "Optional Flag DIOPERF is ON: to do IO Perf")
 endif(IOPERF)
+
+# Refine with Unix IO & O_DIRECT
+set(DIRECTIO 1)
+if (DIRECTIO)
+    add_compile_options(-DDIRECTIO=1)
+    message(STATUS "Optional Flag DIRECTIO is ON: to do DIRECT IO: O_DIRECT")
+endif(DIRECTIO)
 
 include_directories(include)
 
