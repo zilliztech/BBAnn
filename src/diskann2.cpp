@@ -496,7 +496,7 @@ void page_align(const std::string& raw_data_bin_file, const std::string& output_
     for (uint32_t i = 0; i < K1; i ++) {
         std::string cluster_raw_data_file_name = output_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
         std::string cluster_ids_data_file_name = output_path + CLUSTER + std::to_string(i) + GLOBAL_IDS + BIN;
-        std::string cluster_raw_data_file_name2 = output_path + CLUSTER + "-" + std::to_string(i) + RAWDATA + BIN;
+        std::string cluster_raw_data_file_name2 = output_path + CLUSTER + std::to_string(i) + "-" + RAWDATA + BIN;
         uint32_t cluster_size, cluster_dim, ids_size, ids_dim;
 
         IOReader data_reader(cluster_raw_data_file_name, (uint64_t)(2) * GIGABYTE);
@@ -848,6 +848,7 @@ void search_pq_residual_quantizer(
     rc.ElapseFromBegin("search quantizer done.");
 }
 
+// cannot work
 template<typename DATAT, typename DISTT, typename HEAPT>
 void refine(const std::string& index_path,
             const int K1,
@@ -1020,7 +1021,7 @@ void aligned_refine(const std::string& index_path,
 
     std::vector<std::ifstream> raw_data_file_handlers(K1);
     for (int i = 0; i < K1; i ++) {
-        std::string aligned_data_filei = index_path + CLUSTER + "-" + std::to_string(i) + RAWDATA + BIN;
+        std::string aligned_data_filei = index_path + CLUSTER + std::to_string(i) + "-" + RAWDATA + BIN;
         raw_data_file_handlers[i] = std::ifstream(aligned_data_filei, std::ios::binary);
         uint32_t clu_size, clu_dim;
         uint32_t ps, check;
@@ -1116,7 +1117,7 @@ void aligned_refine(const std::string& index_path,
     rc.RecordSection("calculate done.");
 
     for (int i = 0; i < K1; i ++) {
-        std::string data_filei = index_path + CLUSTER + "-" + std::to_string(i) + RAWDATA + BIN;
+        std::string data_filei = index_path + CLUSTER + std::to_string(i) + "-" + RAWDATA + BIN;
         raw_data_file_handlers[i].close();
     }
 
@@ -1124,6 +1125,7 @@ void aligned_refine(const std::string& index_path,
     rc.ElapseFromBegin("aligned refine done.");
 }
 
+// cannot work
 template<typename DATAT, typename DISTT, typename HEAPT>
 void refine_c(const std::string& index_path,
             const int K1,

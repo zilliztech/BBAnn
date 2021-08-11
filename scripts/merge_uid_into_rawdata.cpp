@@ -9,7 +9,7 @@
 uint32_t page_size = 4096;
 
 int main(int argc, char** argv) {
-    if (argc != 3) {
+    if (argc != 5) {
         std::cout << "Usage:" << argv[0]
                   << " data type(float or uint8 or int8)"
                   << " index path"
@@ -50,7 +50,7 @@ int main(int argc, char** argv) {
     for (auto i = 0; i < cluster_num; i ++) {
         std::string aligned_data_filei = index_path + "cluster-" + "-" + std::to_string(i) + "raw_data" + ".bin";
         std::string aligned_ids_filei  = index_path + "cluster-" + "-" + std::to_string(i) + "global_ids" + ".bin";
-        std::string aligned_data_filei2 = index_path + "cluster-" + "--" + std::to_string(i) + "raw_data" + ".bin";
+        std::string aligned_data_filei2 = index_path + "cluster-" + std::to_string(i) + "-" + "raw_data" + ".bin";
         raw_data_file_handlers[i] = std::ifstream(aligned_data_filei, std::ios::binary);
         ids_data_file_handlers[i] = std::ifstream(aligned_ids_filei , std::ios::binary);
         data_writer[i] = std::ofstream(aligned_data_filei2, std::ios::binary);
