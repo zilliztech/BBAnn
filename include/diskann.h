@@ -207,3 +207,32 @@ void search_bigann(const std::string& index_path,
 
 
 
+template<typename DATAT, typename DISTT, typename HEAPT, typename HEAPTT>
+void pipeline_search(const std::string& index_path,
+                   const std::string& query_bin_file,
+                   const std::string& answer_bin_file,
+                   const int nprobe,
+                   const int refine_nprobe,
+                   const int topk,
+                   const int refine_topk,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   PQResidualQuantizer<HEAPTT, DATAT, uint8_t>& pq_quantizer,
+                   const int K1,
+                   std::vector<std::vector<uint8_t>>& pq_codebook,
+                   std::vector<std::vector<uint32_t>>& meta,
+                   Computer<DATAT, DATAT, DISTT>& dis_computer);
+template<typename DATAT, typename DISTT, typename HEAPT, typename HEAPTT>
+void pipeline_search(const std::string& index_path,
+                   const std::string& query_bin_file,
+                   const std::string& answer_bin_file,
+                   const int nprobe,
+                   const int refine_nprobe,
+                   const int topk,
+                   const int refine_topk,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   ProductQuantizer<HEAPTT, DATAT, uint8_t>& pq_quantizer,
+                   const int K1,
+                   std::vector<std::vector<uint8_t>>& pq_codebook,
+                   std::vector<std::vector<uint32_t>>& meta,
+                   Computer<DATAT, DATAT, DISTT>& dis_computer);
+

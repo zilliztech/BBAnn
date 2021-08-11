@@ -6,6 +6,8 @@
 #include <unistd.h>
 #include <algorithm>
 #include <cstdio>
+#include <libaio.h>
+#include <thread>
 
 template<typename DATAT>
 void train_cluster(const std::string& raw_data_bin_file,
@@ -2089,7 +2091,532 @@ void train_cluster<int8_t>(const std::string& raw_data_bin_file,
 
 
 
+/**************************************************************************************************************************/
+/*                                              search pipeline                                                           */
+/**************************************************************************************************************************/
+template<typename DATAT, typename DISTT, typename HEAPT, typename HEAPTT>
+void pipeline_search(const std::string& index_path,
+                   const std::string& query_bin_file,
+                   const std::string& answer_bin_file,
+                   const int nprobe,
+                   const int refine_nprobe,
+                   const int topk,
+                   const int refine_topk,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   ProductQuantizer<HEAPTT, DATAT, uint8_t>& quantizer,
+                   const int K1,
+                   std::vector<std::vector<uint8_t>>& pq_codebook,
+                   std::vector<std::vector<uint32_t>>& meta,
+                   Computer<DATAT, DATAT, DISTT>& dis_computer) {
+    TimeRecorder rc("search bigann with pipeline");
 
+    std::cout << "pipeline_search parameters:" << std::endl;
+    std::cout << " index_path: " << index_path
+              << " query_bin_file: " << query_bin_file
+              << " answer_bin_file: " << answer_bin_file
+              << " nprobe: " << nprobe
+              << " refine_nprobe: " << refine_nprobe
+              << " topk: " << topk
+              << " refine topk: " << refine_topk
+              << " K1: " << K1
+              << std::endl;
+    std::cout << "pipeline search currently does not support pq, please use pqresidual instead." << std::endl;
+}
+
+
+
+
+template<typename DATAT, typename DISTT, typename HEAPT, typename HEAPTT>
+void pipeline_search(const std::string& index_path,
+                   const std::string& query_bin_file,
+                   const std::string& answer_bin_file,
+                   const int nprobe,
+                   const int refine_nprobe,
+                   const int topk,
+                   const int refine_topk,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   PQResidualQuantizer<HEAPTT, DATAT, uint8_t>& quantizer,
+                   const int K1,
+                   std::vector<std::vector<uint8_t>>& pq_codebook,
+                   std::vector<std::vector<uint32_t>>& meta,
+                   Computer<DATAT, DATAT, DISTT>& dis_computer) {
+    TimeRecorder rc("search bigann with pipeline");
+
+    std::cout << "pipeline_search parameters:" << std::endl;
+    std::cout << " index_path: " << index_path
+              << " query_bin_file: " << query_bin_file
+              << " answer_bin_file: " << answer_bin_file
+              << " nprobe: " << nprobe
+              << " refine_nprobe: " << refine_nprobe
+              << " topk: " << topk
+              << " refine topk: " << refine_topk
+              << " K1: " << K1
+              << std::endl;
+
+
+    DATAT* raw_query = nullptr;
+    DATAT* pquery = nullptr;
+    DISTT* answer_dists = nullptr;
+    uint32_t* answer_ids = nullptr;
+    DISTT* pq_distance = nullptr;
+    uint64_t* pq_offsets = nullptr;
+    uint64_t* p_labels = nullptr;
+
+    uint32_t nq, dq;
+
+    read_bin_file<DATAT>(query_bin_file, raw_query, nq, dq);
+    rc.RecordSection("load query done.");
+    std::cout << "query numbers: " << nq << " query dims: " << dq << std::endl;
+
+    pquery = new DATAT[nq * dq];
+    int qk = (nq - 1) / 500 + 1;
+
+    // do qk-means on query
+    std::vector<int> query_buckets_border(qk + 2, 0);
+    std::vector<uint32_t> qid2off(nq);
+    std::vector<uint32_t> off2qid(nq);
+    float* query_centroids = new float[qk * dq];
+    std::vector<int64_t> bucket_ids(nq);
+    std::vector<float> bucket_dis(nq);
+    kmeans<DATAT>(nq, raw_query, dq, qk, query_centroids, false, 0);
+    rc.RecordSection(std::to_string(qk) + "-means on query done.");
+    elkan_L2_assign<const DATAT, const float, float>(raw_query, query_centroids, dq, nq, qk, bucket_ids.data(), bucket_dis.data());
+    rc.RecordSection("elkan_L2_assign done.");
+    for (auto i = 0; i < nq; i ++) {
+        query_buckets_border[bucket_ids[i] + 2] ++;
+    }
+    delete[] query_centroids;
+
+    std::vector<unsigned char*> data_pool(qk, nullptr);
+    std::vector<int> async_io_rst(qk, -1);
+    std::vector<io_context_t> async_io_ctx(qk);
+    int64_t vector_size = sizeof(DATAT) * dq;
+    int64_t node_size = vector_size + sizeof(uint32_t);
+    for (auto i = 0; i < qk; i ++) {
+        data_pool[i] = new unsigned char[node_size * refine_topk * query_buckets_border[i + 2]];
+    }
+    // data_pool[0] = new DATAT[dq * max_query_bucket];
+    // data_pool[1] = new DATAT[dq * max_query_bucket];
+
+    for (auto i = 2; i <= qk + 1; i ++) {
+        query_buckets_border[i] += query_buckets_border[i - 1];
+    }
+
+    for (auto i = 0; i < nq; i ++) {
+        auto offset = query_buckets_border[bucket_ids[i] + 1] ++;
+        for (auto j = 0; j < dq; j ++) {
+            pquery[offset * dq + j] = raw_query[i * dq + j];
+        }
+        off2qid[offset] = i;
+        qid2off[i] = offset;
+    }
+
+    pq_distance = new DISTT[(int64_t)nq * refine_topk];
+    answer_dists = new DISTT[(int64_t)nq * topk];
+    answer_ids = new uint32_t[(int64_t)nq * topk];
+    pq_offsets = new uint64_t[(int64_t)nq * refine_topk];
+    p_labels = new uint64_t[(int64_t)nq * nprobe];
+
+    std::vector<std::vector<int>> qid_by_bucket(qk);
+
+    std::vector<int> raw_data_fds(K1);
+    for (int i = 0; i < K1; i ++) {
+        std::string aligned_data_filei = index_path + CLUSTER + std::to_string(i) + "-" + RAWDATA + BIN;
+        raw_data_fds[i] = open(aligned_data_filei.c_str(), O_RDONLY);
+    }
+
+    uint32_t page_size = PAGESIZE;
+    uint32_t nnpp = page_size / node_size;
+
+    float* ivf_centroids = nullptr;
+    uint32_t c_n, c_dim;
+    read_bin_file<float>(index_path + BUCKET + CENTROIDS + BIN, ivf_centroids, c_n, c_dim);
+    rc.RecordSection("read ivf_centroids done.");
+
+    bool flag = false;
+    auto fun_refine = [&] () {
+        std::cout << "refine thread start!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+        int succ = 0;
+        while (succ < qk) {
+            for (auto i = 0; i < qk; i ++) {
+                if (async_io_rst[i] == (qid_by_bucket[i].size())) {
+                    for (auto j = 0; j < qid_by_bucket[i].size(); j ++) {
+                        auto datai = data_pool[i] + node_size * j;
+                        auto qqid = query_buckets_border[i] + qid_by_bucket[i][j];
+                        auto disj = dis_computer((DATAT*)datai, pquery + qqid * dq, dq);
+                        if (HEAPT::cmp(answer_dists[topk * qqid], disj)) {
+                            heap_swap_top<HEAPT>(topk, answer_dists + topk * qqid, answer_ids + topk * qqid, disj, *((uint32_t*)(datai + vector_size)));
+                        }
+                    }
+
+                    async_io_rst[i] = -1;
+                    succ ++;
+                }
+            }
+        }
+        flag = true;
+        std::cout << "thread refine done.!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!.." << std::endl;
+    };
+
+    int batch_num = 37;
+
+    auto fun_async_io = [&] (int query_bucket_id) {
+        std::cout << "async io with query_bucket_id: " << query_bucket_id << " start!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+        std::vector<std::vector<std::pair<uint32_t, uint32_t>>> refine_records(K1);
+        int64_t bucket_nq = query_buckets_border[query_bucket_id + 1] - query_buckets_border[query_bucket_id];
+        int record_cnt = 0;
+        for (int64_t i = 0; i < bucket_nq; i ++) {
+            auto pq_offi = pq_offsets + (query_buckets_border[query_bucket_id] + i) * refine_topk;
+            for (int j = 0; j < refine_topk; j ++) {
+                if (pq_offi[j] == (uint64_t)(-1))
+                    continue;
+                uint32_t cid, off, qid;
+                parse_refine_id(pq_offi[j], cid, off, qid);
+                refine_records[cid].emplace_back(off, qid);
+                record_cnt ++;
+            }
+        }
+        std::cout << "fun_async_io.query_bucket_id = " << query_bucket_id << ", refine_records.cnt = " << record_cnt << std::endl;
+        for (auto i = query_buckets_border[query_bucket_id]; i < query_buckets_border[query_bucket_id + 1]; i ++) {
+            auto ans_disi = answer_dists + topk * i;
+            auto ans_idsi = answer_ids + topk * i;
+            heap_heapify<HEAPT>(topk, ans_disi, ans_idsi);
+        }
+        int max_events = record_cnt;
+        std::cout << "fun_async_io.query_bucket_id = " << query_bucket_id << ", max events = " << max_events << std::endl;
+        memset(&async_io_ctx[query_bucket_id], 0, sizeof(async_io_ctx[query_bucket_id]));
+        io_setup(max_events, &async_io_ctx[query_bucket_id]);
+        struct iocb **p_cb = new iocb*[max_events];
+        struct iocb *cb = new iocb[max_events];
+        struct io_event *events = new io_event[max_events];
+
+        for (auto i = 0; i < max_events; i ++) {
+            p_cb[i] = cb + i;
+        }
+        int cnt = 0;
+        qid_by_bucket[query_bucket_id].reserve(bucket_nq * refine_topk);
+        for (auto i = 0; i < K1; i ++) {
+            for (auto j = 0; j < refine_records[i].size(); j ++) {
+                qid_by_bucket[query_bucket_id].push_back(refine_records[i][j].second);
+                int64_t ofst = refine_records[i][j].first;
+                int64_t data_off = (uint64_t)(ofst / nnpp + 1) * page_size + node_size * (ofst % nnpp);
+                io_prep_pread(p_cb[cnt], raw_data_fds[i], data_pool[query_bucket_id] + node_size * cnt, node_size, (int64_t)(data_off));
+                cnt += 1;
+            }
+        }
+        std::cout << "fun_async_io.query_bucket_id = " << query_bucket_id << ", refine cnt = " << cnt << std::endl;
+        std::cout << "fun_async_io.query_bucket_id = " << query_bucket_id << ", qid_by_bucket[query_bucket_id].size() = " << qid_by_bucket[query_bucket_id].size() << std::endl;
+        int aio_ret = io_submit(async_io_ctx[query_bucket_id], max_events, p_cb);
+        std::cout << "query bucket " << query_bucket_id << " io_submit returns: " << aio_ret << std::endl;
+        int aio_ret_cnt = 0;
+        while (aio_ret_cnt < max_events) {
+            aio_ret = io_getevents(async_io_ctx[query_bucket_id], batch_num, max_events, events, nullptr);
+            aio_ret_cnt += aio_ret;
+            std::cout << "query_bucket: " << query_bucket_id << " current aio_ret_cnt: " << aio_ret_cnt << std::endl;
+        }
+        std::cout << "query bucket " << query_bucket_id << " io_getevents returns: " << aio_ret_cnt << std::endl;
+        async_io_rst[query_bucket_id] = max_events;
+
+        delete[] events;
+        delete[] cb;
+        delete[] p_cb;
+        std::cout << "async io function with query_bucket_id " << query_bucket_id << " done!!!!!!!!!!!!!!!!!!!!!!!!!!!." << std::endl;
+    };
+
+
+    // auto fun_sync_io = [&] (int query_bucket_id) {
+    //     std::cout << "sync io with query_bucket_id: " << query_bucket_id << " start!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+    //     std::vector<std::vector<std::pair<uint32_t, uint32_t>>> refine_records(K1);
+    //     int64_t bucket_nq = query_buckets_border[query_bucket_id + 1] - query_buckets_border[query_bucket_id];
+    //     int record_cnt = 0;
+    //     for (int64_t i = 0; i < bucket_nq; i ++) {
+    //         auto pq_offi = pq_offsets + (query_buckets_border[query_bucket_id] + i) * refine_topk;
+    //         for (int j = 0; j < refine_topk; j ++) {
+    //             if (pq_offi[j] == (uint64_t)(-1))
+    //                 continue;
+    //             uint32_t cid, off, qid;
+    //             parse_refine_id(pq_offi[j], cid, off, qid);
+    //             refine_records[cid].emplace_back(off, qid);
+    //             record_cnt ++;
+    //         }
+    //     }
+    //     std::cout << "fun_sync_io.query_bucket_id = " << query_bucket_id << ", refine_records.cnt = " << record_cnt << std::endl;
+    //     for (auto i = query_buckets_border[query_bucket_id]; i < query_buckets_border[query_bucket_id + 1]; i ++) {
+    //         auto ans_disi = answer_dists + topk * i;
+    //         auto ans_idsi = answer_ids + topk * i;
+    //         heap_heapify<HEAPT>(topk, ans_disi, ans_idsi);
+    //     }
+    //     int cnt = 0;
+    //     qid_by_bucket[query_bucket_id].reserve(bucket_nq * refine_topk);
+    //     for (auto i = 0; i < K1; i ++) {
+    //         for (auto j = 0; j < refine_records[i].size(); j ++) {
+    //             qid_by_bucket[query_bucket_id].push_back(refine_records[i][j].second);
+    //             int64_t ofst = refine_records[i][j].first;
+    //             int64_t data_off = (uint64_t)(ofst / nnpp + 1) * page_size + node_size * (ofst % nnpp);
+    //             io_prep_pread(p_cb[cnt * 2], raw_data_fds[i], data_pool[query_bucket_id] + node_size * cnt, vector_size, (int64_t)(data_off));
+    //             cnt += 1;
+    //         }
+    //     }
+    //     std::cout << "fun_sync_io.query_bucket_id = " << query_bucket_id << ", refine cnt = " << cnt << std::endl;
+    //     std::cout << "fun_sync_io.query_bucket_id = " << query_bucket_id << ", qid_by_bucket[query_bucket_id].size() = " << qid_by_bucket[query_bucket_id].size() << std::endl;
+    //     int aio_ret = io_submit(async_io_ctx[query_bucket_id], cnt * 2, p_cb);
+    //     std::cout << "query bucket " << query_bucket_id << " io_submit returns: " << aio_ret << std::endl;
+    //     aio_ret = io_getevents(async_io_ctx[query_bucket_id], cnt * 2, cnt * 2, events, nullptr);
+    //     std::cout << "query bucket " << query_bucket_id << " io_getevents returns: " << aio_ret << std::endl;
+    //     async_io_rst[query_bucket_id] = aio_ret;
+
+    //     delete[] events;
+    //     delete[] cb;
+    //     delete[] p_cb;
+    //     std::cout << "sync io function with query_bucket_id " << query_bucket_id << " done!!!!!!!!!!!!!!!!!!!!!!!!!!!." << std::endl;
+    // };
+
+    std::thread t_refine(fun_refine);
+    rc.RecordSection("start refine thread.");
+
+    std::vector<std::thread> async_io_threads(qk);
+    for (auto i = 0; i < qk; i ++) {
+        auto query_bucketi = pquery + query_buckets_border[i] * dq;
+        uint32_t nqi = query_buckets_border[i + 1] - query_buckets_border[i];
+        search_graph<DATAT>(index_hnsw, nqi, dq, nprobe, refine_nprobe, query_bucketi, p_labels + query_buckets_border[i] * nprobe);
+        auto pq_distancei = pq_distance + query_buckets_border[i] * refine_topk;
+        auto pq_offseti = pq_offsets + query_buckets_border[i] * refine_topk;
+        search_pq_residual_quantizer<DATAT, DISTT, HEAPTT>(quantizer, nqi, dq, ivf_centroids, p_labels + query_buckets_border[i] * nprobe, nprobe,
+                                                           refine_topk, K1, query_bucketi, pq_codebook, meta, 
+                                                           pq_distancei,
+                                                           pq_offseti);
+        async_io_threads[i] = std::thread(fun_async_io, i);
+    }
+    rc.RecordSection("start all async io threads.");
+    delete[] ivf_centroids;
+
+    t_refine.join();
+    assert(flag == true);
+    rc.RecordSection("refine thread done.");
+
+    for (int i = 0; i < K1; i ++) {
+        close(raw_data_fds[i]);
+    }
+    for (auto i = 0; i < qk; i ++) {
+        delete[] data_pool[i];
+    }
+
+    DISTT* write_answer_dists = new DISTT[(int64_t)nq * topk];
+    uint32_t* write_answer_ids = new uint32_t[(int64_t)nq * topk];
+    for (auto i = 0; i < nq; i ++) {
+        memcpy(write_answer_dists + topk * i, answer_dists + topk * qid2off[i], sizeof(DISTT) * topk);
+        memcpy(write_answer_ids + topk * i, answer_ids + topk * qid2off[i], sizeof(uint32_t) * topk);
+    }
+    // write answers
+    save_answers<DISTT, HEAPT>(answer_bin_file, topk, nq, write_answer_dists, write_answer_ids);
+    rc.RecordSection("write answers done");
+
+    for (auto i = 0; i < async_io_threads.size(); i ++)
+        async_io_threads[i].detach();
+
+    delete[] write_answer_ids;
+    delete[] write_answer_dists;
+    delete[] pquery;
+    delete[] raw_query;
+    delete[] p_labels;
+    delete[] pq_distance;
+    delete[] pq_offsets;
+    delete[] answer_ids;
+    delete[] answer_dists;
+    rc.ElapseFromBegin("search bigann totally done");
+}
+
+
+template 
+void pipeline_search<float, float, CMax<float, uint32_t>, CMax<float, uint64_t>>(const std::string& index_path,
+                   const std::string& query_bin_file,
+                   const std::string& answer_bin_file,
+                   const int nprobe,
+                   const int refine_nprobe,
+                   const int topk,
+                   const int refine_topk,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   PQResidualQuantizer<CMax<float, uint64_t>, float, uint8_t>& pq_quantizer,
+                   const int K1,
+                   std::vector<std::vector<uint8_t>>& pq_codebook,
+                   std::vector<std::vector<uint32_t>>& meta,
+                   Computer<float, float, float>& dis_computer);
+
+template 
+void pipeline_search<float, float, CMin<float, uint32_t>, CMin<float, uint64_t>>(const std::string& index_path,
+                   const std::string& query_bin_file,
+                   const std::string& answer_bin_file,
+                   const int nprobe,
+                   const int refine_nprobe,
+                   const int topk,
+                   const int refine_topk,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   PQResidualQuantizer<CMin<float, uint64_t>, float, uint8_t>& pq_quantizer,
+                   const int K1,
+                   std::vector<std::vector<uint8_t>>& pq_codebook,
+                   std::vector<std::vector<uint32_t>>& meta,
+                   Computer<float, float, float>& dis_computer);
+
+template 
+void pipeline_search<uint8_t, uint32_t, CMax<uint32_t, uint32_t>, CMax<uint32_t, uint64_t>>(const std::string& index_path,
+                   const std::string& query_bin_file,
+                   const std::string& answer_bin_file,
+                   const int nprobe,
+                   const int refine_nprobe,
+                   const int topk,
+                   const int refine_topk,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   PQResidualQuantizer<CMax<uint32_t, uint64_t>, uint8_t, uint8_t>& pq_quantizer,
+                   const int K1,
+                   std::vector<std::vector<uint8_t>>& pq_codebook,
+                   std::vector<std::vector<uint32_t>>& meta,
+                   Computer<uint8_t, uint8_t, uint32_t>& dis_computer);
+
+template 
+void pipeline_search<uint8_t, uint32_t, CMin<uint32_t, uint32_t>, CMin<uint32_t, uint64_t>>(const std::string& index_path,
+                   const std::string& query_bin_file,
+                   const std::string& answer_bin_file,
+                   const int nprobe,
+                   const int refine_nprobe,
+                   const int topk,
+                   const int refine_topk,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   PQResidualQuantizer<CMin<uint32_t, uint64_t>, uint8_t, uint8_t>& pq_quantizer,
+                   const int K1,
+                   std::vector<std::vector<uint8_t>>& pq_codebook,
+                   std::vector<std::vector<uint32_t>>& meta,
+                   Computer<uint8_t, uint8_t, uint32_t>& dis_computer);
+
+template 
+void pipeline_search<int8_t, int32_t, CMax<int32_t, uint32_t>, CMax<int32_t, uint64_t>>(const std::string& index_path,
+                   const std::string& query_bin_file,
+                   const std::string& answer_bin_file,
+                   const int nprobe,
+                   const int refine_nprobe,
+                   const int topk,
+                   const int refine_topk,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   PQResidualQuantizer<CMax<int32_t, uint64_t>, int8_t, uint8_t>& pq_quantizer,
+                   const int K1,
+                   std::vector<std::vector<uint8_t>>& pq_codebook,
+                   std::vector<std::vector<uint32_t>>& meta,
+                   Computer<int8_t, int8_t, int32_t>& dis_computer);
+
+template 
+void pipeline_search<int8_t, int32_t, CMin<int32_t, uint32_t>, CMin<int32_t, uint64_t>>(const std::string& index_path,
+                   const std::string& query_bin_file,
+                   const std::string& answer_bin_file,
+                   const int nprobe,
+                   const int refine_nprobe,
+                   const int topk,
+                   const int refine_topk,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   PQResidualQuantizer<CMin<int32_t, uint64_t>, int8_t, uint8_t>& pq_quantizer,
+                   const int K1,
+                   std::vector<std::vector<uint8_t>>& pq_codebook,
+                   std::vector<std::vector<uint32_t>>& meta,
+                   Computer<int8_t, int8_t, int32_t>& dis_computer);
+
+
+
+
+template 
+void pipeline_search<float, float, CMax<float, uint32_t>, CMax<float, uint64_t>>(const std::string& index_path,
+                   const std::string& query_bin_file,
+                   const std::string& answer_bin_file,
+                   const int nprobe,
+                   const int refine_nprobe,
+                   const int topk,
+                   const int refine_topk,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   ProductQuantizer<CMax<float, uint64_t>, float, uint8_t>& pq_quantizer,
+                   const int K1,
+                   std::vector<std::vector<uint8_t>>& pq_codebook,
+                   std::vector<std::vector<uint32_t>>& meta,
+                   Computer<float, float, float>& dis_computer);
+
+template 
+void pipeline_search<float, float, CMin<float, uint32_t>, CMin<float, uint64_t>>(const std::string& index_path,
+                   const std::string& query_bin_file,
+                   const std::string& answer_bin_file,
+                   const int nprobe,
+                   const int refine_nprobe,
+                   const int topk,
+                   const int refine_topk,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   ProductQuantizer<CMin<float, uint64_t>, float, uint8_t>& pq_quantizer,
+                   const int K1,
+                   std::vector<std::vector<uint8_t>>& pq_codebook,
+                   std::vector<std::vector<uint32_t>>& meta,
+                   Computer<float, float, float>& dis_computer);
+
+template 
+void pipeline_search<uint8_t, uint32_t, CMax<uint32_t, uint32_t>, CMax<uint32_t, uint64_t>>(const std::string& index_path,
+                   const std::string& query_bin_file,
+                   const std::string& answer_bin_file,
+                   const int nprobe,
+                   const int refine_nprobe,
+                   const int topk,
+                   const int refine_topk,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   ProductQuantizer<CMax<uint32_t, uint64_t>, uint8_t, uint8_t>& pq_quantizer,
+                   const int K1,
+                   std::vector<std::vector<uint8_t>>& pq_codebook,
+                   std::vector<std::vector<uint32_t>>& meta,
+                   Computer<uint8_t, uint8_t, uint32_t>& dis_computer);
+
+template 
+void pipeline_search<uint8_t, uint32_t, CMin<uint32_t, uint32_t>, CMin<uint32_t, uint64_t>>(const std::string& index_path,
+                   const std::string& query_bin_file,
+                   const std::string& answer_bin_file,
+                   const int nprobe,
+                   const int refine_nprobe,
+                   const int topk,
+                   const int refine_topk,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   ProductQuantizer<CMin<uint32_t, uint64_t>, uint8_t, uint8_t>& pq_quantizer,
+                   const int K1,
+                   std::vector<std::vector<uint8_t>>& pq_codebook,
+                   std::vector<std::vector<uint32_t>>& meta,
+                   Computer<uint8_t, uint8_t, uint32_t>& dis_computer);
+
+template 
+void pipeline_search<int8_t, int32_t, CMax<int32_t, uint32_t>, CMax<int32_t, uint64_t>>(const std::string& index_path,
+                   const std::string& query_bin_file,
+                   const std::string& answer_bin_file,
+                   const int nprobe,
+                   const int refine_nprobe,
+                   const int topk,
+                   const int refine_topk,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   ProductQuantizer<CMax<int32_t, uint64_t>, int8_t, uint8_t>& pq_quantizer,
+                   const int K1,
+                   std::vector<std::vector<uint8_t>>& pq_codebook,
+                   std::vector<std::vector<uint32_t>>& meta,
+                   Computer<int8_t, int8_t, int32_t>& dis_computer);
+
+template 
+void pipeline_search<int8_t, int32_t, CMin<int32_t, uint32_t>, CMin<int32_t, uint64_t>>(const std::string& index_path,
+                   const std::string& query_bin_file,
+                   const std::string& answer_bin_file,
+                   const int nprobe,
+                   const int refine_nprobe,
+                   const int topk,
+                   const int refine_topk,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   ProductQuantizer<CMin<int32_t, uint64_t>, int8_t, uint8_t>& pq_quantizer,
+                   const int K1,
+                   std::vector<std::vector<uint8_t>>& pq_codebook,
+                   std::vector<std::vector<uint32_t>>& meta,
+                   Computer<int8_t, int8_t, int32_t>& dis_computer);
+
+
+
+
+
+/**************************************************************************************************************************/
+/*                                              search pipeline done                                                      */
+/**************************************************************************************************************************/
 
 
 
