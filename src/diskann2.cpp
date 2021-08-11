@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <algorithm>
 #include <cstdio>
+#include <util/io_perf.h>
 
 template<typename DATAT>
 void train_cluster(const std::string& raw_data_bin_file,
@@ -1662,9 +1663,16 @@ void search_bigann(const std::string& index_path,
 
     rc.RecordSection("pq residual search done.");
 
-    // refine<DATAT, DISTT, HEAPT>(index_path, K1, nq, dq, topk, refine_topk, pq_offsets, pquery, answer_dists, answer_ids, dis_computer);
-    aligned_refine<DATAT, DISTT, HEAPT>(index_path, K1, nq, dq, topk, refine_topk, pq_offsets, pquery, answer_dists, answer_ids, dis_computer);  // refine with C++ std::ifstream
+    {
+#if IOPERF
+        PID_IO_Counter s1;
+        DiskStat_Read_Counter s2;
+#endif
+        // refine<DATAT, DISTT, HEAPT>(index_path, K1, nq, dq, topk, refine_topk, pq_offsets, pquery, answer_dists, answer_ids, dis_computer);
+        aligned_refine<DATAT, DISTT, HEAPT>(index_path, K1, nq, dq, topk, refine_topk, pq_offsets, pquery, answer_dists,
+                                            answer_ids, dis_computer);  // refine with C++ std::ifstream
 //    aligned_refine_c<DATAT, DISTT, HEAPT>(index_path, K1, nq, dq, topk, refine_topk, pq_offsets, pquery, answer_dists, answer_ids, dis_computer);  // refine_c with C open(), pread(), close()
+    }
     rc.RecordSection("refine done");
     // write answers
     save_answers<DISTT, HEAPT>(answer_bin_file, topk, nq, answer_dists, answer_ids);
@@ -1778,9 +1786,16 @@ void search_bigann(const std::string& index_path,
     */
 
 
-    aligned_refine<DATAT, DISTT, HEAPT>(index_path, K1, nq, dq, topk, refine_topk, pq_offsets, pquery, answer_dists, answer_ids, dis_computer);  // refine with C++ std::ifstream
+    {
+#if IOPERF
+        PID_IO_Counter s1;
+        DiskStat_Read_Counter s2;
+#endif
+        aligned_refine<DATAT, DISTT, HEAPT>(index_path, K1, nq, dq, topk, refine_topk, pq_offsets, pquery, answer_dists,
+                                            answer_ids, dis_computer);  // refine with C++ std::ifstream
 //    aligned_refine_c<DATAT, DISTT, HEAPT>(index_path, K1, nq, dq, topk, refine_topk, pq_offsets, pquery, answer_dists, answer_ids, dis_computer);  // refine_c with C open(), pread(), close()
 //    refine_c<DATAT, DISTT, HEAPT>(index_path, K1, nq, dq, topk, refine_topk, pq_offsets, pquery, answer_dists, answer_ids, dis_computer);  // refine_c with C open(), pread(), close()
+    }
     rc.RecordSection("refine done");
     // write answers
     save_answers<DISTT, HEAPT>(answer_bin_file, topk, nq, answer_dists, answer_ids, true);
