@@ -8,6 +8,8 @@
 #include <cstdio>
 #include <libaio.h>
 #include <thread>
+#include <mutex>
+#include <condition_variable>
 
 template<typename DATAT>
 void train_cluster(const std::string& raw_data_bin_file,
@@ -2154,22 +2156,23 @@ void pipeline_search(const std::string& index_path,
               << std::endl;
 
 
-    DATAT* raw_query = nullptr;
-    DATAT* pquery = nullptr;
-    DISTT* answer_dists = nullptr;
-    uint32_t* answer_ids = nullptr;
-    DISTT* pq_distance = nullptr;
-    uint64_t* pq_offsets = nullptr;
-    uint64_t* p_labels = nullptr;
-
     uint32_t nq, dq;
-
+    DATAT* raw_query = nullptr;
     read_bin_file<DATAT>(query_bin_file, raw_query, nq, dq);
     rc.RecordSection("load query done.");
     std::cout << "query numbers: " << nq << " query dims: " << dq << std::endl;
 
-    pquery = new DATAT[nq * dq];
-    int qk = (nq - 1) / 500 + 1;
+    DATAT* pquery = new DATAT[nq * dq];
+    DISTT* answer_dists = new DISTT[(int64_t)nq * topk];
+    uint32_t* answer_ids = new uint32_t[(int64_t)nq * topk];
+    DISTT* pq_distance = new DISTT[(int64_t)nq * refine_topk];
+    uint64_t* pq_offsets = new uint64_t[(int64_t)nq * refine_topk];
+    uint64_t* p_labels = new uint64_t[(int64_t)nq * nprobe];
+
+    int max_io_nr = 65536;
+    int qb_size_max = 65000 / refine_topk;
+    int qb_size_advice = qb_size_max / 3;
+    int qk = (nq * 3 - 1) / qb_size_advice + 1;
 
     // do qk-means on query
     std::vector<int> query_buckets_border(qk + 2, 0);
@@ -2211,11 +2214,6 @@ void pipeline_search(const std::string& index_path,
         qid2off[i] = offset;
     }
 
-    pq_distance = new DISTT[(int64_t)nq * refine_topk];
-    answer_dists = new DISTT[(int64_t)nq * topk];
-    answer_ids = new uint32_t[(int64_t)nq * topk];
-    pq_offsets = new uint64_t[(int64_t)nq * refine_topk];
-    p_labels = new uint64_t[(int64_t)nq * nprobe];
 
     std::vector<std::vector<int>> qid_by_bucket(qk);
 
@@ -2227,6 +2225,11 @@ void pipeline_search(const std::string& index_path,
 
     uint32_t page_size = PAGESIZE;
     uint32_t nnpp = page_size / node_size;
+
+    std::mutex wake_up_setup;
+    std::mutex update_cur_setup_num;
+    int current_setup_num = 0;
+    std::condition_variable setup_cv;
 
     float* ivf_centroids = nullptr;
     uint32_t c_n, c_dim;
@@ -2251,6 +2254,7 @@ void pipeline_search(const std::string& index_path,
 
                     async_io_rst[i] = -1;
                     succ ++;
+                    std::cout << "current succ = " << succ << std::endl;
                 }
             }
         }
@@ -2285,7 +2289,7 @@ void pipeline_search(const std::string& index_path,
         int max_events = record_cnt;
         std::cout << "fun_async_io.query_bucket_id = " << query_bucket_id << ", max events = " << max_events << std::endl;
         memset(&async_io_ctx[query_bucket_id], 0, sizeof(async_io_ctx[query_bucket_id]));
-        io_setup(max_events, &async_io_ctx[query_bucket_id]);
+
         struct iocb **p_cb = new iocb*[max_events];
         struct iocb *cb = new iocb[max_events];
         struct io_event *events = new io_event[max_events];
@@ -2306,6 +2310,19 @@ void pipeline_search(const std::string& index_path,
         }
         std::cout << "fun_async_io.query_bucket_id = " << query_bucket_id << ", refine cnt = " << cnt << std::endl;
         std::cout << "fun_async_io.query_bucket_id = " << query_bucket_id << ", qid_by_bucket[query_bucket_id].size() = " << qid_by_bucket[query_bucket_id].size() << std::endl;
+
+        auto iosuret = -1;
+        do {
+            std::unique_lock<std::mutex> lk(wake_up_setup);
+            setup_cv.wait(lk, [&] { std::unique_lock<std::mutex> lock(update_cur_setup_num); return current_setup_num < max_io_nr; });
+            iosuret = io_setup(max_events, &async_io_ctx[query_bucket_id]);
+        } while (iosuret < 0);
+        {
+            std::unique_lock<std::mutex> lock(update_cur_setup_num);
+            current_setup_num  += max_events;
+        }
+        setup_cv.notify_one();
+
         int aio_ret = io_submit(async_io_ctx[query_bucket_id], max_events, p_cb);
         std::cout << "query bucket " << query_bucket_id << " io_submit returns: " << aio_ret << std::endl;
         int aio_ret_cnt = 0;
@@ -2314,8 +2331,14 @@ void pipeline_search(const std::string& index_path,
             aio_ret_cnt += aio_ret;
             std::cout << "query_bucket: " << query_bucket_id << " current aio_ret_cnt: " << aio_ret_cnt << std::endl;
         }
-        std::cout << "query bucket " << query_bucket_id << " io_getevents returns: " << aio_ret_cnt << std::endl;
+        auto io_destroy_ret = io_destroy(async_io_ctx[query_bucket_id]);
+        {
+            std::unique_lock<std::mutex> lock(update_cur_setup_num);
+            current_setup_num  -= max_events;
+        }
+        std::cout << "query bucket " << query_bucket_id << " io_destroy returns: " << io_destroy_ret << std::endl;
         async_io_rst[query_bucket_id] = max_events;
+        assert(max_events == qid_by_bucket[query_bucket_id].size());
 
         delete[] events;
         delete[] cb;
