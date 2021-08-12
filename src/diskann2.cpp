@@ -1172,11 +1172,11 @@ void aligned_refine_c(const std::string& index_path,
 
     constexpr size_t O_DIRECT_ALIGNMENT = 512;
     char* dat_buf;
-    int posix_memalign_size = posix_memalign(reinterpret_cast<void **>(&dat_buf), O_DIRECT_ALIGNMENT, page_size);
-    assert(posix_memalign_size == page_size);
+    int posix_memalign_rt = posix_memalign(reinterpret_cast<void **>(&dat_buf), O_DIRECT_ALIGNMENT, page_size);
+    assert(posix_memalign_rt == 0);
     char* ids_buf;
-    posix_memalign_size = posix_memalign(reinterpret_cast<void **>(&ids_buf), O_DIRECT_ALIGNMENT, page_size);
-    assert(posix_memalign_size == page_size);
+    posix_memalign_rt = posix_memalign(reinterpret_cast<void **>(&ids_buf), O_DIRECT_ALIGNMENT, page_size);
+    assert(posix_memalign_rt == 0);
 
     memset(dat_buf, 0, page_size);
     memset(ids_buf, 0, page_size);
@@ -1201,9 +1201,9 @@ void aligned_refine_c(const std::string& index_path,
         uint32_t clu_size, clu_dim, clu_id_size, clu_id_dim;
         uint32_t ps, check;
         int pread_size = pread(raw_data_file_fds.back(), dat_buf, page_size, 0);
-        assert(pread_size == page_size);
+        assert(pread_size != -1);
         pread_size = pread(ids_data_file_fds.back(), ids_buf, page_size, 0);
-        assert(pread_size == page_size);
+        assert(pread_size != -1);
 
         memcpy(&clu_size, dat_buf + 0 * sizeof(uint32_t), sizeof(uint32_t));
         memcpy(&clu_dim , dat_buf + 1 * sizeof(uint32_t), sizeof(uint32_t));
@@ -1264,9 +1264,9 @@ void aligned_refine_c(const std::string& index_path,
         uint32_t global_id;
 
         int pread_size = pread(raw_data_file_fds[i], dat_bufi, page_size, (pv + 1) * page_size);
-        assert(pread_size == dq * sizeof(DATAT));
+        assert(pread_size != -1);
         pread_size = pread(ids_data_file_fds[i], ids_bufi, page_size, (pi + 1) * page_size);
-        assert(pread_size == sizeof(uint32_t));
+        assert(pread_size != -1);
 
         refine_statastics[i].vector_load_cnt = 1;
         refine_statastics[i].id_load_cnt = 1;
@@ -1279,7 +1279,7 @@ void aligned_refine_c(const std::string& index_path,
             if (refine_off >= (pv + 1) * nvpp) {
                 pv = refine_off / nvpp;
                 pread_size = pread(raw_data_file_fds[i], dat_bufi, page_size, (pv + 1) * page_size);
-                assert(pread_size == page_size);
+                assert(pread_size != -1);
                 refine_statastics[i].vector_load_cnt ++;
             } else {
                 refine_statastics[i].vector_page_hit_cnt ++;
@@ -1287,7 +1287,7 @@ void aligned_refine_c(const std::string& index_path,
             if (refine_off >= (pi + 1) * nipp) {
                 pi = refine_off / nipp;
                 pread_size = pread(ids_data_file_fds[i], ids_bufi, page_size, (pi + 1) * page_size);
-                assert(pread_size == sizeof(uint32_t));
+                assert(pread_size != -1);
                 refine_statastics[i].id_load_cnt ++;
             } else {
                 refine_statastics[i].id_page_hit_cnt ++;
@@ -1386,26 +1386,26 @@ void refine_c(const std::string& index_path,
         assert(ids_data_file_fds.back() != -1);
 
         void *clu_size;
-        int posix_memalign_size = posix_memalign(&clu_size, O_DIRECT_ALIGNMENT, sizeof(uint32_t));
-        assert(posix_memalign_size == sizeof(uint32_t));
+        int posix_memalign_rt = posix_memalign(&clu_size, O_DIRECT_ALIGNMENT, sizeof(uint32_t));
+        assert(posix_memalign_rt == 0);
         void *clu_dim;
-        posix_memalign_size = posix_memalign(&clu_dim, O_DIRECT_ALIGNMENT, sizeof(uint32_t));
-        assert(posix_memalign_size == sizeof(uint32_t));
+        posix_memalign_rt = posix_memalign(&clu_dim, O_DIRECT_ALIGNMENT, sizeof(uint32_t));
+        assert(posix_memalign_rt == 0);
         void *clu_id_size;
-        posix_memalign_size = posix_memalign(&clu_id_size, O_DIRECT_ALIGNMENT, sizeof(uint32_t));
-        assert(posix_memalign_size == sizeof(uint32_t));
+        posix_memalign_rt = posix_memalign(&clu_id_size, O_DIRECT_ALIGNMENT, sizeof(uint32_t));
+        assert(posix_memalign_rt == 0);
         void *clu_id_dim;
-        posix_memalign_size = posix_memalign(&clu_id_dim, O_DIRECT_ALIGNMENT, sizeof(uint32_t));
-        assert(posix_memalign_size == sizeof(uint32_t));
+        posix_memalign_rt = posix_memalign(&clu_id_dim, O_DIRECT_ALIGNMENT, sizeof(uint32_t));
+        assert(posix_memalign_rt == 0);
 
         int pread_size = pread(raw_data_file_fds.back(), clu_size, sizeof(uint32_t), 0);
-        assert(pread_size == sizeof(uint32_t));
+        assert(pread_size != -1);
         pread_size = pread(raw_data_file_fds.back(), clu_dim, sizeof(uint32_t), 0 + sizeof(uint32_t));
-        assert(pread_size == sizeof(uint32_t));
+        assert(pread_size != -1);
         pread_size = pread(ids_data_file_fds.back(), clu_id_size, sizeof(uint32_t), 0);
-        assert(pread_size == sizeof(uint32_t));
+        assert(pread_size != -1);
         pread_size = pread(ids_data_file_fds.back(), clu_id_dim, sizeof(uint32_t), 0 + sizeof(uint32_t));
-        assert(pread_size == sizeof(uint32_t));
+        assert(pread_size != -1);
 
         std::cout << "cluster-" << i << " has " << *static_cast<uint32_t *>(clu_size) << " vectors,"
                   << " has clu_dim = " << *static_cast<uint32_t *>(clu_dim)
@@ -1441,25 +1441,25 @@ void refine_c(const std::string& index_path,
         uint64_t pre_off = refine_records[i][0].first;
         uint32_t meta_bytes = 8; // pass meta
         void *data_bufi;
-        int posix_memalign_size = posix_memalign(&data_bufi, O_DIRECT_ALIGNMENT, dq * sizeof(DATAT));
-        assert(posix_memalign_size == dq * sizeof(DATAT));
+        int posix_memalign_rt = posix_memalign(&data_bufi, O_DIRECT_ALIGNMENT, dq * sizeof(DATAT));
+        assert(posix_memalign_rt == 0);
         void *global_id;
-        posix_memalign_size = posix_memalign(&global_id, O_DIRECT_ALIGNMENT, sizeof(uint32_t));
-        assert(posix_memalign_size == sizeof(uint32_t));
+        posix_memalign_rt = posix_memalign(&global_id, O_DIRECT_ALIGNMENT, sizeof(uint32_t));
+        assert(posix_memalign_rt == 0);
 
         int pread_size = pread(raw_data_file_fds[i], data_bufi, dq * sizeof(DATAT), meta_bytes + pre_off * dq * sizeof(DATAT));
-        assert(pread_size == dq * sizeof(DATAT));
+        assert(pread_size != -1);
         pread_size = pread(ids_data_file_fds[i], global_id, sizeof(uint32_t), meta_bytes + pre_off * sizeof(uint32_t));
-        assert(pread_size == sizeof(uint32_t));
+        assert(pread_size != -1);
         load_vectors[i] ++;
         // for debug
         for (int j = 0; j < refine_records[i].size(); j ++) {
             if (refine_records[i][j].first != pre_off) {
                 pre_off = refine_records[i][j].first;
                 pread_size = pread(raw_data_file_fds[i], data_bufi, dq * sizeof(DATAT), meta_bytes + pre_off * dq * sizeof(DATAT));
-                assert(pread_size == dq * sizeof(DATAT));
+                assert(pread_size != -1);
                 pread_size = pread(ids_data_file_fds[i], global_id, sizeof(uint32_t), meta_bytes + pre_off * sizeof(uint32_t));
-                assert(pread_size == sizeof(uint32_t));
+                assert(pread_size != -1);
                 assert(*static_cast<uint32_t *>(global_id) >= 0);
                 load_vectors[i] ++;
             }
