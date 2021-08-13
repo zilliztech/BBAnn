@@ -23,3 +23,15 @@ target_link_libraries(test_distance BigAnn)
 
 add_executable(helloworld_io_perf helloworld_io_perf.cpp)
 target_link_libraries(helloworld_io_perf BigAnn)
+
+
+## Google Test
+set(TEST_SOURCES
+        # add your *.cpp files here
+        Tester.cpp
+        )
+
+add_executable(tester ${TEST_SOURCES})
+target_link_libraries(tester PUBLIC
+#        BigAnn
+        GTest::GTest)
