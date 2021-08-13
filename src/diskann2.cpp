@@ -2247,6 +2247,58 @@ void pipeline_search(const std::string& index_path,
         pcbs[i] = new iocb*[nqi * refine_topk];
     }
 
+    auto fun_sync_io = [&] (int query_bucket_id) {
+        std::cout << "sync io with query_bucket_id: " << query_bucket_id << " start!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+        std::vector<std::vector<std::pair<uint32_t, uint32_t>>> refine_records(K1);
+        int64_t bucket_nq = query_buckets_border[query_bucket_id + 1] - query_buckets_border[query_bucket_id];
+        int max_events = 0;
+        for (int64_t i = 0; i < bucket_nq; i ++) {
+            auto pq_offi = pq_offsets + (query_buckets_border[query_bucket_id] + i) * refine_topk;
+            for (int j = 0; j < refine_topk; j ++) {
+                if (pq_offi[j] == (uint64_t)(-1))
+                    continue;
+                uint32_t cid, off, qid;
+                parse_refine_id(pq_offi[j], cid, off, qid);
+                refine_records[cid].emplace_back(off, qid);
+                max_events ++;
+            }
+        }
+        std::cout << "fun_sync_io.query_bucket_id = " << query_bucket_id << ", refine_records.cnt = " << max_events << std::endl;
+        for (auto i = query_buckets_border[query_bucket_id]; i < query_buckets_border[query_bucket_id + 1]; i ++) {
+            auto ans_disi = answer_dists + topk * i;
+            auto ans_idsi = answer_ids + topk * i;
+            heap_heapify<HEAPT>(topk, ans_disi, ans_idsi);
+        }
+
+        qid_by_bucket[query_bucket_id].reserve(bucket_nq * refine_topk);
+        int cnt = 0;
+        for (auto i = 0; i < K1; i ++) {
+            // std::sort(refine_records[i].begin(), refine_records[i].end(), [](const auto &l, const auto &r) {
+            //     return l.first < r.first;
+            //     });
+            for (auto j = 0; j < refine_records[i].size(); j ++) {
+                qid_by_bucket[query_bucket_id].push_back(refine_records[i][j].second);
+                int64_t ofst = refine_records[i][j].first;
+                int64_t data_off = (uint64_t)(ofst / nnpp + 1) * page_size + node_size * (ofst % nnpp);
+                lseek64(raw_data_fds[i], data_off, SEEK_SET);
+                read(raw_data_fds[i], data_pool[query_bucket_id] + node_size * cnt, node_size);
+                cnt ++;
+                // io_prep_pread(pcbs[query_bucket_id][cnt], raw_data_fds[i], data_pool[query_bucket_id] + node_size * cnt, node_size, (int64_t)(data_off));
+            }
+        }
+
+        
+        for (auto j = 0; j < qid_by_bucket[query_bucket_id].size(); j ++) {
+            auto datai = data_pool[query_bucket_id] + node_size * j;
+            auto qqid = query_buckets_border[query_bucket_id] + qid_by_bucket[query_bucket_id][j];
+            auto disj = dis_computer((DATAT*)datai, pquery + qqid * dq, dq);
+            if (HEAPT::cmp(answer_dists[topk * qqid], disj)) {
+                heap_swap_top<HEAPT>(topk, answer_dists + topk * qqid, answer_ids + topk * qqid, disj, *((uint32_t*)(datai + vector_size)));
+            }
+        }
+        std::cout << "sync io function with query_bucket_id " << query_bucket_id << " done!!!!!!!!!!!!!!!!!!!!!!!!!!!." << std::endl;
+    };
+
     auto fun_async_io = [&] (int query_bucket_id) {
         std::cout << "async io with query_bucket_id: " << query_bucket_id << " start!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
         std::vector<std::vector<std::pair<uint32_t, uint32_t>>> refine_records(K1);
