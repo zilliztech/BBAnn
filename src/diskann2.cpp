@@ -2226,49 +2226,32 @@ void pipeline_search(const std::string& index_path,
     uint32_t page_size = PAGESIZE;
     uint32_t nnpp = page_size / node_size;
 
-    std::mutex wake_up_setup;
+    std::mutex setup_mtx;
     std::mutex update_cur_setup_num;
     int current_setup_num = 0;
     std::condition_variable setup_cv;
+    bool setup_notified = false;
 
     float* ivf_centroids = nullptr;
     uint32_t c_n, c_dim;
     read_bin_file<float>(index_path + BUCKET + CENTROIDS + BIN, ivf_centroids, c_n, c_dim);
     rc.RecordSection("read ivf_centroids done.");
 
-    bool flag = false;
-    auto fun_refine = [&] () {
-        std::cout << "refine thread start!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
-        int succ = 0;
-        while (succ < qk) {
-            for (auto i = 0; i < qk; i ++) {
-                if (async_io_rst[i] == (qid_by_bucket[i].size())) {
-                    for (auto j = 0; j < qid_by_bucket[i].size(); j ++) {
-                        auto datai = data_pool[i] + node_size * j;
-                        auto qqid = query_buckets_border[i] + qid_by_bucket[i][j];
-                        auto disj = dis_computer((DATAT*)datai, pquery + qqid * dq, dq);
-                        if (HEAPT::cmp(answer_dists[topk * qqid], disj)) {
-                            heap_swap_top<HEAPT>(topk, answer_dists + topk * qqid, answer_ids + topk * qqid, disj, *((uint32_t*)(datai + vector_size)));
-                        }
-                    }
-
-                    async_io_rst[i] = -1;
-                    succ ++;
-                    std::cout << "current succ = " << succ << std::endl;
-                }
-            }
-        }
-        flag = true;
-        std::cout << "thread refine done.!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!.." << std::endl;
-    };
-
     int batch_num = 37;
+
+    std::vector<struct iocb *> cbs(qk, nullptr); 
+    std::vector<struct iocb **> pcbs(qk, nullptr); 
+    for (auto i = 0; i < qk; i ++) {
+        uint32_t nqi = query_buckets_border[i + 1] - query_buckets_border[i];
+        cbs[i] = new iocb[nqi * refine_topk];
+        pcbs[i] = new iocb*[nqi * refine_topk];
+    }
 
     auto fun_async_io = [&] (int query_bucket_id) {
         std::cout << "async io with query_bucket_id: " << query_bucket_id << " start!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
         std::vector<std::vector<std::pair<uint32_t, uint32_t>>> refine_records(K1);
         int64_t bucket_nq = query_buckets_border[query_bucket_id + 1] - query_buckets_border[query_bucket_id];
-        int record_cnt = 0;
+        int max_events = 0;
         for (int64_t i = 0; i < bucket_nq; i ++) {
             auto pq_offi = pq_offsets + (query_buckets_border[query_bucket_id] + i) * refine_topk;
             for (int j = 0; j < refine_topk; j ++) {
@@ -2277,25 +2260,23 @@ void pipeline_search(const std::string& index_path,
                 uint32_t cid, off, qid;
                 parse_refine_id(pq_offi[j], cid, off, qid);
                 refine_records[cid].emplace_back(off, qid);
-                record_cnt ++;
+                max_events ++;
             }
         }
-        std::cout << "fun_async_io.query_bucket_id = " << query_bucket_id << ", refine_records.cnt = " << record_cnt << std::endl;
+        std::cout << "fun_async_io.query_bucket_id = " << query_bucket_id << ", refine_records.cnt = " << max_events << std::endl;
         for (auto i = query_buckets_border[query_bucket_id]; i < query_buckets_border[query_bucket_id + 1]; i ++) {
             auto ans_disi = answer_dists + topk * i;
             auto ans_idsi = answer_ids + topk * i;
             heap_heapify<HEAPT>(topk, ans_disi, ans_idsi);
         }
-        int max_events = record_cnt;
         std::cout << "fun_async_io.query_bucket_id = " << query_bucket_id << ", max events = " << max_events << std::endl;
         memset(&async_io_ctx[query_bucket_id], 0, sizeof(async_io_ctx[query_bucket_id]));
 
-        struct iocb **p_cb = new iocb*[max_events];
-        struct iocb *cb = new iocb[max_events];
-        struct io_event *events = new io_event[max_events];
+        // struct iocb **p_cb = new iocb*[max_events];
+        // struct iocb *cb = new iocb[max_events];
 
         for (auto i = 0; i < max_events; i ++) {
-            p_cb[i] = cb + i;
+            pcbs[query_bucket_id][i] = cbs[query_bucket_id] + i;
         }
         int cnt = 0;
         qid_by_bucket[query_bucket_id].reserve(bucket_nq * refine_topk);
@@ -2304,100 +2285,63 @@ void pipeline_search(const std::string& index_path,
                 qid_by_bucket[query_bucket_id].push_back(refine_records[i][j].second);
                 int64_t ofst = refine_records[i][j].first;
                 int64_t data_off = (uint64_t)(ofst / nnpp + 1) * page_size + node_size * (ofst % nnpp);
-                io_prep_pread(p_cb[cnt], raw_data_fds[i], data_pool[query_bucket_id] + node_size * cnt, node_size, (int64_t)(data_off));
+                io_prep_pread(pcbs[query_bucket_id][cnt], raw_data_fds[i], data_pool[query_bucket_id] + node_size * cnt, node_size, (int64_t)(data_off));
                 cnt += 1;
             }
         }
         std::cout << "fun_async_io.query_bucket_id = " << query_bucket_id << ", refine cnt = " << cnt << std::endl;
         std::cout << "fun_async_io.query_bucket_id = " << query_bucket_id << ", qid_by_bucket[query_bucket_id].size() = " << qid_by_bucket[query_bucket_id].size() << std::endl;
+        assert(max_events == qid_by_bucket[query_bucket_id].size());
 
-        auto iosuret = -1;
-        do {
-            std::unique_lock<std::mutex> lk(wake_up_setup);
-            setup_cv.wait(lk, [&] { std::unique_lock<std::mutex> lock(update_cur_setup_num); return current_setup_num < max_io_nr; });
-            iosuret = io_setup(max_events, &async_io_ctx[query_bucket_id]);
-        } while (iosuret < 0);
-        {
-            std::unique_lock<std::mutex> lock(update_cur_setup_num);
-            current_setup_num  += max_events;
-        }
-        setup_cv.notify_one();
-
-        int aio_ret = io_submit(async_io_ctx[query_bucket_id], max_events, p_cb);
+        auto iosuret = io_setup(max_events, &async_io_ctx[query_bucket_id]);
+        std::cout << "fun_async_io.query_bucket_id = " << query_bucket_id << ", iosuret = " << iosuret << std::endl;
+        
+        int aio_ret = io_submit(async_io_ctx[query_bucket_id], max_events, pcbs[query_bucket_id]);
         std::cout << "query bucket " << query_bucket_id << " io_submit returns: " << aio_ret << std::endl;
+
+        // delete[] cb;
+        // delete[] p_cb;
+        std::cout << "async io function with query_bucket_id " << query_bucket_id << " done!!!!!!!!!!!!!!!!!!!!!!!!!!!." << std::endl;
+    };
+
+
+    auto fun_async_refine = [&] (int query_bucket_id) {
+        int64_t bucket_nq = query_buckets_border[query_bucket_id + 1] - query_buckets_border[query_bucket_id];
+        int max_events = qid_by_bucket[query_bucket_id].size();
+        struct io_event *events = new io_event[max_events];
         int aio_ret_cnt = 0;
         while (aio_ret_cnt < max_events) {
-            aio_ret = io_getevents(async_io_ctx[query_bucket_id], batch_num, max_events, events, nullptr);
+            auto aio_ret = io_getevents(async_io_ctx[query_bucket_id], batch_num, max_events, events, nullptr);
             aio_ret_cnt += aio_ret;
             std::cout << "query_bucket: " << query_bucket_id << " current aio_ret_cnt: " << aio_ret_cnt << std::endl;
         }
         auto io_destroy_ret = io_destroy(async_io_ctx[query_bucket_id]);
         {
             std::unique_lock<std::mutex> lock(update_cur_setup_num);
-            current_setup_num  -= max_events;
+            current_setup_num  -= bucket_nq * refine_topk;
+        }
+        {
+            std::unique_lock<std::mutex> lk(setup_mtx);
+            setup_notified = true;
+            setup_cv.notify_one();
         }
         std::cout << "query bucket " << query_bucket_id << " io_destroy returns: " << io_destroy_ret << std::endl;
-        async_io_rst[query_bucket_id] = max_events;
-        assert(max_events == qid_by_bucket[query_bucket_id].size());
-
+        assert(0 == io_destroy_ret);
         delete[] events;
-        delete[] cb;
-        delete[] p_cb;
-        std::cout << "async io function with query_bucket_id " << query_bucket_id << " done!!!!!!!!!!!!!!!!!!!!!!!!!!!." << std::endl;
+        for (auto j = 0; j < qid_by_bucket[query_bucket_id].size(); j ++) {
+            auto datai = data_pool[query_bucket_id] + node_size * j;
+            auto qqid = query_buckets_border[query_bucket_id] + qid_by_bucket[query_bucket_id][j];
+            auto disj = dis_computer((DATAT*)datai, pquery + qqid * dq, dq);
+            if (HEAPT::cmp(answer_dists[topk * qqid], disj)) {
+                heap_swap_top<HEAPT>(topk, answer_dists + topk * qqid, answer_ids + topk * qqid, disj, *((uint32_t*)(datai + vector_size)));
+            }
+        }
     };
 
+    // std::thread t_refine(fun_refine);
+    // rc.RecordSection("start refine thread.");
 
-    // auto fun_sync_io = [&] (int query_bucket_id) {
-    //     std::cout << "sync io with query_bucket_id: " << query_bucket_id << " start!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
-    //     std::vector<std::vector<std::pair<uint32_t, uint32_t>>> refine_records(K1);
-    //     int64_t bucket_nq = query_buckets_border[query_bucket_id + 1] - query_buckets_border[query_bucket_id];
-    //     int record_cnt = 0;
-    //     for (int64_t i = 0; i < bucket_nq; i ++) {
-    //         auto pq_offi = pq_offsets + (query_buckets_border[query_bucket_id] + i) * refine_topk;
-    //         for (int j = 0; j < refine_topk; j ++) {
-    //             if (pq_offi[j] == (uint64_t)(-1))
-    //                 continue;
-    //             uint32_t cid, off, qid;
-    //             parse_refine_id(pq_offi[j], cid, off, qid);
-    //             refine_records[cid].emplace_back(off, qid);
-    //             record_cnt ++;
-    //         }
-    //     }
-    //     std::cout << "fun_sync_io.query_bucket_id = " << query_bucket_id << ", refine_records.cnt = " << record_cnt << std::endl;
-    //     for (auto i = query_buckets_border[query_bucket_id]; i < query_buckets_border[query_bucket_id + 1]; i ++) {
-    //         auto ans_disi = answer_dists + topk * i;
-    //         auto ans_idsi = answer_ids + topk * i;
-    //         heap_heapify<HEAPT>(topk, ans_disi, ans_idsi);
-    //     }
-    //     int cnt = 0;
-    //     qid_by_bucket[query_bucket_id].reserve(bucket_nq * refine_topk);
-    //     for (auto i = 0; i < K1; i ++) {
-    //         for (auto j = 0; j < refine_records[i].size(); j ++) {
-    //             qid_by_bucket[query_bucket_id].push_back(refine_records[i][j].second);
-    //             int64_t ofst = refine_records[i][j].first;
-    //             int64_t data_off = (uint64_t)(ofst / nnpp + 1) * page_size + node_size * (ofst % nnpp);
-    //             io_prep_pread(p_cb[cnt * 2], raw_data_fds[i], data_pool[query_bucket_id] + node_size * cnt, vector_size, (int64_t)(data_off));
-    //             cnt += 1;
-    //         }
-    //     }
-    //     std::cout << "fun_sync_io.query_bucket_id = " << query_bucket_id << ", refine cnt = " << cnt << std::endl;
-    //     std::cout << "fun_sync_io.query_bucket_id = " << query_bucket_id << ", qid_by_bucket[query_bucket_id].size() = " << qid_by_bucket[query_bucket_id].size() << std::endl;
-    //     int aio_ret = io_submit(async_io_ctx[query_bucket_id], cnt * 2, p_cb);
-    //     std::cout << "query bucket " << query_bucket_id << " io_submit returns: " << aio_ret << std::endl;
-    //     aio_ret = io_getevents(async_io_ctx[query_bucket_id], cnt * 2, cnt * 2, events, nullptr);
-    //     std::cout << "query bucket " << query_bucket_id << " io_getevents returns: " << aio_ret << std::endl;
-    //     async_io_rst[query_bucket_id] = aio_ret;
-
-    //     delete[] events;
-    //     delete[] cb;
-    //     delete[] p_cb;
-    //     std::cout << "sync io function with query_bucket_id " << query_bucket_id << " done!!!!!!!!!!!!!!!!!!!!!!!!!!!." << std::endl;
-    // };
-
-    std::thread t_refine(fun_refine);
-    rc.RecordSection("start refine thread.");
-
-    std::vector<std::thread> async_io_threads(qk);
+    std::vector<std::thread> refine_threads(qk);
     for (auto i = 0; i < qk; i ++) {
         auto query_bucketi = pquery + query_buckets_border[i] * dq;
         uint32_t nqi = query_buckets_border[i + 1] - query_buckets_border[i];
@@ -2408,14 +2352,34 @@ void pipeline_search(const std::string& index_path,
                                                            refine_topk, K1, query_bucketi, pq_codebook, meta, 
                                                            pq_distancei,
                                                            pq_offseti);
-        async_io_threads[i] = std::thread(fun_async_io, i);
+        while (1) {
+            std::unique_lock<std::mutex> lock(update_cur_setup_num);
+            if (current_setup_num + nqi * refine_topk < max_io_nr) {
+                current_setup_num += nqi * refine_topk;
+                lock.unlock();
+                break;
+            } else {
+                lock.unlock();
+                std::unique_lock<std::mutex> s_lock(setup_mtx);
+                if (!setup_notified) {
+                    setup_cv.wait(s_lock);
+                }
+                setup_notified = false;
+            }
+        }
+        fun_async_io(i);
+        refine_threads[i] = std::thread(fun_async_refine, i);
     }
     rc.RecordSection("start all async io threads.");
     delete[] ivf_centroids;
 
-    t_refine.join();
-    assert(flag == true);
-    rc.RecordSection("refine thread done.");
+    for (auto i = 0; i < qk; i ++)
+        refine_threads[i].join();
+
+    for (auto i = 0; i < qk; i ++) {
+        delete[] cbs[i];
+        delete[] pcbs[i];
+    }
 
     for (int i = 0; i < K1; i ++) {
         close(raw_data_fds[i]);
@@ -2433,9 +2397,6 @@ void pipeline_search(const std::string& index_path,
     // write answers
     save_answers<DISTT, HEAPT>(answer_bin_file, topk, nq, write_answer_dists, write_answer_ids);
     rc.RecordSection("write answers done");
-
-    for (auto i = 0; i < async_io_threads.size(); i ++)
-        async_io_threads[i].detach();
 
     delete[] write_answer_ids;
     delete[] write_answer_dists;
