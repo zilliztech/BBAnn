@@ -13,6 +13,7 @@
 #include <thread>
 #include <chrono>
 #include <future>
+#include <atomic>
 //---------------------------------------------------------------------------
 namespace {
 //---------------------------------------------------------------------------
@@ -72,15 +73,14 @@ int IO_function() {
 //---------------------------------------------------------------------------
 TEST(IOPerf, Basic) {
     // Let this thread only run 1s.
-    std::future<bool> fut  = std::async(std::launch::async, []() {
-        {
-            DiskStat_Read_Counter s1;
-            PID_IO_Counter s2;
-            auto result = IO_function();
-        }
-        return true;
+    std::thread fut([]() {
+        DiskStat_Read_Counter s1;
+        PID_IO_Counter s2;
+        auto result = IO_function();
     });
+    fut.detach();
     std::this_thread::sleep_for(std::chrono_literals::operator ""s(1));
+    return;
 }
 //---------------------------------------------------------------------------
 } // namespace
