@@ -21,10 +21,6 @@ target_link_libraries(test_refine_id BigAnn)
 add_executable(test_distance test_distance.cpp)
 target_link_libraries(test_distance BigAnn)
 
-add_executable(helloworld_io_perf helloworld_io_perf.cpp)
-target_link_libraries(helloworld_io_perf BigAnn)
-
-
 ## Google Test
 set(TEST_SOURCES
         # add your *.cpp files here
