@@ -18,14 +18,16 @@ namespace {
 void __attribute__((optimize("O0"))) write_mmap_sample_data() {
     int fd;
     struct stat textfilestat;
-    fd = open("MMAP_DATA.txt", O_CREAT | O_TRUNC | O_WRONLY, 0777);
+    fd = open("MMAP_DATA.txt", O_CREAT | O_TRUNC | O_WRONLY);
     if (fd == -1) {
         perror("File open error ");
         return;
     }
     char ch = 'A';
+    int write_byte = 0;
     for (auto i = 0; i < 1'000; ++i) {
-        write(fd, &ch, sizeof(ch));
+        write_byte = write(fd, &ch, sizeof(ch));
+        assert(write_byte != -1);
     }
     close(fd);
     return;
