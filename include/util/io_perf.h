@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <array>
+#include <iostream>
 // ----------------------------------------------------------------------------------------------------
 /**
  * A class parsing a line of file /proc/$PID/io
