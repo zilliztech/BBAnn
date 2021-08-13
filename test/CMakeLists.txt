@@ -31,6 +31,7 @@ set(TEST_SOURCES
         Tester.cpp
         TestIOPerf.cpp)
 
+
 add_executable(tester ${TEST_SOURCES})
 target_link_libraries(tester PUBLIC
         BigAnn
