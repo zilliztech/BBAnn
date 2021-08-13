@@ -1,10 +1,18 @@
-project(BigAnn)
-
 cmake_minimum_required(VERSION 3.14)
+project(BigAnn)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 find_package(OpenMP REQUIRED)
+set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+find_package(Threads REQUIRED)
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
+include(BundledGTest)
+include(EnableAddressSanitizer)
+include(EnableUndefinedSanitizer)
 
 if (OPENMP_FOUND)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
@@ -12,8 +20,8 @@ if (OPENMP_FOUND)
     set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
 endif()
 
-set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -march=native -O3 -pthread -fopenmp -mavx2 -mfma" )
-# set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -march=native -O0 -g -pthread -fopenmp -mavx2 -mfma" )
+set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -O3 -fopenmp -mavx2 -mfma" )
+# set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -O0 -g -mavx2 -mfma" )
 
 # Log with I/O statistics doing profiling
 set(IOPERF 1)
