@@ -7,6 +7,9 @@
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <cassert>
+#include <cstdint>
+#include <algorithm>
+#include <random>
 // ----------------------------------------------------------------------------------------------------
 #include <iostream>
 #include <fstream>
@@ -14,7 +17,6 @@
 namespace {
 //---------------------------------------------------------------------------
 // TODO: only for UINT8. :(
-// TODO: only the first sample_size
 void generate_sample(const std::string& input_path, const int sample_size, const std::string& output_path) {
     // All datasets are in the common binary format that starts with
     // 8 bytes of data consisting of num_points(uint32_t) num_dimensions(uint32)
@@ -32,10 +34,24 @@ void generate_sample(const std::string& input_path, const int sample_size, const
     std::ofstream output(output_path, std::ios::binary);
     assert(output.is_open());
     uint8_t ele;
-    for (int i = 0; i < num_dimensions * sample_size; ++i) {
-        input.read(reinterpret_cast<char*>(&ele), sizeof(ele));
-        output.write(reinterpret_cast<char*>(&ele), sizeof(ele));
+
+    std::vector<size_t> random_indexes(sample_size, 0);
+    std::mt19937 generator(1);
+    for (int i = 0; i < sample_size; ++i) {
+        random_indexes[i] = generator() % num_points;
     }
+    std::sort(random_indexes.begin(), random_indexes.end());
+
+    for (int i = 0; i < sample_size; ++i) {
+        input.seekg(random_indexes[i] * sizeof(ele) * num_dimensions);
+        for (int j = 0; j < num_dimensions; ++j) {
+            input.read(reinterpret_cast<char*>(&ele), sizeof(ele));
+            output.write(reinterpret_cast<char *>(&ele), sizeof(ele));
+        }
+        std::cout << std::endl;
+    }
+    output.close();
+
 
     {
         // Validation: reading the ouput file
