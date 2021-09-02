@@ -54,6 +54,7 @@ add_executable(build_bigann ${build_bigann})
 add_executable(search_bigann ${search_bigann})
 
 add_subdirectory(test)
+add_subdirectory(playground)
 add_subdirectory(scripts)
 target_link_libraries(build_bigann BigAnn)
 target_link_libraries(search_bigann BigAnn)
