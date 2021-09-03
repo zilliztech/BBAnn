@@ -93,7 +93,7 @@ public:
     }
 
     // get one vector centroid
-    float* reconstruct(float* r, const U* c) {
+    void reconstruct(float* r, const U* c) {
         for (uint32_t i = 0; i < m; ++i, ++c) {
             memcpy(
                 r + i * dsub,
