@@ -16,6 +16,7 @@
  * 8. metric type(string): metric type
  * 9. K1(int): number of centroids of the first round kmeans
  * 10. bucket threshold(int): the threshold of spliting the cluster
+ * 11. PQ type(string): PQ or PQRes
  */
 
 int main(int argc, char** argv) {
