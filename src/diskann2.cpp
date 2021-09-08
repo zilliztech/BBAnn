@@ -660,6 +660,7 @@ void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
               << " buckets_label: " << static_cast<void *>(buckets_label)
               << std::endl;
     index_hnsw->setEf(refine_nprobe);
+    omp_set_num_threads(64);
 #pragma omp parallel for
     for (int64_t i = 0; i < nq; i ++) {
         // auto queryi = pquery + i * dq;
@@ -795,6 +796,7 @@ void search_pq_residual_quantizer(
         pre[i] = (i == 0 ? 0 : pre[i-1] + meta[i-1].size());
     }
 
+    omp_set_num_threads(64);
 #pragma omp parallel
     {
         float* precompute_table = nullptr;
@@ -2144,6 +2146,7 @@ void pipeline_search(const std::string& index_path,
                    Computer<DATAT, DATAT, DISTT>& dis_computer) {
     TimeRecorder rc("search bigann with pipeline");
 
+    // int refine_topk = 20;
     std::cout << "pipeline_search parameters:" << std::endl;
     std::cout << " index_path: " << index_path
               << " query_bin_file: " << query_bin_file
@@ -2159,6 +2162,7 @@ void pipeline_search(const std::string& index_path,
     uint32_t nq, dq;
     DATAT* raw_query = nullptr;
     read_bin_file<DATAT>(query_bin_file, raw_query, nq, dq);
+    // nq = 2000;
     rc.RecordSection("load query done.");
     std::cout << "query numbers: " << nq << " query dims: " << dq << std::endl;
 
@@ -2173,6 +2177,7 @@ void pipeline_search(const std::string& index_path,
     int qb_size_max = 65000 / refine_topk;
     int qb_size_advice = qb_size_max / 3;
     int qk = (nq * 3 - 1) / qb_size_advice + 1;
+    qk = 20;
 
     // do qk-means on query
     std::vector<int> query_buckets_border(qk + 2, 0);
@@ -2185,16 +2190,36 @@ void pipeline_search(const std::string& index_path,
     rc.RecordSection(std::to_string(qk) + "-means on query done.");
     elkan_L2_assign<const DATAT, const float, float>(raw_query, query_centroids, dq, nq, qk, bucket_ids.data(), bucket_dis.data());
     rc.RecordSection("elkan_L2_assign done.");
+    /*
+    {
+	std::cout << "show bucket id of query:" << std::endl;
+	for (auto i = 0; i < nq; i ++) {
+	    std::cout << i << "-" << bucket_ids[i] << " ";
+	}
+	std::cout << std::endl;
+    }
+    */
     for (auto i = 0; i < nq; i ++) {
         query_buckets_border[bucket_ids[i] + 2] ++;
     }
     delete[] query_centroids;
+
+    /*
+    */
+    {
+	std::cout << "show bucket size of query:" << std::endl;
+	for (auto i = 0; i < query_buckets_border.size(); i ++) {
+	    std::cout << query_buckets_border[i] << " ";
+	}
+	std::cout << std::endl;
+    }
 
     std::vector<unsigned char*> data_pool(qk, nullptr);
     std::vector<int> async_io_rst(qk, -1);
     std::vector<io_context_t> async_io_ctx(qk);
     int64_t vector_size = sizeof(DATAT) * dq;
     int64_t node_size = vector_size + sizeof(uint32_t);
+    std::cout << "vector size: " << vector_size << ", node_size: " << node_size << std::endl;
     for (auto i = 0; i < qk; i ++) {
         data_pool[i] = new unsigned char[node_size * refine_topk * query_buckets_border[i + 2]];
     }
@@ -2205,6 +2230,16 @@ void pipeline_search(const std::string& index_path,
         query_buckets_border[i] += query_buckets_border[i - 1];
     }
 
+    /*
+    {
+	std::cout << "show1 bucket size of query:" << std::endl;
+	for (auto i = 0; i < query_buckets_border.size(); i ++) {
+	    std::cout << query_buckets_border[i] << " ";
+	}
+	std::cout << std::endl;
+    }
+    */
+
     for (auto i = 0; i < nq; i ++) {
         auto offset = query_buckets_border[bucket_ids[i] + 1] ++;
         for (auto j = 0; j < dq; j ++) {
@@ -2214,14 +2249,40 @@ void pipeline_search(const std::string& index_path,
         qid2off[i] = offset;
     }
 
+    /*
+    {
+	std::cout << "show off2qid:" << std::endl;
+	for (auto i = 0; i < off2qid.size(); i ++) {
+	    std::cout << off2qid[i] << " ";
+	}
+	std::cout << std::endl;
+    }
+
+    {
+	std::cout << "show qid2off:" << std::endl;
+	for (auto i = 0; i < qid2off.size(); i ++) {
+	    std::cout << qid2off[i] << " ";
+	}
+	std::cout << std::endl;
+    }
+
+    {
+	std::cout << "show2 bucket size of query:" << std::endl;
+	for (auto i = 0; i < query_buckets_border.size(); i ++) {
+	    std::cout << query_buckets_border[i] << " ";
+	}
+	std::cout << std::endl;
+    }
+    */
+
 
     std::vector<std::vector<int>> qid_by_bucket(qk);
 
-    std::vector<int> raw_data_fds(K1);
-    for (int i = 0; i < K1; i ++) {
-        std::string aligned_data_filei = index_path + CLUSTER + std::to_string(i) + "-" + RAWDATA + BIN;
-        raw_data_fds[i] = open(aligned_data_filei.c_str(), O_RDONLY);
-    }
+    // std::vector<int> raw_data_fds(K1);
+    // for (int i = 0; i < K1; i ++) {
+    //     std::string aligned_data_filei = index_path + CLUSTER + std::to_string(i) + "-" + RAWDATA + BIN;
+    //     raw_data_fds[i] = open(aligned_data_filei.c_str(), O_RDONLY);
+    // }
 
     uint32_t page_size = PAGESIZE;
     uint32_t nnpp = page_size / node_size;
@@ -2248,10 +2309,12 @@ void pipeline_search(const std::string& index_path,
     }
 
     auto fun_sync_io = [&] (int query_bucket_id) {
-        std::cout << "sync io with query_bucket_id: " << query_bucket_id << " start!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
+    	TimeRecorder rc("sync pipeline on the " + std::to_string(query_bucket_id) + "th query bucket:");
+	// std::cout << "start sync io of the " << query_bucket_id << "th query bucket, current timestamp: " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() << std::endl;
         std::vector<std::vector<std::pair<uint32_t, uint32_t>>> refine_records(K1);
         int64_t bucket_nq = query_buckets_border[query_bucket_id + 1] - query_buckets_border[query_bucket_id];
         int max_events = 0;
+	// std::cout << "show refine_records(off, qid):" << std::endl;
         for (int64_t i = 0; i < bucket_nq; i ++) {
             auto pq_offi = pq_offsets + (query_buckets_border[query_bucket_id] + i) * refine_topk;
             for (int j = 0; j < refine_topk; j ++) {
@@ -2260,43 +2323,63 @@ void pipeline_search(const std::string& index_path,
                 uint32_t cid, off, qid;
                 parse_refine_id(pq_offi[j], cid, off, qid);
                 refine_records[cid].emplace_back(off, qid);
+		// std::cout << "(" << off << ", " << qid << ") ";
                 max_events ++;
             }
         }
-        std::cout << "fun_sync_io.query_bucket_id = " << query_bucket_id << ", refine_records.cnt = " << max_events << std::endl;
+	rc.RecordSection("parse id done");
+	// std::cout << std::endl;
+        // std::cout << "fun_sync_io.query_bucket_id = " << query_bucket_id << ", refine_records.cnt = " << max_events 
+		  // << " expect records number: " << bucket_nq * refine_topk << std::endl;
         for (auto i = query_buckets_border[query_bucket_id]; i < query_buckets_border[query_bucket_id + 1]; i ++) {
             auto ans_disi = answer_dists + topk * i;
             auto ans_idsi = answer_ids + topk * i;
             heap_heapify<HEAPT>(topk, ans_disi, ans_idsi);
         }
 
-        qid_by_bucket[query_bucket_id].reserve(bucket_nq * refine_topk);
-        int cnt = 0;
+        qid_by_bucket[query_bucket_id].resize(bucket_nq * refine_topk, -1);
+	std::vector<int> cnts(K1 + 1, 0);
+	for (auto i = 0; i < K1; i ++)
+		cnts[i + 1] = cnts[i] + refine_records[i].size();
+#pragma omp parallel for
         for (auto i = 0; i < K1; i ++) {
+            std::string aligned_data_filei = index_path + CLUSTER + std::to_string(i) + "-" + RAWDATA + BIN;
+            auto fdsi = open(aligned_data_filei.c_str(), O_RDONLY);
             // std::sort(refine_records[i].begin(), refine_records[i].end(), [](const auto &l, const auto &r) {
             //     return l.first < r.first;
             //     });
             for (auto j = 0; j < refine_records[i].size(); j ++) {
-                qid_by_bucket[query_bucket_id].push_back(refine_records[i][j].second);
+                qid_by_bucket[query_bucket_id][cnts[i]] = refine_records[i][j].second;
                 int64_t ofst = refine_records[i][j].first;
                 int64_t data_off = (uint64_t)(ofst / nnpp + 1) * page_size + node_size * (ofst % nnpp);
-                lseek64(raw_data_fds[i], data_off, SEEK_SET);
-                read(raw_data_fds[i], data_pool[query_bucket_id] + node_size * cnt, node_size);
-                cnt ++;
+        	// int pread_size = pread(raw_data_fds[i], data_pool[query_bucket_id] + node_size * cnt, node_size, data_off);
+		// assert (pread_size == node_size);
+                lseek64(fdsi, data_off, SEEK_SET);
+                read(fdsi, data_pool[query_bucket_id] + node_size * cnts[i], node_size);
+                cnts[i] ++;
                 // io_prep_pread(pcbs[query_bucket_id][cnt], raw_data_fds[i], data_pool[query_bucket_id] + node_size * cnt, node_size, (int64_t)(data_off));
             }
+	    close(fdsi);
         }
+	rc.RecordSection("sync io done");
+	// std::cout << "qid_by_bucket[" << query_bucket_id << "].size() = " << qid_by_bucket[query_bucket_id].size() << std::endl;
 
         
+	// std::cout << "show (qqid, dis, uid): " << std::endl;
         for (auto j = 0; j < qid_by_bucket[query_bucket_id].size(); j ++) {
             auto datai = data_pool[query_bucket_id] + node_size * j;
             auto qqid = query_buckets_border[query_bucket_id] + qid_by_bucket[query_bucket_id][j];
+	    if (qqid < 0) continue;
             auto disj = dis_computer((DATAT*)datai, pquery + qqid * dq, dq);
+	    // std::cout << "(" << qqid << ", " << disj << ", " << *((uint32_t*)(datai + vector_size)) << ") ";
             if (HEAPT::cmp(answer_dists[topk * qqid], disj)) {
                 heap_swap_top<HEAPT>(topk, answer_dists + topk * qqid, answer_ids + topk * qqid, disj, *((uint32_t*)(datai + vector_size)));
             }
         }
-        std::cout << "sync io function with query_bucket_id " << query_bucket_id << " done!!!!!!!!!!!!!!!!!!!!!!!!!!!." << std::endl;
+	rc.RecordSection("refine done");
+	// std::cout << "end sync io of the " << query_bucket_id << "th query bucket, current timestamp: " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() << std::endl;
+	// std::cout << std::endl;
+        // std::cout << "sync io function with query_bucket_id " << query_bucket_id << " done!!!!!!!!!!!!!!!!!!!!!!!!!!!." << std::endl;
     };
 
     auto fun_async_io = [&] (int query_bucket_id) {
@@ -2333,13 +2416,16 @@ void pipeline_search(const std::string& index_path,
         int cnt = 0;
         qid_by_bucket[query_bucket_id].reserve(bucket_nq * refine_topk);
         for (auto i = 0; i < K1; i ++) {
+            std::string aligned_data_filei = index_path + CLUSTER + std::to_string(i) + "-" + RAWDATA + BIN;
+            auto fdsi = open(aligned_data_filei.c_str(), O_RDONLY);
             for (auto j = 0; j < refine_records[i].size(); j ++) {
                 qid_by_bucket[query_bucket_id].push_back(refine_records[i][j].second);
                 int64_t ofst = refine_records[i][j].first;
                 int64_t data_off = (uint64_t)(ofst / nnpp + 1) * page_size + node_size * (ofst % nnpp);
-                io_prep_pread(pcbs[query_bucket_id][cnt], raw_data_fds[i], data_pool[query_bucket_id] + node_size * cnt, node_size, (int64_t)(data_off));
+                io_prep_pread(pcbs[query_bucket_id][cnt], fdsi, data_pool[query_bucket_id] + node_size * cnt, node_size, (int64_t)(data_off));
                 cnt += 1;
             }
+	    close(fdsi);
         }
         std::cout << "fun_async_io.query_bucket_id = " << query_bucket_id << ", refine cnt = " << cnt << std::endl;
         std::cout << "fun_async_io.query_bucket_id = " << query_bucket_id << ", qid_by_bucket[query_bucket_id].size() = " << qid_by_bucket[query_bucket_id].size() << std::endl;
@@ -2394,48 +2480,59 @@ void pipeline_search(const std::string& index_path,
     // rc.RecordSection("start refine thread.");
 
     std::vector<std::thread> refine_threads(qk);
+    rc.RecordSection("start do sync io.");
     for (auto i = 0; i < qk; i ++) {
+    	TimeRecorder rci("the " + std::to_string(i) + "th query bucket:");
+	// std::cout << "start the " << i << "th query bucket, current timestamp: " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() << std::endl;
         auto query_bucketi = pquery + query_buckets_border[i] * dq;
         uint32_t nqi = query_buckets_border[i + 1] - query_buckets_border[i];
         search_graph<DATAT>(index_hnsw, nqi, dq, nprobe, refine_nprobe, query_bucketi, p_labels + query_buckets_border[i] * nprobe);
+	rci.RecordSection("search graph done");
         auto pq_distancei = pq_distance + query_buckets_border[i] * refine_topk;
         auto pq_offseti = pq_offsets + query_buckets_border[i] * refine_topk;
         search_pq_residual_quantizer<DATAT, DISTT, HEAPTT>(quantizer, nqi, dq, ivf_centroids, p_labels + query_buckets_border[i] * nprobe, nprobe,
                                                            refine_topk, K1, query_bucketi, pq_codebook, meta, 
                                                            pq_distancei,
                                                            pq_offseti);
-        while (1) {
-            std::unique_lock<std::mutex> lock(update_cur_setup_num);
-            if (current_setup_num + nqi * refine_topk < max_io_nr) {
-                current_setup_num += nqi * refine_topk;
-                lock.unlock();
-                break;
-            } else {
-                lock.unlock();
-                std::unique_lock<std::mutex> s_lock(setup_mtx);
-                if (!setup_notified) {
-                    setup_cv.wait(s_lock);
-                }
-                setup_notified = false;
-            }
-        }
-        fun_async_io(i);
-        refine_threads[i] = std::thread(fun_async_refine, i);
+	rci.RecordSection("search pq residual done");
+        // while (1) {
+        //     std::unique_lock<std::mutex> lock(update_cur_setup_num);
+        //     if (current_setup_num + nqi * refine_topk < max_io_nr) {
+        //         current_setup_num += nqi * refine_topk;
+        //         lock.unlock();
+        //         break;
+        //     } else {
+        //         lock.unlock();
+        //         std::unique_lock<std::mutex> s_lock(setup_mtx);
+        //         if (!setup_notified) {
+        //             setup_cv.wait(s_lock);
+        //         }
+        //         setup_notified = false;
+        //     }
+        // }
+        // fun_async_io(i);
+        // refine_threads[i] = std::thread(fun_async_refine, i);
+	// fun_sync_io(i);
+        refine_threads[i] = std::thread(fun_sync_io, i);
+	// std::cout << "end the " << i << "th query bucket, current timestamp: " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() << std::endl;
     }
-    rc.RecordSection("start all async io threads.");
+    rc.RecordSection("start all sync io threads.");
+    // std::cout << "start all query buckets, current timestamp: " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() << std::endl;
     delete[] ivf_centroids;
 
     for (auto i = 0; i < qk; i ++)
         refine_threads[i].join();
+    rc.RecordSection("end all sync io threads.");
+    // std::cout << "end all query buckets, current timestamp: " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count() << std::endl;
 
     for (auto i = 0; i < qk; i ++) {
         delete[] cbs[i];
         delete[] pcbs[i];
     }
 
-    for (int i = 0; i < K1; i ++) {
-        close(raw_data_fds[i]);
-    }
+    // for (int i = 0; i < K1; i ++) {
+    //     close(raw_data_fds[i]);
+    // }
     for (auto i = 0; i < qk; i ++) {
         delete[] data_pool[i];
     }
