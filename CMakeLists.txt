@@ -40,23 +40,18 @@ endif(DIRECTIO)
 include_directories(include)
 
 add_subdirectory(src)
-set(build_bigann
-    build_bigann.cpp
-    #src/diskann2.cpp
-)
 
-set(search_bigann
-    search_bigann.cpp
-    #src/diskann2.cpp
-)
-
-add_executable(build_bigann ${build_bigann})
-add_executable(search_bigann ${search_bigann})
+add_executable(build_bigann build_bigann.cpp)
+add_executable(search_bigann search_bigann.cpp)
+add_executable(build_bbann build_bbann.cpp)
+add_executable(search_bbann search_bbann.cpp)
 
 add_subdirectory(test)
 add_subdirectory(playground)
 add_subdirectory(scripts)
 target_link_libraries(build_bigann BigAnn)
 target_link_libraries(search_bigann BigAnn)
+target_link_libraries(build_bbann BigAnn)
+target_link_libraries(search_bbann BigAnn)
 
 
