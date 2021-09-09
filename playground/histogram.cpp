@@ -16,7 +16,7 @@
 //---------------------------------------------------------------------------
 namespace {
 //---------------------------------------------------------------------------
-// TODO: only for text-to-image. :(
+// TODO: only for text-to-image with float. :(
 void generate_norm_histogram(const std::string& input_path, const std::string& output_path) {
     // All datasets are in the common binary format that starts with
     // 8 bytes of data consisting of num_points(uint32_t) num_dimensions(uint32)
@@ -30,7 +30,7 @@ void generate_norm_histogram(const std::string& input_path, const std::string& o
     assert(num_dimensions == 200 && "ONLY FOR TEST TO IMAGE.");
     std::cout << "number of points: " << num_points << std::endl;
     std::cout << "number of dimensions: " << num_dimensions << std::endl;
-    std::vector<float> norm_squared_vec(num_points, 0.0);
+    std::vector<float> norm_vec(num_points, 0.0);
 
     std::cout << "Start to process the vector file." << std::endl;
     float ele;
@@ -40,18 +40,17 @@ void generate_norm_histogram(const std::string& input_path, const std::string& o
             input.read(reinterpret_cast<char*>(&ele), sizeof(ele));
             norm_squared += ele * ele;
         }
-        norm_squared_vec[i] = norm_squared;
+        norm_vec[i] = std::sqrt(norm_squared);
     }
     input.close();
     std::cout << "End of processing the vector file. Start to do in-memory sort." << std::endl;
 
     // ONLY IN-MEMORY SORTING!
-    std::sort(norm_squared_vec.begin(), norm_squared_vec.end());
-    const float min = norm_squared_vec.front();
-    const float max = norm_squared_vec.back();
+    std::sort(norm_vec.begin(), norm_vec.end());
+    const float min = norm_vec.front();
+    const float max = norm_vec.back();
     assert(max <= 1.0);
     std::cout << "End of sorting. Start to build histogram." << std::endl;
-
 
     const int num_histogram_sperator = 20 - 1;
     std::vector<uint64_t> range_counter(num_histogram_sperator + 1, 0);
@@ -59,7 +58,7 @@ void generate_norm_histogram(const std::string& input_path, const std::string& o
     // [range_start， range_end)， but for the last [range_start, max]
     float range_start = min;
     float range_end = min + range_width;
-    for (const auto& norm : norm_squared_vec) {
+    for (const auto& norm : norm_vec) {
         const int index = (norm == max) ? num_histogram_sperator : (norm - min) / range_width;
         // Possible BUG: compare of float 0.0!=0.0
         assert(index >= 0 && index <= num_histogram_sperator);
@@ -87,13 +86,14 @@ void generate_norm_histogram(const std::string& input_path, const std::string& o
         }
         assert(sum_percentage == 1.0);
         assert(sum_counter == num_points);
+        std::cout << "The median of Norm: " << norm_vec[num_points / 2] << std::endl;
     }
 
     {
         std::ofstream output(output_path, std::ios::binary);
         assert(output.is_open());
         int i = 0;
-        for (const auto& norm : norm_squared_vec) {
+        for (const auto& norm : norm_vec) {
             output << norm << " ";
             ++i;
         }

@@ -11,11 +11,18 @@ def ivecs_read(fname):
     d = a[0]
     return a.reshape(-1, d + 1)[:, 1:].copy(), d
 
-
 def fvecs_read(fname):
     data, d = ivecs_read(fname)
     return data.view('float32').astype(np.float32), d
 
+def fbin_read(fname):
+    file = np.fromfile(fname, dtype='int32')
+    num_points = file[0]
+    dim = file[1]
+    file = file[2:]
+    file = file.view('float32').astype(np.float32)
+    file = file.reshape(-1, dim)
+    return file, num_points, dim
 
 def bvecs_read(fname):
     a = np.fromfile(fname, dtype='uint8')

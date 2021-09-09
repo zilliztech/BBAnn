@@ -21,9 +21,10 @@ datasets = ['text-to-image']
 
 
 def plot(dataset):
-    path = '../data/{}/{}_base.fvecs'.format(dataset, dataset)
+    # path = '../data/{}/{}_base.fvecs'.format(dataset, dataset)
     path = "/home/jigao/Desktop/Yandex.TexttoImage.base.10M.fdata"
-    X, dim = fvecs_read(path)
+    # X, dim = fvecs_read(path)
+    X, num_points, dim = fbin_read(path)
     norms = np.linalg.norm(X, axis=1)
     norms[:] = norms[:] / np.max(norms)
     norms = np.sort(norms)
@@ -44,8 +45,8 @@ def plot(dataset):
 
     # plt.figure(figsize=(12.8, 9.25))
     # plt.axis([0, 1, 0, 2e6])
-    plt.hist(np.tile(norms, 100), bins=100, color='dimgray')
-    plt.legend(["%s, median %.3f" % (dataset, norms[median])], loc='upper right')
+    plt.hist(norms, bins=20, color='dimgray')
+    plt.legend(["%s, median %.6f" % (dataset, norms[median])], loc='upper right')
     plt.xlabel('Norm')
     plt.xticks()
     plt.ylabel('Frequency')
