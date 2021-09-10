@@ -82,7 +82,7 @@ void generate_norm_histogram(const std::string& input_path, const std::string& o
                       << ((i == range_pecetage.size() - 1) ? (max) : (min + range_width * (i + 1)))
                       << ((i == range_pecetage.size() - 1) ? "]" : ")")
                       << "  :=  "
-                      << range_counter[i] << "  " << range_pecetage[i]  << "%" << std::endl;
+                      << range_counter[i] << "  " << range_pecetage[i] * 100.0 << "%" << std::endl;
         }
         assert(sum_percentage == 1.0);
         assert(sum_counter == num_points);
@@ -102,6 +102,7 @@ void generate_norm_histogram(const std::string& input_path, const std::string& o
             }
         }
         output << std::endl;
+        output.close();
     }
 }
 //---------------------------------------------------------------------------
