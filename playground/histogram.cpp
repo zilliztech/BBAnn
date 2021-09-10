@@ -96,10 +96,10 @@ void generate_norm_histogram(const std::string& input_path, const std::string& o
         for (const auto& norm : norm_vec) {
             output << norm << " ";
             ++i;
-        }
-        if (i % 999999 == 0) {
-            output << "\n";
-            i = 0;
+            if (i % 999999 == 0) {
+                output << "\n";
+                i = 0;
+            }
         }
         output << std::endl;
     }
@@ -110,14 +110,14 @@ void generate_norm_histogram(const std::string& input_path, const std::string& o
 int main() {
     std::cout << "Please type in the input file input_path into the std::cin:" << std::endl;
     std::cout << "Example: \"/home/jigao/Desktop/Yandex.TexttoImage.base.10M.fdata\"" << std::endl;
-std::string input_path = "/home/jigao/Desktop/Yandex.TexttoImage.base.10M.fdata";
-//    std::cin >> input_path;
+    std::string input_path ;
+    std::cin >> input_path;
     std::cout << "The input input_path is: " << input_path << std::endl;
 
     std::cout << "Please type in the output file input_path into the std::cin:" << std::endl;
     std::cout << "Example: \"/home/jigao/Desktop/histogram.csv\"" << std::endl;
-    std::string output_path = "/home/jigao/Desktop/histogram.csv";
-//    std::cin >> output_path;
+    std::string output_path;
+    std::cin >> output_path;
     std::cout << "The output_path is: " << output_path << std::endl;
 
     generate_norm_histogram(input_path, output_path);
