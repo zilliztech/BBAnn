@@ -17,7 +17,7 @@
 namespace {
 //---------------------------------------------------------------------------
 // TODO: only for text-to-image with float. :(
-void generate_norm_histogram(const std::string& input_path, const std::string& output_path) {
+void generate_norm_histogram(const std::string& input_path, const std::string& output_path, const int num_bins) {
     // All datasets are in the common binary format that starts with
     // 8 bytes of data consisting of num_points(uint32_t) num_dimensions(uint32)
     // followed by num_pts X num_dimensions x sizeof(type) bytes of data stored one vector after another.
@@ -52,7 +52,7 @@ void generate_norm_histogram(const std::string& input_path, const std::string& o
     assert(max <= 1.0);
     std::cout << "End of sorting. Start to build histogram." << std::endl;
 
-    const int num_histogram_sperator = 20 - 1;
+    const int num_histogram_sperator = num_bins - 1;
     std::vector<uint64_t> range_counter(num_histogram_sperator + 1, 0);
     const float range_width = (max - min) / (num_histogram_sperator + 1);
     // [range_start， range_end)， but for the last [range_start, max]
@@ -114,13 +114,19 @@ int main() {
     std::cin >> input_path;
     std::cout << "The input input_path is: " << input_path << std::endl;
 
+    std::cout << "Please type in the number of bins of the histogram:" << std::endl;
+    std::cout << "Example: 20" << std::endl;
+    int num_bins;
+    std::cin >> num_bins;
+    std::cout << "The input number of bins is: " << num_bins << std::endl;
+
     std::cout << "Please type in the output file input_path into the std::cin:" << std::endl;
     std::cout << "Example: \"/home/jigao/Desktop/histogram.csv\"" << std::endl;
     std::string output_path;
     std::cin >> output_path;
     std::cout << "The output_path is: " << output_path << std::endl;
 
-    generate_norm_histogram(input_path, output_path);
+    generate_norm_histogram(input_path, output_path, num_bins);
 
     return 0;
 }
