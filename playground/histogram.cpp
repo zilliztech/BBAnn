@@ -84,7 +84,7 @@ void generate_norm_histogram(const std::string& input_path, const std::string& o
                       << "  :=  "
                       << range_counter[i] << "  " << range_pecetage[i] * 100.0 << "%" << std::endl;
         }
-        assert(sum_percentage == 1.0 || std::abs(sum_percentage - 1.0) < std::abs(std::min(sum_percentage, 1.0)) * std::numeric_limits<double>::epsilon());
+        assert(sum_percentage == 1.0 || std::abs(sum_percentage - 1.0) < (1.0 * std::numeric_limits<double>::epsilon()));
         assert(sum_counter == num_points);
         std::cout << "The median of Norm: " << norm_vec[num_points / 2] << std::endl;
     }
