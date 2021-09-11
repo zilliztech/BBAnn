@@ -183,6 +183,22 @@ void reservoir_sampling_residual(
     }
 }
 
+inline uint32_t gen_global_block_id(const uint32_t cid, const uint32_t bid) {
+    uint32_t ret = 0;
+    ret |= (cid & 0xff);
+    ret <<= 24;
+    ret |= (bid & 0xffffff);
+    return ret;
+}
+
+inline void parse_global_block_id(uint32_t id, uint32_t& cid, uint32_t& bid) {
+    bid = (id & 0xffffff);
+    id >>= 24;
+    cid = (id & 0xff);
+    return ;
+}
+
+
 inline uint64_t gen_id(const uint32_t cid, const uint32_t bid, const uint32_t off) {
     uint64_t ret = 0;
     ret |= (cid & 0xff);

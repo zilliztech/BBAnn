@@ -284,6 +284,99 @@ void conquer_clusters(const std::string& output_path,
     rc.ElapseFromBegin("conquer cluster totally done");
 }
 
+template<typename DATAT, typename DISTT, typename HEAPT>
+void  hierarchical_clusters(const std::string& output_path,
+                            const int K1, const double  avg_len, const int blk_size) {
+    TimeRecorder rc("hierarchical clusters");
+    std::cout << "hierarchical clusters parameters:" << std::endl;
+    std::cout << " output_path: " << output_path
+              << " vector avg length: " << avg_len
+              <<" block size: " << blk_size
+              << std::endl;
+
+    uint32_t cluster_size, cluster_dim, ids_size, ids_dim;
+    uint32_t threshold;
+    uint32_t entry_num;
+
+    std::string bucket_centroids_file = output_path + BUCKET + CENTROIDS + BIN;
+    std::string bucket_centroids_id_file = output_path + CLUSTER + COMBINE_IDS + BIN;
+    IOWriter centroids_writer(bucket_centroids_file);
+    IOWriter centroids_id_writer(bucket_centroids_id_file);
+    uint32_t placeholder = 1;
+    char* data_blk_buf = new char[blk_size];
+    centroids_writer.write((char*)&placeholder, sizeof(uint32_t));
+    centroids_writer.write((char*)&placeholder, sizeof(uint32_t));
+    centroids_id_writer.write((char*)&placeholder, sizeof(uint32_t));
+    centroids_id_writer.write((char*)&placeholder, sizeof(uint32_t));
+    uint32_t global_centroids_number = 0;0
+    for (int i=0; i < K1; i++) {
+        TimeRecorder rci("train-cluster-" + std::to_string(i));
+        std::string data_file = output_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
+        std::string ids_file = output_path + CLUSTER + std::to_string(i) + GLOBAL_IDS + BIN;
+        IOReader data_reader(data_file);
+        IOReader ids_reader(ids_file);
+
+        data_reader.read((char*)&cluster_size, sizeof(uint32_t));
+        data_reader.read((char*)&cluster_dim, sizeof(uint32_t));
+        ids_reader.read((char*)&ids_size, sizeof(uint32_t));
+        ids_reader.read((char*)&ids_dim, sizeof(uint32_t));
+        entry_num = blk_size/(cluster_dim * sizeof(DATAT) + ids_dim * sizeof(uint32_t));
+        threshold = cluster_size / entry_num;
+        assert(cluster_size == ids_size);
+        assert(ids_dim == 1);
+        assert(threshold > 0);
+
+        DATAT* datai = new DATAT[cluster_size * cluster_dim];
+        uint32_t* idi = new uint32_t[ids_size * ids_dim];
+        uint32_t blk_num = 0;
+        data_reader.read((char*)datai, cluster_size * cluster_dim * sizeof(DATAT));
+        ids_reader.read((char*)idi, ids_size * ids_dim * sizeof(uint32_t));
+
+        IOWriter data_writer(data_file, MEGABYTE * 100);
+        memset(data_blk_buf, 0, blk_size);
+        *(uint32_t*)(data_blk_buf + 0 * sizeof(uint32_t)) = cluster_size;
+        *(uint32_t*)(data_blk_buf + 1 * sizeof(uint32_t)) = cluster_dim;
+        *(uint32_t*)(data_blk_buf + 2 * sizeof(uint32_t)) = blk_size;
+        *(uint32_t*)(data_blk_buf + 3 * sizeof(uint32_t)) = entry_num;
+        *(uint32_t*)(data_blk_buf + 4 * sizeof(uint32_t)) = placeholder;
+        *(uint32_t*)(data_blk_buf + 5 * sizeof(uint32_t)) = i;
+        data_writer.write((char*)data_blk_buf, blk_size);
+
+        recursive_kmeans(cluster_size, datai, idi, cluster_dim, threshold, blk_size, blk_num,
+                         data_writer, centroids_writer, false, avg_len);
+
+        global_centroids_number += blk_num;
+        data_writer.~IOWriter();
+
+        //write back the data's placeholder:
+        ofstream data_meta_writer(data_file, std::ios::binary | std::ios::in);
+        data_meta_writer.seekp(4 * sizeof(uint32_t));
+        data_meta_writer.write(blk_num);
+        data_meta_writer.close();
+        delete [] datai;
+        delete [] idi;
+    }
+    delete [] data_blk_buf;
+    centroids_writer.~IOWriter();
+    centroids_id_writer.~IOWriter();
+
+    // write back the centroids' placeholder:
+    ofstream centroids_meta_writer(data_file, std::ios::binary | std::ios::in);
+    ofstream centroids_ids_meta_writer(data_file, std::ios::binary | std::ios::in);
+    centroids_meta_writer.seekp(0);
+    centroids_meta_writer.write(global_centroids_number, sizeof(uint32_t));
+    centroids_meta_writer.write(dim, sizeof(uint32_t));
+    centroids_ids_meta_writer.seekp(0);
+    centroids_ids_meta_writer.write(global_centroids_number, sizeof(uint32_t));
+    centroids_ids_meta_writer.write(1, sizeof(uint32_t));
+    centroids_meta_writer.close();
+    centroids_ids_meta_writer.close();
+
+    std::cout<<"hierarchical_clusters generate "<<global_centroids_number<<" centroids"<<std::endl;
+    return ;
+}
+
+
 void build_graph(const std::string& index_path,
                  const int hnswM, const int hnswefC,
                  MetricType metric_type) {
@@ -365,7 +458,7 @@ void build_bigann(const std::string& raw_data_bin_file,
     divide_raw_data<DATAT, DISTT, HEAPT>(raw_data_bin_file, output_path, centroids, K1);
     rc.RecordSection("divide raw data into " + std::to_string(K1) + " clusters done");
 
-    conquer_clusters<DATAT, DISTT, HEAPT>(output_path, K1, avg_len, threshold);
+    hierarchical_clusters<DATAT, DISTT, HEAPT>(output_path, K1, avg_len, threshold);
     rc.RecordSection("conquer each cluster into buckets done");
 
     build_graph(output_path, hnswM, hnswefC, metric_type);
