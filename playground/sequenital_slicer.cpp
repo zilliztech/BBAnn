@@ -41,21 +41,21 @@ void generate_slice(const std::string& input_path, const int slice_size, const s
     output.close();
 
     {
-        // Validation: reading the output file
-        std::ifstream output(output_path, std::ios::binary);
-        assert(output.is_open());
-        output.read(reinterpret_cast<char*>(&num_points), sizeof(num_points));
-        assert(num_points == slice_size);
-        output.read(reinterpret_cast<char*>(&num_dimensions), sizeof(num_dimensions));
-        T ele;
-        for (int i = 0; i < slice_size; ++i) {
-            for (int j = 0; j < num_dimensions; ++j) {
-                output.read(reinterpret_cast<char*>(&ele), sizeof(ele));
-                int temp = ele;
-                std::cout << temp << " ";
-            }
-            std::cout << std::endl;
-        }
+//        // Validation: reading the output file
+//        std::ifstream output(output_path, std::ios::binary);
+//        assert(output.is_open());
+//        output.read(reinterpret_cast<char*>(&num_points), sizeof(num_points));
+//        assert(num_points == slice_size);
+//        output.read(reinterpret_cast<char*>(&num_dimensions), sizeof(num_dimensions));
+//        T ele;
+//        for (int i = 0; i < slice_size; ++i) {
+//            for (int j = 0; j < num_dimensions; ++j) {
+//                output.read(reinterpret_cast<char*>(&ele), sizeof(ele));
+//                int temp = ele;
+//                std::cout << temp << " ";
+//            }
+//            std::cout << std::endl;
+//        }
     }
 }
 //---------------------------------------------------------------------------
