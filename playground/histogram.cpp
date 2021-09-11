@@ -92,16 +92,17 @@ void generate_norm_histogram(const std::string& input_path, const std::string& o
     {
         std::ofstream output(output_path, std::ios::binary);
         assert(output.is_open());
-        int i = 0;
-        for (const auto& norm : norm_vec) {
-            output << norm << " ";
-            ++i;
-            if (i % 999999 == 0) {
-                output << "\n";
-                i = 0;
-            }
+        output << "norm value range,counter,percentage" << std::endl;  // CSV's header
+        for (int i = 0; i < range_pecetage.size(); ++i) {
+            output << "["
+                      << min + range_width * i
+                      << " ~ "
+                      << ((i == range_pecetage.size() - 1) ? (max) : (min + range_width * (i + 1)))
+                      << ((i == range_pecetage.size() - 1) ? "]" : ")")
+                      << ","
+                      << range_counter[i]
+                      << "," << range_pecetage[i] << std::endl;
         }
-        output << std::endl;
         output.close();
     }
 }
