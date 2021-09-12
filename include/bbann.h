@@ -3,6 +3,8 @@
 #include <iostream>
 #include <string>
 
+#include "omp.h"
+
 #include "util/constants.h"
 #include "util/utils.h"
 #include "hnswlib/hnswlib.h"
@@ -41,7 +43,7 @@ void save_answers(const std::string& answer_bin_file,
                   bool use_comp_format = true);
 
 template<typename DATAT, typename DISTT, typename HEAPT>
-void build_bigann(const std::string& raw_data_bin_file,
+void build_bbann(const std::string& raw_data_bin_file,
                   const std::string& output_path,
                   const int hnswM, const int hnswefC,
                   const int K1, const int threshold,
