@@ -77,6 +77,8 @@ void generate_norm_histogram(const std::string& input_path, const std::string& o
         }
         assert(sum_percentage == 1.0 || std::fabs(sum_percentage - 1.0) <= 0.00001);
         assert(sum_counter == num_points);
+        std::cout << "The min of Norm: " << norm_vec.front() << std::endl;
+        std::cout << "The max of Norm: " << norm_vec.back() << std::endl;
         std::cout << "The median of Norm: " << norm_vec[num_points / 2] << std::endl;
     }
 
