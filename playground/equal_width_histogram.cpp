@@ -105,7 +105,7 @@ void generate_norm_histogram(const std::string& input_path, const std::string& o
 int main() {
     std::cout << "Please type in the input file input_path into the std::cin:" << std::endl;
     std::cout << "Example: \"/home/jigao/Desktop/Yandex.TexttoImage.base.10M.fdata\"" << std::endl;
-    std::string input_path ;
+    std::string input_path;
     std::cin >> input_path;
     std::cout << "The input input_path is: " << input_path << std::endl;
 
