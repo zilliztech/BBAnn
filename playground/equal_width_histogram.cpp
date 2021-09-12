@@ -53,24 +53,22 @@ void generate_norm_histogram(const std::string& input_path, const std::string& o
     std::cout << "End of sorting. Start to build histogram." << std::endl;
 
     const int num_histogram_sperator = num_bins - 1;
-    std::vector<uint64_t> range_counter(num_histogram_sperator + 1, 0);
-    const float range_width = (max - min) / (num_histogram_sperator + 1);
+    std::vector<uint64_t> range_counter(num_bins, 0);
+    const float range_width = (max - min) / num_bins;
     // [range_start， range_end)， but for the last [range_start, max]
-    float range_start = min;
-    float range_end = min + range_width;
     for (const auto& norm : norm_vec) {
         const int index = (norm == max) ? num_histogram_sperator : (norm - min) / range_width;
-        // Possible BUG: compare of float 0.0!=0.0
         assert(index >= 0 && index <= num_histogram_sperator);
         ++range_counter[index];
     }
-    std::vector<double> range_pecetage(num_histogram_sperator + 1, 0.0);
+    std::vector<double> range_pecetage(num_bins, 0.0);
     for (int i = 0; i < range_pecetage.size(); ++i) {
         range_pecetage[i] = 1.0 * range_counter[i] / num_points;
     }
     std::cout << "End of building histogram." << std::endl;
 
     {
+        // COUT output
         uint64_t sum_counter = 0;
         double sum_percentage = 0.0;
         for (int i = 0; i < range_pecetage.size(); ++i) {
@@ -90,6 +88,7 @@ void generate_norm_histogram(const std::string& input_path, const std::string& o
     }
 
     {
+        // CSV output
         std::ofstream output(output_path, std::ios::binary);
         assert(output.is_open());
         output << "norm value range,counter,percentage" << std::endl;  // CSV's header
