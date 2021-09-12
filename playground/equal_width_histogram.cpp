@@ -1,11 +1,4 @@
 // ----------------------------------------------------------------------------------------------------
-#include <stdio.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <sys/mman.h>
 #include <cassert>
 #include <cstdint>
 #include <algorithm>
@@ -53,24 +46,21 @@ void generate_norm_histogram(const std::string& input_path, const std::string& o
     std::cout << "End of sorting. Start to build histogram." << std::endl;
 
     const int num_histogram_sperator = num_bins - 1;
-    std::vector<uint64_t> range_counter(num_histogram_sperator + 1, 0);
-    const float range_width = (max - min) / (num_histogram_sperator + 1);
+    std::vector<uint64_t> range_counter(num_bins, 0);
+    const float range_width = (max - min) / num_bins;
     // [range_start， range_end)， but for the last [range_start, max]
-    float range_start = min;
-    float range_end = min + range_width;
     for (const auto& norm : norm_vec) {
         const int index = (norm == max) ? num_histogram_sperator : (norm - min) / range_width;
-        // Possible BUG: compare of float 0.0!=0.0
         assert(index >= 0 && index <= num_histogram_sperator);
         ++range_counter[index];
     }
-    std::vector<double> range_pecetage(num_histogram_sperator + 1, 0.0);
-    for (int i = 0; i < range_pecetage.size(); ++i) {
-        range_pecetage[i] = 1.0 * range_counter[i] / num_points;
-    }
+
+    std::vector<double> range_pecetage(num_bins, 0.0);
+    for (int i = 0; i < range_pecetage.size(); ++i) range_pecetage[i] = 1.0 * range_counter[i] / num_points;
     std::cout << "End of building histogram." << std::endl;
 
     {
+        // COUT output
         uint64_t sum_counter = 0;
         double sum_percentage = 0.0;
         for (int i = 0; i < range_pecetage.size(); ++i) {
@@ -86,10 +76,13 @@ void generate_norm_histogram(const std::string& input_path, const std::string& o
         }
         assert(sum_percentage == 1.0 || std::fabs(sum_percentage - 1.0) <= 0.00001);
         assert(sum_counter == num_points);
+        std::cout << "The min of Norm: " << norm_vec.front() << std::endl;
+        std::cout << "The max of Norm: " << norm_vec.back() << std::endl;
         std::cout << "The median of Norm: " << norm_vec[num_points / 2] << std::endl;
     }
 
     {
+        // CSV output
         std::ofstream output(output_path, std::ios::binary);
         assert(output.is_open());
         output << "norm value range,counter,percentage" << std::endl;  // CSV's header
@@ -99,8 +92,7 @@ void generate_norm_histogram(const std::string& input_path, const std::string& o
                       << " ~ "
                       << ((i == range_pecetage.size() - 1) ? (max) : (min + range_width * (i + 1)))
                       << ((i == range_pecetage.size() - 1) ? "]" : ")")
-                      << ","
-                      << range_counter[i]
+                      << "," << range_counter[i]
                       << "," << range_pecetage[i] << std::endl;
         }
         output.close();
@@ -112,7 +104,7 @@ void generate_norm_histogram(const std::string& input_path, const std::string& o
 int main() {
     std::cout << "Please type in the input file input_path into the std::cin:" << std::endl;
     std::cout << "Example: \"/home/jigao/Desktop/Yandex.TexttoImage.base.10M.fdata\"" << std::endl;
-    std::string input_path ;
+    std::string input_path;
     std::cin >> input_path;
     std::cout << "The input input_path is: " << input_path << std::endl;
 
