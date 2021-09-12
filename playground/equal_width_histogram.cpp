@@ -92,8 +92,7 @@ void generate_norm_histogram(const std::string& input_path, const std::string& o
                       << " ~ "
                       << ((i == range_pecetage.size() - 1) ? (max) : (min + range_width * (i + 1)))
                       << ((i == range_pecetage.size() - 1) ? "]" : ")")
-                      << ","
-                      << range_counter[i]
+                      << "," << range_counter[i]
                       << "," << range_pecetage[i] << std::endl;
         }
         output.close();
