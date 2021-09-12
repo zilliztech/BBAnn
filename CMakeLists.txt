@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.14)
 project(BigAnn)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(OpenMP REQUIRED)
@@ -11,6 +11,7 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 include(BundledGTest)
+include(Gbenchmark)
 include(EnableAddressSanitizer)
 include(EnableUndefinedSanitizer)
 

@@ -2,6 +2,8 @@ build/**/*
 data/**/*
 .idea/
 cmake-build-*/
+build/
+release/
 logs/
 
 # Created by https://www.toptal.com/developers/gitignore/api/cmake,vim,visualstudiocode,c++,linux,macos
