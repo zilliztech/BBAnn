@@ -54,10 +54,9 @@ void generate_norm_histogram(const std::string& input_path, const std::string& o
         assert(index >= 0 && index <= num_histogram_sperator);
         ++range_counter[index];
     }
+
     std::vector<double> range_pecetage(num_bins, 0.0);
-    for (int i = 0; i < range_pecetage.size(); ++i) {
-        range_pecetage[i] = 1.0 * range_counter[i] / num_points;
-    }
+    for (int i = 0; i < range_pecetage.size(); ++i) range_pecetage[i] = 1.0 * range_counter[i] / num_points;
     std::cout << "End of building histogram." << std::endl;
 
     {
