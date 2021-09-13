@@ -73,9 +73,10 @@ void generate_norm_bias_histogram(const std::string& base_input_path, const std:
         uint32_t nn_id;  // NN vector ID
         for (size_t j = 0; j < knn; ++j) {
             query_input.read(reinterpret_cast<char*>(&nn_id), sizeof(nn_id));
-            all_nn_id.emplace_back(nn_id);
+            if (j < TOP_K) all_nn_id.emplace_back(nn_id);  // skip the rest
         }
     }
+    assert(all_nn_id.size() == num_queries * TOP_K);
 
     // Counter NN's norm in histogram.
     std::vector<uint64_t> range_counter(num_bins, 0);
@@ -93,7 +94,7 @@ void generate_norm_bias_histogram(const std::string& base_input_path, const std:
 
     std::vector<double> range_percentage(num_bins, 0.0);
     for (int i = 0; i < range_percentage.size(); ++i) {
-        range_percentage[i] = 1.0 * range_counter[i] / num_points;
+        range_percentage[i] = 1.0 * range_counter[i] / all_nn_id.size();
     }
     std::cout << "End of building histogram." << std::endl;
 
