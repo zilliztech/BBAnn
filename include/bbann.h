@@ -28,6 +28,9 @@ template<typename DATAT, typename DISTT, typename HEAPT>
 void conquer_clusters(const std::string& output_path,
                       const int K1, const int threshold);
 
+template<typename DATAT, typename DISTT, typename HEAPT>
+void  hierarchical_clusters(const std::string& output_path,
+                            const int K1, const double  avg_len, const int blk_size);
 
 void build_graph(const std::string& index_path,
                  const int hnswM, const int hnswefC,
