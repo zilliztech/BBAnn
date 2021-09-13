@@ -60,8 +60,13 @@ void read_ground_truth(const std::string& input_path) {
 
     std::cout << "min nn id: " << min_nn_id << std::endl;
     std::cout << "max nn id: " << max_nn_id << std::endl;
-    std::cout << "min distance: " << min_distance << std::endl;
-    std::cout << "min distance: " << max_distance << std::endl;
+    if constexpr (std::is_same_v<T, float>) {
+        std::cout << "min distance: " << min_distance << std::endl;
+        std::cout << "min distance: " << max_distance << std::endl;
+    } else {
+        std::cout << "min distance: " << static_cast<int32_t>(min_distance) << std::endl;
+        std::cout << "min distance: " << static_cast<int32_t>(max_distance) << std::endl;
+    }
 
     input.close();
 }
