@@ -49,7 +49,11 @@ void read_ground_truth(const std::string& input_path) {
             input.read(reinterpret_cast<char*>(&distance), sizeof(distance));
             min_distance = std::min<T>(min_distance, distance);
             max_distance = std::max<T>(max_distance, distance);
-            std::cout << distance << " ";
+            if constexpr (std::is_same_v<T, float>) {
+                std::cout << distance << " ";
+            } else {
+                std::cout << static_cast<int32_t>(distance) << " ";
+            }
         }
         std::cout << std::endl;
     }
@@ -81,8 +85,10 @@ int main() {
     }
     std::cout << "The data type is: " << data_type << std::endl;
 
-    if (data_type == "uint8" || data_type == "int8") {
+    if (data_type == "uint8") {
         read_ground_truth<uint8_t>(input_path);
+    } else if (data_type == "int8") {
+        read_ground_truth<int8_t>(input_path);
     } else if (data_type == "float32") {
         read_ground_truth<float>(input_path);
     }
