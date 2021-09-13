@@ -74,6 +74,7 @@ void read_ground_truth(const std::string& input_path) {
 } // namespace
 //---------------------------------------------------------------------------
 int main() {
+    // TODO: NO Range Search Dataset
     std::cout << "Please type in the input file input_path into the std::cin:" << std::endl;
     std::cout << "Example: \"/home/jigao/Desktop/GT_10M_v2/GT_10M/bigann-10M\"" << std::endl;
     std::string input_path;
@@ -90,13 +91,15 @@ int main() {
     }
     std::cout << "The data type is: " << data_type << std::endl;
 
-    if (data_type == "uint8") {
-        read_ground_truth<uint8_t>(input_path);
-    } else if (data_type == "int8") {
-        read_ground_truth<int8_t>(input_path);
-    } else if (data_type == "float32") {
-        read_ground_truth<float>(input_path);
-    }
+    read_ground_truth<float>(input_path);
+
+//    if (data_type == "uint8") {
+//        read_ground_truth<uint8_t>(input_path);
+//    } else if (data_type == "int8") {
+//        read_ground_truth<int8_t>(input_path);
+//    } else if (data_type == "float32") {
+//        read_ground_truth<float>(input_path);
+//    }
     return 0;
 }
 //---------------------------------------------------------------------------
