@@ -1,16 +1,9 @@
 // ----------------------------------------------------------------------------------------------------
-#include <stdio.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <stdlib.h>
 #include <sys/mman.h>
 #include <cassert>
 #include <cstdint>
 #include <algorithm>
-#include <random>
-// ----------------------------------------------------------------------------------------------------
+#include <limits>
 #include <iostream>
 #include <fstream>
 //---------------------------------------------------------------------------
@@ -30,27 +23,41 @@ void read_ground_truth(const std::string& input_path) {
     std::cout << "number of queries: " << num_queries << std::endl;
     std::cout << "k-NN: " << knn << std::endl;
 
+    uint32_t min_nn_id = std::numeric_limits<uint32_t>::max();
+    uint32_t max_nn_id = std::numeric_limits<uint32_t>::min();
     for (size_t i = 0; i < num_queries; ++i) {
         std::cout << i << "-th query: ";
-        uint32_t ele;
+        uint32_t nn_id;
         for (size_t j = 0; j < knn; ++j) {
-            input.read(reinterpret_cast<char*>(&ele), sizeof(ele));
-            std::cout << ele << " ";
+            input.read(reinterpret_cast<char*>(&nn_id), sizeof(nn_id));
+            min_nn_id = std::min(min_nn_id, nn_id);
+            max_nn_id = std::max(max_nn_id, nn_id);
+            std::cout << nn_id << " ";
         }
         std::cout << std::endl;
     }
 
     std::cout << std::endl;
 
+    float min_distance = std::numeric_limits<float>::max();
+    float max_distance = std::numeric_limits<float>::min();
     for (size_t i = 0; i < num_queries; ++i) {
         std::cout << i << "-th query: ";
-        float ele;
+        float distance;
         for (size_t j = 0; j < knn; ++j) {
-            input.read(reinterpret_cast<char*>(&ele), sizeof(ele));
-            std::cout << ele << " ";
+            input.read(reinterpret_cast<char*>(&distance), sizeof(distance));
+            min_distance = std::min(min_distance, distance);
+            max_distance = std::max(max_distance, distance);
+            std::cout << distance << " ";
         }
         std::cout << std::endl;
     }
+
+    std::cout << "min nn id: " << min_nn_id << std::endl;
+    std::cout << "max nn id: " << max_nn_id << std::endl;
+    std::cout << "min distance: " << min_distance << std::endl;
+    std::cout << "min distance: " << max_distance << std::endl;
+
     input.close();
 }
 //---------------------------------------------------------------------------
