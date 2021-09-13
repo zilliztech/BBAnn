@@ -5,6 +5,7 @@
 #include <string.h>
 #include <assert.h>
 #include <memory>
+#include <unistd.h>
 #include "util/distance.h"
 #include "util/utils.h"
 #include "util/random.h"
@@ -228,10 +229,10 @@ void kmeanspp(const DATAT* pdata, const int64_t nb, const int64_t dim,
 //    else: normalize
 
 template <typename T>
-void kmeans (int64_t nx, const T* x_in, int64_t dim, int64_t k, float* centroids,
+void kmeans (int64_t nx, const T* x_in, int32_t dim, int64_t k, float* centroids,
              bool kmpp = false, float avg_len = 0.0, int64_t niter = 10, 
              int64_t seed = 1234) {
-    std::cout << "start do " << k << "-means on " << nx << " vectors" << std::endl;
+
     if (k > 1000)
         nx = k * 40;
     std::cout << "new nx = " << nx << std::endl;
@@ -266,13 +267,21 @@ void kmeans (int64_t nx, const T* x_in, int64_t dim, int64_t k, float* centroids
     } else {
         rand_perm(assign.get(), nx, k, seed);
         for (int64_t i = 0; i < k; i++) {
-            const T* x = x_in + assign[i] * dim;
+           // std::cout<<i<<assign[i]<<std::endl;
+            const T* x = x_in + (uint32_t)((assign[i]%nx) * dim);
+
             float* c = centroids + i * dim;
+
             for (int64_t d = 0; d < dim; d++){
-                c[d] = x[d];
+
+               // c[d] = x[d];
+               c[d] = x_in[assign[i]*dim+d];
+
+
             }
         }
     }
+
 
     float err = std::numeric_limits<float>::max();
     for (int64_t i = 0; i < niter; i++) {
@@ -307,10 +316,95 @@ void kmeans (int64_t nx, const T* x_in, int64_t dim, int64_t k, float* centroids
             mx = hassign[i];
         if (hassign[i] < mn)
             mn = hassign[i];
+       // std::cout<<hassign[i]<<std::endl;
     }
-    std::cout << "after the kmeans with nx = " << nx << ", k = " << k 
+     std::cout << "after the kmeans with nx = " << nx << ", k = " << k
               << ", has " << empty_cnt << " empty clusters," 
               << " max cluster: " << mx
               << " min cluster: " << mn
               << std::endl;
+}
+
+
+template <typename T>
+void recursive_kmeans(uint32_t k1_id, uint32_t cluster_size,  T* data, int32_t* ids, uint32_t dim, int32_t threshold, int64_t blk_size,
+                      int32_t& blk_num, IOWriter& data_writer, IOWriter& centroids_writer, IOWriter& centroids_id_writer,
+                      bool kmpp = false, float avg_len = 0.0, int64_t niter = 10, int64_t seed = 1234) {
+
+
+    int vector_size = sizeof(T) * dim;
+    int id_size = sizeof(int32_t);
+
+    int k2 = cluster_size/threshold + 1 < MAX_CLUSTER_K2 ? cluster_size/threshold + 1 :MAX_CLUSTER_K2;
+    float* k2_centroids = new float[k2 * dim];
+
+    kmeans<T>(cluster_size, data, dim, k2, k2_centroids, kmpp, avg_len, niter, seed);
+    std::vector<int64_t> cluster_id(cluster_size, -1);
+    std::vector<float> dists(cluster_size, -1);
+    std::vector<float> bucket_pre_size(k2 + 1, 0);
+
+    elkan_L2_assign<>(data, k2_centroids, dim, cluster_size, k2, cluster_id.data(), dists.data());
+    //dists is useless, so delete first
+    std::vector<float>().swap(dists);
+
+    for (int i=0; i<cluster_size; i++) {
+        bucket_pre_size[cluster_id[i]+1]++;
+    }
+    for (int i=1; i <= k2; i++) {
+        bucket_pre_size[i] += bucket_pre_size[i-1];
+    }
+
+    //reorder thr data and ids by their cluster id
+    T* x_temp = new T[cluster_size * dim];
+    int32_t* ids_temp = new int32_t[cluster_size];
+    int64_t offest;
+    memcpy(x_temp, data, cluster_size * vector_size);
+    memcpy(ids_temp, ids, cluster_size * id_size);
+    for(int i=0; i < cluster_size; i++) {
+        offest = (bucket_pre_size[cluster_id[i]]++);
+        ids[offest] = i;
+        memcpy(data + offest * dim, x_temp + i * dim, vector_size);
+    }
+    delete []x_temp;
+    delete []ids_temp;
+
+    int64_t bucket_size;
+    int64_t bucket_offest;
+    int entry_size = vector_size + id_size;
+    uint32_t global_id;
+    std::cout<<"k:"<<k2<<std::endl;
+    char* data_blk_buf = new char[blk_size];
+    for(int i=0; i < k2; i++) {
+        if (i == 0) {
+            bucket_size = bucket_pre_size[i];
+            bucket_offest = 0;
+        } else {
+            bucket_size = bucket_pre_size[i] - bucket_pre_size[i - 1];
+            bucket_offest = bucket_pre_size[i - 1];
+        }
+        // std::cout<<"after kmeans : centroids i"<<i<<" has vectors "<<(int)bucket_size<<std::endl;
+        if (bucket_size <= threshold) {
+            //write a blk to file
+            memset(data_blk_buf, 0, blk_size);
+
+
+            for (int j = 0; j < bucket_size; j++) {
+                memcpy(data_blk_buf + j * entry_size, ids + bucket_offest + j, id_size);
+                memcpy(data_blk_buf + j * entry_size + id_size, data + dim * (bucket_offest + j), vector_size);
+            }
+            global_id = gen_global_block_id(k1_id, blk_num);
+
+            data_writer.write((char *) data_blk_buf, blk_size );
+            centroids_writer.write((char *) (&k2_centroids[i]), sizeof(float) * dim);
+            centroids_id_writer.write((char *) (&global_id), sizeof(uint32_t));
+            blk_num++;
+        } else {
+
+            recursive_kmeans(k1_id, (uint32_t)bucket_size, data + bucket_offest, ids + bucket_offest, dim, threshold, blk_size,
+                             blk_num, data_writer, centroids_writer, centroids_id_writer, kmpp, avg_len, niter, seed);
+        }
+    }
+    delete [] data_blk_buf;
+    delete [] k2_centroids;
+
 }

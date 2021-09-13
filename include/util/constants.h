@@ -19,7 +19,8 @@ constexpr static float K1_SAMPLE_RATE = 0.01;
 constexpr static float PQ_SAMPLE_RATE = 0.01;
 // the threshold of the second round k-means, if the size of cluster is larger than this threshold, than do ((cluster size)/threshold)-means
 constexpr static int SPLIT_THRESHOLD = 500;
-
+// the max cluster number in hierarchical_cluster
+constexpr static int MAX_CLUSTER_K2 = 500;
 
 
 
