@@ -344,13 +344,13 @@ void  hierarchical_clusters(const std::string& output_path,
         *(uint32_t*)(data_blk_buf + 5 * sizeof(uint32_t)) = i;
         data_writer.write((char*)data_blk_buf, blk_size);
 
-        recursive_kmeans<DATAT>(i, (int64_tc)cluster_size, datai, idi, (int64_t)cluster_dim, threshold, blk_size, blk_num,
-                         data_writer, centroids_writer, false, avg_len);
+        recursive_kmeans<DATAT>(i, cluster_size, datai, idi, cluster_dim, threshold, blk_size, blk_num,
+                         data_writer, centroids_writer, centroids_id_writer, false, avg_len);
 
         global_centroids_number += blk_num;
 
         //write back the data's placeholder:
-        ofstream data_meta_writer(data_file, std::ios::binary | std::ios::in);
+        std::ofstream data_meta_writer(data_file, std::ios::binary | std::ios::in);
         data_meta_writer.seekp(4 * sizeof(uint32_t));
         data_meta_writer.write((char*)&blk_num, sizeof(uint32_t));
         data_meta_writer.close();
@@ -361,13 +361,13 @@ void  hierarchical_clusters(const std::string& output_path,
 
     // write back the centroids' placeholder:
     uint32_t centroids_id_dim = 1;
-    ofstream centroids_meta_writer(bucket_centroids_file, std::ios::binary | std::ios::in);
-    ofstream centroids_ids_meta_writer(bucket_centroids_id_file, std::ios::binary | std::ios::in);
+    std::ofstream centroids_meta_writer(bucket_centroids_file, std::ios::binary | std::ios::in);
+    std::ofstream centroids_ids_meta_writer(bucket_centroids_id_file, std::ios::binary | std::ios::in);
     centroids_meta_writer.seekp(0);
-    centroids_meta_writer.write(global_centroids_number, sizeof(uint32_t));
+    centroids_meta_writer.write((char*)&global_centroids_number, sizeof(uint32_t));
     centroids_meta_writer.write((char*)&centroids_dim, sizeof(uint32_t));
     centroids_ids_meta_writer.seekp(0);
-    centroids_ids_meta_writer.write(global_centroids_number, sizeof(uint32_t));
+    centroids_ids_meta_writer.write((char*)&global_centroids_number, sizeof(uint32_t));
     centroids_ids_meta_writer.write((char*)&centroids_id_dim, sizeof(uint32_t));
     centroids_meta_writer.close();
     centroids_ids_meta_writer.close();
@@ -444,6 +444,8 @@ void build_bbann(const std::string& raw_data_bin_file,
               << " hnsw.efConstruction: " << hnswefC
               << " K1: " << K1
               << std::endl;
+    // TODO: block size
+    int block_size = 12 * 1024;
 
     float* centroids = nullptr;
     double avg_len;
@@ -455,7 +457,7 @@ void build_bbann(const std::string& raw_data_bin_file,
     divide_raw_data<DATAT, DISTT, HEAPT>(raw_data_bin_file, output_path, centroids, K1);
     rc.RecordSection("divide raw data into " + std::to_string(K1) + " clusters done");
 
-    hierarchical_clusters<DATAT, DISTT, HEAPT>(output_path, K1, avg_len, threshold);
+    hierarchical_clusters<DATAT, DISTT, HEAPT>(output_path, K1, avg_len, block_size);
     rc.RecordSection("conquer each cluster into buckets done");
 
     build_graph(output_path, hnswM, hnswefC, metric_type);
@@ -464,6 +466,8 @@ void build_bbann(const std::string& raw_data_bin_file,
     delete[] centroids;
     rc.ElapseFromBegin("build bigann totally done.");
 }
+
+
 
 template<typename DATAT>
 void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
@@ -503,7 +507,42 @@ void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
     rc.ElapseFromBegin("search graph done.");
 }
 
-template<typename DATAT, typename DISTT, typename HEAPT, typename HEAPTT>
+
+template<typename DISTT, typename HEAPT>
+void save_answers(const std::string& answer_bin_file,
+                  const int topk,
+                  const uint32_t nq,
+                  DISTT*& answer_dists,
+                  uint32_t*& answer_ids) {
+    TimeRecorder rc("save answers");
+    std::cout << "save answer parameters:" << std::endl;
+    std::cout << " answer_bin_file: " << answer_bin_file
+              << " topk: " << topk
+              << " nq: " << nq
+              << " answer_dists: " << answer_dists
+              << " answer_ids: " << answer_ids
+              << std::endl;
+
+    std::ofstream answer_writer(answer_bin_file, std::ios::binary);
+    answer_writer.write((char*)&nq, sizeof(uint32_t));
+    answer_writer.write((char*)&topk, sizeof(uint32_t));
+
+    for (int i = 0; i < nq; i ++) {
+        auto ans_disi = answer_dists + topk * i;
+        auto ans_idsi = answer_ids + topk * i;
+        heap_reorder<HEAPT>(topk, ans_disi, ans_idsi);
+    }
+
+    uint32_t tot = nq * topk;
+    answer_writer.write((char*)answer_ids, tot * sizeof(uint32_t));
+    answer_writer.write((char*)answer_dists, tot * sizeof(DISTT));
+
+    answer_writer.close();
+
+    rc.ElapseFromBegin("save answers done.");
+}
+
+template<typename DATAT, typename DISTT, typename HEAPT>
 void search_bbann(const std::string& index_path,
                    const std::string& query_bin_file,
                    const std::string& answer_bin_file,
@@ -529,7 +568,7 @@ void search_bbann(const std::string& index_path,
     DATAT* pquery = nullptr;
     DISTT* answer_dists = nullptr;
     uint32_t* answer_ids = nullptr;
-    uint64_t* p_labels = nullptr;
+    uint32_t* bucket_labels = nullptr;
 
     uint32_t nq, dq;
 
@@ -552,7 +591,7 @@ void search_bbann(const std::string& index_path,
     for (int64_t i = 0; i < nq; ++i) {
         const auto ii = i * nprobe;
         for (int64_t j = 0; j < nprobe; ++j) {
-            parse_id(bucket_labels, cid, bid);
+            parse_global_block_id(bucket_labels, cid, bid);
             mp[cid][bid].insert(i);
         }
     }
@@ -591,7 +630,7 @@ void search_bbann(const std::string& index_path,
      * Other proposal like make hnsw_search, read_data and calculation as a pipeline
      * may also worth investigating.
      */
-#pragma omp parallel for
+// #pragma omp parallel for
             for (const auto& qid : qs) {
                 const float* q_idx = pquery + qid * dq;
                 for (uint32_t i = 0; i < MAX_VEC_IN_BLOCK; ++i) {
@@ -609,11 +648,11 @@ void search_bbann(const std::string& index_path,
         }
     }
     delete[] buf;
-    delete[] p_labels;
+    delete[] bucket_labels;
     rc.RecordSection("flat");
 
     // write answers
-    save_answers<DISTT, HEAPT>(answer_bin_file, topk, nq, answer_dists, answer_ids, true);
+    save_answers<DISTT, HEAPT>(answer_bin_file, topk, nq, answer_dists, answer_ids);
     rc.RecordSection("write answers done");
 
     delete[] pquery;
@@ -621,3 +660,19 @@ void search_bbann(const std::string& index_path,
     delete[] answer_dists;
     rc.ElapseFromBegin("search bigann totally done");
 }
+
+#define BUILD_BBANN_DECL(DATAT, DISTT)                                                                   \
+    template void build_bbann<DATAT, DISTT, CMin<DISTT, uint32_t>>(const std::string &raw_data_bin_file, \
+                                                                   const std::string &output_path,       \
+                                                                   const int hnswM, const int hnswefC,   \
+                                                                   const int K1,                         \
+                                                                   MetricType metric_type);              \
+    template void build_bbann<DATAT, DISTT, CMax<DISTT, uint32_t>>(const std::string &raw_data_bin_file, \
+                                                                   const std::string &output_path,       \
+                                                                   const int hnswM, const int hnswefC,   \
+                                                                   const int K1,                         \
+                                                                   MetricType metric_type);
+
+BUILD_BBANN_DECL(uint8_t, uint32_t)
+BUILD_BBANN_DECL(int8_t, int32_t)
+BUILD_BBANN_DECL(float, float)
