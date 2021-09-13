@@ -9,6 +9,7 @@
 //---------------------------------------------------------------------------
 namespace {
 //---------------------------------------------------------------------------
+template <typename T>
 void read_ground_truth(const std::string& input_path) {
     // The ground truth binary files for k-NN search consist of the following information:
     //   num_queries(uint32_t) K-NN(uint32) followed by
@@ -39,15 +40,15 @@ void read_ground_truth(const std::string& input_path) {
 
     std::cout << std::endl;
 
-    float min_distance = std::numeric_limits<float>::max();
-    float max_distance = std::numeric_limits<float>::min();
+    T min_distance = std::numeric_limits<T>::max();
+    T max_distance = std::numeric_limits<T>::min();
     for (size_t i = 0; i < num_queries; ++i) {
         std::cout << i << "-th query: ";
-        float distance;
+        T distance;
         for (size_t j = 0; j < knn; ++j) {
             input.read(reinterpret_cast<char*>(&distance), sizeof(distance));
-            min_distance = std::min(min_distance, distance);
-            max_distance = std::max(max_distance, distance);
+            min_distance = std::min<T>(min_distance, distance);
+            max_distance = std::max<T>(max_distance, distance);
             std::cout << distance << " ";
         }
         std::cout << std::endl;
@@ -70,8 +71,21 @@ int main() {
     std::cin >> input_path;
     std::cout << "The input input_path is: " << input_path << std::endl;
 
-    read_ground_truth(input_path);
+    std::cout << "Please type in the data type: uint8, int8 or float32: " << std::endl;
+    std::cout << "Example: \"uint8\"" << std::endl;
+    std::string data_type;
+    std::cin >> data_type;
+    if (data_type != "uint8" && data_type != "int8" && data_type != "float32") {
+        std::cerr << "Wrong data type: " << data_type << std::endl;
+        return 1;
+    }
+    std::cout << "The data type is: " << data_type << std::endl;
 
+    if (data_type == "uint8" || data_type == "int8") {
+        read_ground_truth<uint8_t>(input_path);
+    } else if (data_type == "float32") {
+        read_ground_truth<float>(input_path);
+    }
     return 0;
 }
 //---------------------------------------------------------------------------
