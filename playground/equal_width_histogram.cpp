@@ -55,24 +55,24 @@ void generate_norm_histogram(const std::string& input_path, const std::string& o
         ++range_counter[index];
     }
 
-    std::vector<double> range_pecetage(num_bins, 0.0);
-    for (int i = 0; i < range_pecetage.size(); ++i) range_pecetage[i] = 1.0 * range_counter[i] / num_points;
+    std::vector<double> range_percentage(num_bins, 0.0);
+    for (int i = 0; i < range_percentage.size(); ++i) range_percentage[i] = 1.0 * range_counter[i] / num_points;
     std::cout << "End of building histogram." << std::endl;
 
     {
         // COUT output
         uint64_t sum_counter = 0;
         double sum_percentage = 0.0;
-        for (int i = 0; i < range_pecetage.size(); ++i) {
+        for (int i = 0; i < range_percentage.size(); ++i) {
             sum_counter += range_counter[i];
-            sum_percentage += range_pecetage[i];
+            sum_percentage += range_percentage[i];
             std::cout << "[" << i << "]'s range ["
                       << min + range_width * i
                       << ", "
-                      << ((i == range_pecetage.size() - 1) ? (max) : (min + range_width * (i + 1)))
-                      << ((i == range_pecetage.size() - 1) ? "]" : ")")
+                      << ((i == range_percentage.size() - 1) ? (max) : (min + range_width * (i + 1)))
+                      << ((i == range_percentage.size() - 1) ? "]" : ")")
                       << "  :=  "
-                      << range_counter[i] << "  " << range_pecetage[i] * 100.0 << "%" << std::endl;
+                      << range_counter[i] << "  " << range_percentage[i] * 100.0 << "%" << std::endl;
         }
         assert(sum_percentage == 1.0 || std::fabs(sum_percentage - 1.0) <= 0.00001);
         assert(sum_counter == num_points);
@@ -86,14 +86,14 @@ void generate_norm_histogram(const std::string& input_path, const std::string& o
         std::ofstream output(output_path, std::ios::binary);
         assert(output.is_open());
         output << "norm value range,counter,percentage" << std::endl;  // CSV's header
-        for (int i = 0; i < range_pecetage.size(); ++i) {
+        for (int i = 0; i < range_percentage.size(); ++i) {
             output << "["
                       << min + range_width * i
                       << " ~ "
-                      << ((i == range_pecetage.size() - 1) ? (max) : (min + range_width * (i + 1)))
-                      << ((i == range_pecetage.size() - 1) ? "]" : ")")
+                      << ((i == range_percentage.size() - 1) ? (max) : (min + range_width * (i + 1)))
+                      << ((i == range_percentage.size() - 1) ? "]" : ")")
                       << "," << range_counter[i]
-                      << "," << range_pecetage[i] << std::endl;
+                      << "," << range_percentage[i] << std::endl;
         }
         output.close();
     }
@@ -108,17 +108,17 @@ int main() {
     std::cin >> input_path;
     std::cout << "The input input_path is: " << input_path << std::endl;
 
-    std::cout << "Please type in the number of bins of the histogram:" << std::endl;
-    std::cout << "Example: 20" << std::endl;
-    int num_bins;
-    std::cin >> num_bins;
-    std::cout << "The input number of bins is: " << num_bins << std::endl;
-
     std::cout << "Please type in the output file input_path into the std::cin:" << std::endl;
     std::cout << "Example: \"/home/jigao/Desktop/histogram.csv\"" << std::endl;
     std::string output_path;
     std::cin >> output_path;
     std::cout << "The output_path is: " << output_path << std::endl;
+
+    std::cout << "Please type in the number of bins of the histogram:" << std::endl;
+    std::cout << "Example: 20" << std::endl;
+    int num_bins;
+    std::cin >> num_bins;
+    std::cout << "The input number of bins is: " << num_bins << std::endl;
 
     generate_norm_histogram(input_path, output_path, num_bins);
 

@@ -34,6 +34,7 @@ for bar in plots.patches:
 
 plt.xlabel("Norm Value Range", size = 20)
 plt.ylabel("Percentage", size = 20)
+# TODO: Norm Distribution or Norm Bias
 plt.title("Yandex Text To Image 1B: Norm Distribution", size = 30)
 plt.show()
 
