@@ -68,6 +68,7 @@ void generate_norm_bias_histogram(const std::string& base_input_path, const std:
 
     // Collect all NN id, top-k.
     std::vector<uint32_t> all_nn_id;
+    // TODO: to set
     all_nn_id.reserve(num_queries * TOP_K);
     for (size_t i = 0; i < num_queries; ++i) {
         uint32_t nn_id;  // NN vector ID
