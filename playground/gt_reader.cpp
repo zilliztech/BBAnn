@@ -39,8 +39,8 @@ void read_ground_truth(const std::string& input_path) {
 
     std::cout << std::endl;
 
-    float min_distance = std::numeric_limits<T>::max();
-    float max_distance = std::numeric_limits<T>::min();
+    float min_distance = std::numeric_limits<float>::max();
+    float max_distance = std::numeric_limits<float>::min();
     for (size_t i = 0; i < num_queries; ++i) {
         std::cout << i << "-th query: ";
         float distance;
