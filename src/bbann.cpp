@@ -47,7 +47,7 @@ void divide_raw_data(const std::string& raw_data_bin_file,
     std::cout << " raw_data_bin_file: " << raw_data_bin_file
               << " output_path: " << output_path
               << " centroids: " << centroids
-              << " K1: " << K1 
+              << " K1: " << K1
               << std::endl;
     IOReader reader(raw_data_bin_file);
     uint32_t nb, dim;
@@ -83,7 +83,7 @@ void divide_raw_data(const std::string& raw_data_bin_file,
         rci.RecordSection("read block data done");
         elkan_L2_assign<const DATAT, const float, DISTT>(block_buf, centroids, dim, ep -sp, K1, cluster_id.data(), dists.data());
         //knn_1<HEAPT, DATAT, float> (
-        //    block_buf, centroids, ep - sp, K1, dim, 1, 
+        //    block_buf, centroids, ep - sp, K1, dim, 1,
         //    dists.data(), cluster_id.data(), L2sqr<const DATAT, const float, DISTT>);
         rci.RecordSection("select file done");
         for (int64_t j = 0; j < ep - sp; j ++) {
@@ -179,7 +179,7 @@ void conquer_clusters(const std::string& output_path,
         dists.resize(cluster_size);
         elkan_L2_assign<>(datai, centroids_i, cluster_dim, cluster_size, K2, cluster_id.data(), dists.data());
         // knn_1<HEAPT, DATAT, float> (
-        //     datai, centroids_i, cluster_size, K2, cluster_dim, 1, 
+        //     datai, centroids_i, cluster_size, K2, cluster_dim, 1,
         //     dists.data(), cluster_id.data(), L2sqr<const DATAT, const float, DISTT>);
         rci.RecordSection("assign done");
         std::vector<uint32_t> buckets_size(K2 + 1, 0);
@@ -308,8 +308,9 @@ void  hierarchical_clusters(const std::string& output_path,
     centroids_writer.write((char*)&placeholder, sizeof(uint32_t));
     centroids_id_writer.write((char*)&placeholder, sizeof(uint32_t));
     centroids_id_writer.write((char*)&placeholder, sizeof(uint32_t));
-    uint32_t global_centroids_number = 0;0
-    for (int i=0; i < K1; i++) {
+    uint32_t global_centroids_number = 0;
+    uint32_t centroids_dim = 0;
+    for (uint32_t i=0; i < K1; i++) {
         TimeRecorder rci("train-cluster-" + std::to_string(i));
         std::string data_file = output_path + CLUSTER + std::to_string(i) + RAWDATA + BIN;
         std::string ids_file = output_path + CLUSTER + std::to_string(i) + GLOBAL_IDS + BIN;
@@ -321,6 +322,7 @@ void  hierarchical_clusters(const std::string& output_path,
         ids_reader.read((char*)&ids_size, sizeof(uint32_t));
         ids_reader.read((char*)&ids_dim, sizeof(uint32_t));
         entry_num = blk_size/(cluster_dim * sizeof(DATAT) + ids_dim * sizeof(uint32_t));
+        centroids_dim = cluster_dim;
         threshold = cluster_size / entry_num;
         assert(cluster_size == ids_size);
         assert(ids_dim == 1);
@@ -342,33 +344,31 @@ void  hierarchical_clusters(const std::string& output_path,
         *(uint32_t*)(data_blk_buf + 5 * sizeof(uint32_t)) = i;
         data_writer.write((char*)data_blk_buf, blk_size);
 
-        recursive_kmeans(cluster_size, datai, idi, cluster_dim, threshold, blk_size, blk_num,
+        recursive_kmeans<DATAT>(i, (int64_tc)cluster_size, datai, idi, (int64_t)cluster_dim, threshold, blk_size, blk_num,
                          data_writer, centroids_writer, false, avg_len);
 
         global_centroids_number += blk_num;
-        data_writer.~IOWriter();
 
         //write back the data's placeholder:
         ofstream data_meta_writer(data_file, std::ios::binary | std::ios::in);
         data_meta_writer.seekp(4 * sizeof(uint32_t));
-        data_meta_writer.write(blk_num);
+        data_meta_writer.write((char*)&blk_num, sizeof(uint32_t));
         data_meta_writer.close();
         delete [] datai;
         delete [] idi;
     }
     delete [] data_blk_buf;
-    centroids_writer.~IOWriter();
-    centroids_id_writer.~IOWriter();
 
     // write back the centroids' placeholder:
-    ofstream centroids_meta_writer(data_file, std::ios::binary | std::ios::in);
-    ofstream centroids_ids_meta_writer(data_file, std::ios::binary | std::ios::in);
+    uint32_t centroids_id_dim = 1;
+    ofstream centroids_meta_writer(bucket_centroids_file, std::ios::binary | std::ios::in);
+    ofstream centroids_ids_meta_writer(bucket_centroids_id_file, std::ios::binary | std::ios::in);
     centroids_meta_writer.seekp(0);
     centroids_meta_writer.write(global_centroids_number, sizeof(uint32_t));
-    centroids_meta_writer.write(dim, sizeof(uint32_t));
+    centroids_meta_writer.write((char*)&centroids_dim, sizeof(uint32_t));
     centroids_ids_meta_writer.seekp(0);
     centroids_ids_meta_writer.write(global_centroids_number, sizeof(uint32_t));
-    centroids_ids_meta_writer.write(1, sizeof(uint32_t));
+    centroids_ids_meta_writer.write((char*)&centroids_id_dim, sizeof(uint32_t));
     centroids_meta_writer.close();
     centroids_ids_meta_writer.close();
 
