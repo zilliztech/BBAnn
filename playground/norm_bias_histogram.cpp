@@ -79,7 +79,7 @@ void generate_norm_bias_histogram(const std::string& base_input_path, const std:
     assert(all_nn_id.size() == num_queries * TOP_K);
     std::unordered_set<uint32_t> all_nn_id_set(all_nn_id.begin(), all_nn_id.end());
     std::cout << "# of duplicated vector IDs: " << all_nn_id.size() - all_nn_id_set.size() << std::endl;
-    std::cout << "percentage of duplicated vector IDs: " << (all_nn_id.size() - all_nn_id_set.size()) / all_nn_id.size() << std::endl;
+    std::cout << "percentage of duplicated vector IDs: " << 1.0 * (all_nn_id.size() - all_nn_id_set.size()) / all_nn_id.size() << std::endl;
 
     // Counter NN's norm in histogram.
     std::vector<uint64_t> range_counter(num_bins, 0);
