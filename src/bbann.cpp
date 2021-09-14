@@ -434,8 +434,9 @@ void build_bbann(const std::string& raw_data_bin_file,
                   const std::string& output_path,
                   const int hnswM,
                   const int hnswefC,
+                  MetricType metric_type,
                   const int K1,
-                  MetricType metric_type) {
+                  const uint64_t block_size) {
     TimeRecorder rc("build bigann");
     std::cout << "build bigann parameters:" << std::endl;
     std::cout << " raw_data_bin_file: " << raw_data_bin_file
@@ -444,8 +445,6 @@ void build_bbann(const std::string& raw_data_bin_file,
               << " hnsw.efConstruction: " << hnswefC
               << " K1: " << K1
               << std::endl;
-    // TODO: block size
-    int block_size = 12 * 1024;
 
     float* centroids = nullptr;
     double avg_len;
@@ -547,10 +546,11 @@ void search_bbann(const std::string& index_path,
                    const std::string& query_bin_file,
                    const std::string& answer_bin_file,
                    const int nprobe,
-                   const int refine_nprobe,
+                   const int hnsw_ef,
                    const int topk,
                    std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
                    const int K1,
+                   const uint64_t block_size,
                    Computer<DATAT, DATAT, DISTT>& dis_computer) {
     TimeRecorder rc("search bigann");
 
@@ -559,7 +559,7 @@ void search_bbann(const std::string& index_path,
               << " query_bin_file: " << query_bin_file
               << " answer_bin_file: " << answer_bin_file
               << " nprobe: " << nprobe
-              << " refine_nprobe: " << refine_nprobe
+              << " hnsw_ef: " << hnsw_ef
               << " topk: " << topk
               << " K1: " << K1
               << std::endl;
@@ -584,20 +584,20 @@ void search_bbann(const std::string& index_path,
     // cid -> [bid -> [qid]]
     std::unordered_map<uint32_t, std::unordered_map<uint32_t, std::unordered_set<uint32_t> > > mp;
 
-    search_graph<DATAT>(index_hnsw, nq, dq, nprobe, refine_nprobe, pquery, bucket_labels);
+    search_graph<DATAT>(index_hnsw, nq, dq, nprobe, hnsw_ef, pquery, bucket_labels);
     rc.RecordSection("search buckets done.");
 
     uint32_t cid, bid;
     for (int64_t i = 0; i < nq; ++i) {
         const auto ii = i * nprobe;
         for (int64_t j = 0; j < nprobe; ++j) {
-            parse_global_block_id(bucket_labels, cid, bid);
+            parse_global_block_id(bucket_labels[ii+j], cid, bid);
             mp[cid][bid].insert(i);
         }
     }
 
     // TODO: check BLOCK_SIZE
-    uint32_t BLOCK_SIZE = 0, MAX_VEC_IN_BLOCK = 0;
+    uint32_t MAX_VEC_IN_BLOCK = 0;
     uint32_t dim = dq, gid;
     uint32_t ENTRY_SIZE = sizeof(uint32_t) + sizeof(DATAT) * dim;
     DATAT* vec;
@@ -611,14 +611,14 @@ void search_bbann(const std::string& index_path,
     }
     rc.RecordSection("heapify answers heaps");
 
-    char* buf = new char[BLOCK_SIZE];
+    char* buf = new char[block_size];
     for (const auto& [cid, bid_mp] : mp) {
         std::string cluster_file_path = index_path + CLUSTER + std::to_string(cid) + "-" + RAWDATA + BIN;
         auto fh = std::ifstream(cluster_file_path, std::ios::binary);
 
         for (const auto& [bid, qs] : bid_mp) {
-            fh.seekg(2 * sizeof(uint32_t) + bid * BLOCK_SIZE);
-            fh.read(buf, BLOCK_SIZE);
+            fh.seekg(2 * sizeof(uint32_t) + bid * block_size);
+            fh.read(buf, block_size);
 
     /*
      * A few options here. We can parallelize cid, bid, qs, dis_calculation.
@@ -630,9 +630,12 @@ void search_bbann(const std::string& index_path,
      * Other proposal like make hnsw_search, read_data and calculation as a pipeline
      * may also worth investigating.
      */
-// #pragma omp parallel for
-            for (const auto& qid : qs) {
-                const float* q_idx = pquery + qid * dq;
+            std::vector<uint32_t> qv(qs.begin(), qs.end());
+
+#pragma omp parallel for
+            for (uint32_t i = 0; i < qv.size(); ++i) {
+                const uint32_t qid = qv[i];
+                const DATAT* q_idx = pquery + qid * dq;
                 for (uint32_t i = 0; i < MAX_VEC_IN_BLOCK; ++i) {
                     gid = *reinterpret_cast<uint32_t*>(buf + ENTRY_SIZE * i);
                     if (gid == -1) break;
@@ -661,18 +664,36 @@ void search_bbann(const std::string& index_path,
     rc.ElapseFromBegin("search bigann totally done");
 }
 
-#define BUILD_BBANN_DECL(DATAT, DISTT)                                                                   \
-    template void build_bbann<DATAT, DISTT, CMin<DISTT, uint32_t>>(const std::string &raw_data_bin_file, \
-                                                                   const std::string &output_path,       \
-                                                                   const int hnswM, const int hnswefC,   \
-                                                                   const int K1,                         \
-                                                                   MetricType metric_type);              \
-    template void build_bbann<DATAT, DISTT, CMax<DISTT, uint32_t>>(const std::string &raw_data_bin_file, \
-                                                                   const std::string &output_path,       \
-                                                                   const int hnswM, const int hnswefC,   \
-                                                                   const int K1,                         \
-                                                                   MetricType metric_type);
+#define BUILD_BBANN_DECL(DATAT, DISTT, HEAPT)                                                             \
+    template void build_bbann<DATAT, DISTT, HEAPT<DISTT, uint32_t>>(const std::string &raw_data_bin_file, \
+                                                                    const std::string &output_path,       \
+                                                                    const int hnswM, const int hnswefC,   \
+                                                                    MetricType metric_type,               \
+                                                                    const int K1,                         \
+                                                                    const uint64_t block_size);
 
-BUILD_BBANN_DECL(uint8_t, uint32_t)
-BUILD_BBANN_DECL(int8_t, int32_t)
-BUILD_BBANN_DECL(float, float)
+#define SEARCH_BBANN_DECL(DATAT, DISTT, HEAPT)                                                                                    \
+    template void search_bbann<DATAT, DISTT, HEAPT<DISTT, uint32_t>>(const std::string &index_path,                               \
+                                                                     const std::string &query_bin_file,                           \
+                                                                     const std::string &answer_bin_file,                          \
+                                                                     const int nprobe,                                            \
+                                                                     const int hnsw_ef,                                           \
+                                                                     const int topk,                                              \
+                                                                     std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw, \
+                                                                     const int K1,                                                \
+                                                                     const uint64_t block_size,                                   \
+                                                                     Computer<DATAT, DATAT, DISTT> &dis_computer);
+
+BUILD_BBANN_DECL(uint8_t, uint32_t, CMin)
+BUILD_BBANN_DECL(uint8_t, uint32_t, CMax)
+BUILD_BBANN_DECL(int8_t, int32_t, CMin)
+BUILD_BBANN_DECL(int8_t, int32_t, CMax)
+BUILD_BBANN_DECL(float, float, CMin)
+BUILD_BBANN_DECL(float, float, CMax)
+
+SEARCH_BBANN_DECL(uint8_t, uint32_t, CMin)
+SEARCH_BBANN_DECL(uint8_t, uint32_t, CMax)
+SEARCH_BBANN_DECL(int8_t, int32_t, CMin)
+SEARCH_BBANN_DECL(int8_t, int32_t, CMax)
+SEARCH_BBANN_DECL(float, float, CMin)
+SEARCH_BBANN_DECL(float, float, CMax)

@@ -327,7 +327,7 @@ void kmeans (int64_t nx, const T* x_in, int32_t dim, int64_t k, float* centroids
 
 
 template <typename T>
-void recursive_kmeans(uint32_t k1_id, uint32_t cluster_size,  T* data, uint32_t* ids, uint32_t dim, uint32_t threshold, const int blk_size,
+void recursive_kmeans(uint32_t k1_id, uint32_t cluster_size,  T* data, uint32_t* ids, uint32_t dim, uint32_t threshold, const uint64_t blk_size,
                       uint32_t& blk_num, IOWriter& data_writer, IOWriter& centroids_writer, IOWriter& centroids_id_writer,
                       bool kmpp = false, float avg_len = 0.0, int64_t niter = 10, int64_t seed = 1234) {
 
