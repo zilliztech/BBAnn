@@ -273,15 +273,11 @@ void kmeans (int64_t nx, const T* x_in, int32_t dim, int64_t k, float* centroids
             float* c = centroids + i * dim;
 
             for (int64_t d = 0; d < dim; d++){
-
-               // c[d] = x[d];
-               c[d] = x_in[assign[i]*dim+d];
-
+                c[d] = x[d];
 
             }
         }
     }
-
 
     float err = std::numeric_limits<float>::max();
     for (int64_t i = 0; i < niter; i++) {
@@ -333,7 +329,7 @@ void recursive_kmeans(uint32_t k1_id, uint32_t cluster_size,  T* data, int32_t* 
 
 
     int vector_size = sizeof(T) * dim;
-    int id_size = sizeof(int32_t);
+    int id_size = sizeof(uint32_t);
 
     int k2 = cluster_size/threshold + 1 < MAX_CLUSTER_K2 ? cluster_size/threshold + 1 :MAX_CLUSTER_K2;
     float* k2_centroids = new float[k2 * dim];
@@ -356,7 +352,7 @@ void recursive_kmeans(uint32_t k1_id, uint32_t cluster_size,  T* data, int32_t* 
 
     //reorder thr data and ids by their cluster id
     T* x_temp = new T[cluster_size * dim];
-    int32_t* ids_temp = new int32_t[cluster_size];
+    uint32_t* ids_temp = new uint32_t[cluster_size];
     int64_t offest;
     memcpy(x_temp, data, cluster_size * vector_size);
     memcpy(ids_temp, ids, cluster_size * id_size);
@@ -372,7 +368,7 @@ void recursive_kmeans(uint32_t k1_id, uint32_t cluster_size,  T* data, int32_t* 
     int64_t bucket_offest;
     int entry_size = vector_size + id_size;
     uint32_t global_id;
-    std::cout<<"k:"<<k2<<std::endl;
+
     char* data_blk_buf = new char[blk_size];
     for(int i=0; i < k2; i++) {
         if (i == 0) {
@@ -386,18 +382,20 @@ void recursive_kmeans(uint32_t k1_id, uint32_t cluster_size,  T* data, int32_t* 
         if (bucket_size <= threshold) {
             //write a blk to file
             memset(data_blk_buf, 0, blk_size);
-
+            *(uint32_t*)(data_blk_buf + 0 * sizeof(uint32_t)) = bucket_size;
+            char* beg_address = data_blk_buf + 4;
 
             for (int j = 0; j < bucket_size; j++) {
-                memcpy(data_blk_buf + j * entry_size, ids + bucket_offest + j, id_size);
-                memcpy(data_blk_buf + j * entry_size + id_size, data + dim * (bucket_offest + j), vector_size);
+                memcpy(beg_address + j * entry_size, ids + bucket_offest + j, id_size);
+                memcpy(beg_address + j * entry_size + id_size, data + dim * (bucket_offest + j), vector_size);
             }
             global_id = gen_global_block_id(k1_id, blk_num);
 
-            data_writer.write((char *) data_blk_buf, blk_size );
+            data_writer.write((char *) data_blk_buf, blk_size);
             centroids_writer.write((char *) (&k2_centroids[i]), sizeof(float) * dim);
             centroids_id_writer.write((char *) (&global_id), sizeof(uint32_t));
             blk_num++;
+
         } else {
 
             recursive_kmeans(k1_id, (uint32_t)bucket_size, data + bucket_offest, ids + bucket_offest, dim, threshold, blk_size,
