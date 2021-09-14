@@ -383,7 +383,7 @@ void recursive_kmeans(uint32_t k1_id, uint32_t cluster_size,  T* data, int32_t* 
             //write a blk to file
             memset(data_blk_buf, 0, blk_size);
             *(uint32_t*)(data_blk_buf + 0 * sizeof(uint32_t)) = bucket_size;
-            char* beg_address = data_blk_buf + 4;
+            char* beg_address = data_blk_buf + sizeof(uint32_t);
 
             for (int j = 0; j < bucket_size; j++) {
                 memcpy(beg_address + j * entry_size, ids + bucket_offest + j, id_size);
