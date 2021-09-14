@@ -295,7 +295,6 @@ void  hierarchical_clusters(const std::string& output_path,
               << std::endl;
 
     uint32_t cluster_size, cluster_dim, ids_size, ids_dim;
-    uint32_t threshold;
     uint32_t entry_num;
 
     std::string bucket_centroids_file = output_path + BUCKET + CENTROIDS + BIN;
@@ -303,6 +302,7 @@ void  hierarchical_clusters(const std::string& output_path,
     IOWriter centroids_writer(bucket_centroids_file);
     IOWriter centroids_id_writer(bucket_centroids_id_file);
     uint32_t placeholder = 1;
+
     char* data_blk_buf = new char[blk_size];
     centroids_writer.write((char*)&placeholder, sizeof(uint32_t));
     centroids_writer.write((char*)&placeholder, sizeof(uint32_t));
@@ -321,12 +321,11 @@ void  hierarchical_clusters(const std::string& output_path,
         data_reader.read((char*)&cluster_dim, sizeof(uint32_t));
         ids_reader.read((char*)&ids_size, sizeof(uint32_t));
         ids_reader.read((char*)&ids_dim, sizeof(uint32_t));
-        entry_num = blk_size/(cluster_dim * sizeof(DATAT) + ids_dim * sizeof(uint32_t));
+        entry_num = (blk_size - sizeof(uint32_t)) /(cluster_dim * sizeof(DATAT) + ids_dim * sizeof(uint32_t));
         centroids_dim = cluster_dim;
-        threshold = cluster_size / entry_num;
         assert(cluster_size == ids_size);
         assert(ids_dim == 1);
-        assert(threshold > 0);
+        assert(entry_num > 0);
 
         DATAT* datai = new DATAT[cluster_size * cluster_dim];
         uint32_t* idi = new uint32_t[ids_size * ids_dim];
@@ -344,7 +343,7 @@ void  hierarchical_clusters(const std::string& output_path,
         *(uint32_t*)(data_blk_buf + 5 * sizeof(uint32_t)) = i;
         data_writer.write((char*)data_blk_buf, blk_size);
 
-        recursive_kmeans<DATAT>(i, cluster_size, datai, idi, cluster_dim, threshold, blk_size, blk_num,
+        recursive_kmeans<DATAT>(i, cluster_size, datai, idi, cluster_dim, entry_num, blk_size, blk_num,
                          data_writer, centroids_writer, centroids_id_writer, false, avg_len);
 
         global_centroids_number += blk_num;
