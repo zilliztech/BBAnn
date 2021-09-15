@@ -3,8 +3,14 @@
 ## Prerequisites
 * CMake >= 3.14
 * gcc >= 6.1
-* GTest
-* OpenMP
+* AIO
+
+To install these dependencies:
+
+```bash
+$ chmod +x install.sh
+$ sudo ./install.sh
+```
 
 ## Get Started
 
