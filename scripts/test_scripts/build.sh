@@ -64,8 +64,9 @@ else
   LOG_FILE=${LOG_PREFIX}.log
   echo "Log File: " $LOG_FILE
 
-  ./build_bigann $DATA_TYPE $DATA_FILE $INDEX_PATH $HNSW_M $HNSW_EF $PQ_M $PQ_NBITS $METRIC_TYPE $K1 $BUCKET_THRESHOLD $PQ_TYPE > $LOG_FILE &
+  ./build_bigann $DATA_TYPE $DATA_FILE $INDEX_PATH $HNSW_M $HNSW_EF $PQ_M $PQ_NBITS $METRIC_TYPE $K1 $BUCKET_THRESHOLD $PQ_TYPE >$LOG_FILE 2>&1 &
   pid=$!
+  echo "PID: " $pid
   pidstat -rud -h -t -p $pid 5 > ${LOG_PREFIX}.stat
   python3 analyze_stat.py ${LOG_PREFIX}.stat > ${LOG_PREFIX}.max.stat
   wait $pid
