@@ -20,7 +20,7 @@ BUCKET_THRESHOLD=500
 PQ_TYPE=PQRes
 
 INDEX_PATH=${INDEX_PATH}-${HNSW_M}-${HNSW_EF}-${PQ_M}-${PQ_NBITS}-${K1}-${BUCKET_THRESHOLD}-${PQ_TYPE}/
-LOG_PREFIX=/tmp/build_log
+LOG_PREFIX=${INDEX_PATH}log/
 # ================================================================================
 # ===========================End Of Parameters====================================
 # ================================================================================
@@ -48,6 +48,9 @@ if [ "$?" = "1" ]; then
   echo "Please check this folder!"
   echo "ABORT BUILDING INDEX!"
 else
+  mkdir $LOG_PREFIX
+  LOG_PREFIX=$LOG_PREFIX/build_log
+
   echo "HNSW's M: " $HNSW_M
   echo "HNSW efConstruction: " $HNSW_EF
   echo "PQ's M: " $PQ_M
