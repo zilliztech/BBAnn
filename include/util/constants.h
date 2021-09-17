@@ -50,7 +50,3 @@ constexpr const char* INDEX = "index";
 // suffix
 constexpr const char* BIN = ".bin";
 constexpr const char* TEXT = ".txt";
-
-// block-based
-constexpr static uint64_t BLOCK_PAGE_CNT_INT = 3;
-constexpr static uint64_t BLOCK_PAGE_CNT_FLOAT = 12;
