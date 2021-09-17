@@ -82,9 +82,6 @@ void divide_raw_data(const std::string& raw_data_bin_file,
         reader.read((char*)block_buf, (ep - sp) * dim * sizeof(DATAT));
         rci.RecordSection("read batch data done");
         elkan_L2_assign<const DATAT, const float, DISTT>(block_buf, centroids, dim, ep -sp, K1, cluster_id.data(), dists.data());
-        //knn_1<HEAPT, DATAT, float> (
-        //    block_buf, centroids, ep - sp, K1, dim, 1,
-        //    dists.data(), cluster_id.data(), L2sqr<const DATAT, const float, DISTT>);
         rci.RecordSection("select file done");
         for (int64_t j = 0; j < ep - sp; j ++) {
             int64_t cid = cluster_id[j];
@@ -178,31 +175,6 @@ void  hierarchical_clusters(const std::string& output_path,
             uint32_t blk_num = 0;
             data_reader.read((char*)datai, cluster_size * cluster_dim * sizeof(DATAT));
             ids_reader.read((char*)idi, ids_size * ids_dim * sizeof(uint32_t));
-
-            // std::vector<uint8_t> raw_v = {0,0,0,1,8,7,3,2,5,0,0,3,5,7,11,31,13,0,0,0,0,29,106,107,13,0,0,0,1,61,70,42,0,0,0,0,1,23,28,16,63,4,0,0,0,6,83,81,117,86,25,15,17,50,84,117,31,23,18,35,97,117,49,24,68,27,0,0,0,4,29,71,81,47,13,10,32,87,117,117,45,76,40,22,60,70,41,9,7,21,29,39,53,21,4,1,55,72,3,0,0,0,0,9,65,117,73,37,28,23,17,34,11,11,27,61,64,25,4,0,42,13,1,1,1,14,10,6};
-            // for (uint32_t j = 0; j < cluster_size; ++j) {
-            //     if (*(idi+j) == 0) {
-            //         std::cout << *(idi+j) << std::endl;
-            //         for (int k = 0; k < cluster_dim; ++k) {
-            //             std::cout << (int)(*(datai + j *cluster_dim + k)) << ",";
-            //         }
-            //         std::cout << std::endl;
-            //     }
-            // }
-
-            // for (uint32_t j = 0; j < cluster_size; ++j) {
-            //     bool f = true;
-            //     for (int k = 0; k < cluster_dim; ++k) {
-            //         if (raw_v[k] != *(datai + j*cluster_dim + k)) {
-            //             f = false;
-            //             break;
-            //         }
-            //     }
-            //     if (f) {
-            //         std::cout << "found raw vector 0 in cluster " << i << std::endl;
-            //     }
-            // }
-
 
             IOWriter data_writer(data_file, MEGABYTE * 100);
             recursive_kmeans<DATAT>(i, cluster_size, datai, idi, cluster_dim, entry_num, blk_size, blk_num,
