@@ -323,8 +323,8 @@ void kmeans (int64_t nx, const T* x_in, int32_t dim, int64_t k, float* centroids
 
 
 template <typename T>
-void recursive_kmeans(uint32_t k1_id, uint32_t cluster_size,  T* data, int32_t* ids, uint32_t dim, int32_t threshold, int64_t blk_size,
-                      int32_t& blk_num, IOWriter& data_writer, IOWriter& centroids_writer, IOWriter& centroids_id_writer,
+void recursive_kmeans(uint32_t k1_id, uint32_t cluster_size,  T* data, uint32_t* ids, uint32_t dim, uint32_t threshold, const uint64_t blk_size,
+                      uint32_t& blk_num, IOWriter& data_writer, IOWriter& centroids_writer, IOWriter& centroids_id_writer,
                       bool kmpp = false, float avg_len = 0.0, int64_t niter = 10, int64_t seed = 1234) {
 
 
@@ -358,7 +358,7 @@ void recursive_kmeans(uint32_t k1_id, uint32_t cluster_size,  T* data, int32_t* 
     memcpy(ids_temp, ids, cluster_size * id_size);
     for(int i=0; i < cluster_size; i++) {
         offest = (bucket_pre_size[cluster_id[i]]++);
-        ids[offest] = i;
+        ids[offest] = ids_temp[i];
         memcpy(data + offest * dim, x_temp + i * dim, vector_size);
     }
     delete []x_temp;
@@ -382,7 +382,7 @@ void recursive_kmeans(uint32_t k1_id, uint32_t cluster_size,  T* data, int32_t* 
         if (bucket_size <= threshold) {
             //write a blk to file
             memset(data_blk_buf, 0, blk_size);
-            *(uint32_t*)(data_blk_buf + 0 * sizeof(uint32_t)) = bucket_size;
+            *reinterpret_cast<uint32_t*>(data_blk_buf) = bucket_size;
             char* beg_address = data_blk_buf + sizeof(uint32_t);
 
             for (int j = 0; j < bucket_size; j++) {
@@ -397,8 +397,7 @@ void recursive_kmeans(uint32_t k1_id, uint32_t cluster_size,  T* data, int32_t* 
             blk_num++;
 
         } else {
-
-            recursive_kmeans(k1_id, (uint32_t)bucket_size, data + bucket_offest, ids + bucket_offest, dim, threshold, blk_size,
+            recursive_kmeans(k1_id, (uint32_t)bucket_size, data + bucket_offest * dim, ids + bucket_offest, dim, threshold, blk_size,
                              blk_num, data_writer, centroids_writer, centroids_id_writer, kmpp, avg_len, niter, seed);
         }
     }

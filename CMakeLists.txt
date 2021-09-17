@@ -52,7 +52,7 @@ add_subdirectory(playground)
 add_subdirectory(scripts)
 target_link_libraries(build_bigann BigAnn)
 target_link_libraries(search_bigann BigAnn)
-target_link_libraries(build_bbann BigAnn)
-target_link_libraries(search_bbann BigAnn)
+target_link_libraries(build_bbann BBAnn)
+target_link_libraries(search_bbann BBAnn)
 
 

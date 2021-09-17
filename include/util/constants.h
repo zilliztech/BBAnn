@@ -50,4 +50,3 @@ constexpr const char* INDEX = "index";
 // suffix
 constexpr const char* BIN = ".bin";
 constexpr const char* TEXT = ".txt";
-

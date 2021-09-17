@@ -7,6 +7,8 @@
 #include <functional>
 #include <memory>
 #include <unordered_map>
+#include <sys/stat.h>
+
 #include "file_handler.h" 
 #include "distance.h"
 #include "defines.h"
@@ -459,4 +461,10 @@ void recall(const std::string& groundtruth_file, const std::string& answer_file,
     }
     std::cout << "recall@" << answer_topk << " in range [100, 100]: " << recall100 << std::endl;
     std::cout << "check sum recall: " << check_sum << ", which should equal nq: " << answer_nq << std::endl;
+}
+
+uint64_t fsize(std::string& filename) {
+    struct stat st;
+    stat(filename.c_str(), &st);
+    return st.st_size;
 }
