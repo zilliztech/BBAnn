@@ -1,33 +1,77 @@
 #!/bin/bash
 
-#nprobe=(50 100 200 300 400 500 600 700 800 900 1000)
-nprobe=(1000 2000 3000 4000)
-lennprobe=${#nprobe[@]}
+# ================================================================================
+# ========================Begin Of Parameters=====================================
+# ================================================================================
+#DATA_TYPE=uint8
+#DATA_TYPE=int8
+DATA_TYPE=float
+INDEX_PATH=/data/BIGANN-32-500-32-8-128-500-PQRes/
+QUERY_FILE=/data/query.public.10K.u8bin
+RESULT_OUTPUT=/data/answers/
+TRUTH_SET_FILE=/data/bigann-1B-gt
+NPROBE=50
+REFINE_NPROBE=250
+# K
+EF=50
+PQ_M=32
+PQ_NBITS=8
+K1=128
+METRIC_TYPE=L2
+#METRIC_TYPE=IP
+#PQ_TYPE=PQ
+PQ_TYPE=PQRes
 
-#refinetopk=(50 100 200 400 800 1000 1600 2000)
-refinetopk=(10 20 30 40 50 60 70 80 90 100)
+LOG_FILE=/data/bigann_search.log
+# ================================================================================
+# ===========================End Of Parameters====================================
+# ================================================================================
 
-for npb in ${nprobe[@]};
-do
-    let rnpb=npb*3
-    echo "nprobe: " $npb " rnpb: " $rnpb
-    echo "--------------------------------------------------------"
-    for rt in ${refinetopk[@]};
-    do
-	echo "refine topk: " $rt
-	sync; echo 3 | sudo tee /proc/sys/vm/drop_caches
+echo "Please run this script with root permission."
+echo "Copy this file to release/ folder, where project is compiled."
 
-    pkill -f "search_bigann"
+if [ "$DATA_TYPE" = uint8 ]; then
+  echo "Data Type: uint8 for BIGANN, Facebook SimSearchNet++"
+elif [ "$DATA_TYPE" = int8 ]; then
+  echo "Data Type: int8 for Microsoft SPACEV"
+elif [ "$DATA_TYPE" = float ]; then
+  echo "float: float for Microsoft Turing-ANNS, Yandex DEEP, Yandex Text-to-Image"
+fi
 
-    DATE_WITH_TIME=`date "+%Y%m%d-%H%M%S"`
-    F=search-${npb}-${rnpb}-10-${rt}_${DATE_WITH_TIME}
-	time ./search_bigann float /home/zilliz/bigann/test/ /mnt/Billion-Scale/Yandex-Text-to-Image/query.public.100K.fbin /home/zilliz/bigann/test/answers/YTI_32_500_50_8_IP_128_500_normalize_${npb}_${rt}_top10_small_rt.answer /mnt/Billion-Scale/Yandex-Text-to-Image/text2image-1B-gt ${npb} ${rnpb} 10 ${rt} 50 8 128 IP PQRes > /home/zilliz/bigann/test/logs/small-rt/${F}.log &
+echo "Index Folder: " $INDEX_PATH
+echo "QUERY_FILE: " $QUERY_FILE
+echo "Result Answer Path Folder: " $RESULT_OUTPUT
+mkdir $RESULT_OUTPUT
 
-    pid=$!
-    pidstat -rud -h -t -p $pid 1 > ${F}.stat
-    wait $pid
-    python3 analyze_stat.py ${F}.stat > ${F}.max.stat
+if [ "$?" = "1" ]; then
+  echo "Fail to mkdir this folder: " $RESULT_OUTPUT
+  echo "Please check this folder!"
+  echo "Abort Searching!"
+else
+  echo "TRUTH_SET_FILE: " $TRUTH_SET_FILE
+  echo "nprobe: " $NPROBE
+  echo "refine nprobe: " $REFINE_NPROBE
+  K=10
+  echo "Top K: " $K
+  ecbo "EF Refine Topk" $EF
+  echo "PQ's M: " $PQ_M
+  echo "PQ' Nbits: " $PQ_NBITS
+  echo "K1 (cluster number): " $K1
+  echo "Metric Type: " $METRIC_TYPE
+  echo "Bucket Threshold: " $BUCKET_THRESHOLD
+  echo "PQ Quantizer Type: " $PQ_TYPE
 
-    echo "--------------------------------------------------------"
-    done
-done
+  echo "LOG_FILE: " $LOG_FILE
+
+  sync; echo 3 | sudo tee /proc/sys/vm/drop_caches
+  pkill -f "search_bigann"
+	time ./search_bigann $DATA_TYPE $INDEX_PATH $QUERY_FILE $RESULT_OUTPUT $TRUTH_SET_FILE $NPROBE $REFINE_NPROBE $K $EF $PQ_M $PQ_NBITS $K1 $METRIC_TYPE $PQ_TYPE > $LOG_FILE &
+  pid=$!
+  pidstat -rud -h -t -p $pid 1 > $LOG_FILE.stat
+  wait $pid
+  python3 analyze_stat.py $LOG_FILE.stat > $LOG_FILE.max.stat
+  # TODO: input sanitizer
+
+fi
+
+
