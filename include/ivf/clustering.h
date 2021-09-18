@@ -229,7 +229,7 @@ void kmeanspp(const DATAT* pdata, const int64_t nb, const int64_t dim,
 //    else: normalize
 
 template <typename T>
-void kmeans (int64_t nx, const T* x_in, int32_t dim, int64_t k, float* centroids,
+void kmeans (int64_t nx, const T* x_in, int64_t dim, int64_t k, float* centroids,
              bool kmpp = false, float avg_len = 0.0, int64_t niter = 10, 
              int64_t seed = 1234) {
 
@@ -268,7 +268,7 @@ void kmeans (int64_t nx, const T* x_in, int32_t dim, int64_t k, float* centroids
         rand_perm(assign.get(), nx, k, seed);
         for (int64_t i = 0; i < k; i++) {
            // std::cout<<i<<assign[i]<<std::endl;
-            const T* x = x_in + (uint32_t)((assign[i]%nx) * dim);
+            const T* x = x_in + assign[i] * dim;
 
             float* c = centroids + i * dim;
 
@@ -323,7 +323,7 @@ void kmeans (int64_t nx, const T* x_in, int32_t dim, int64_t k, float* centroids
 
 
 template <typename T>
-void recursive_kmeans(uint32_t k1_id, uint32_t cluster_size,  T* data, uint32_t* ids, uint32_t dim, uint32_t threshold, const uint64_t blk_size,
+void recursive_kmeans(uint32_t k1_id, uint32_t cluster_size, T* data, uint32_t* ids, int64_t dim, uint32_t threshold, const uint64_t blk_size,
                       uint32_t& blk_num, IOWriter& data_writer, IOWriter& centroids_writer, IOWriter& centroids_id_writer,
                       bool kmpp = false, float avg_len = 0.0, int64_t niter = 10, int64_t seed = 1234) {
 
@@ -392,7 +392,7 @@ void recursive_kmeans(uint32_t k1_id, uint32_t cluster_size,  T* data, uint32_t*
             global_id = gen_global_block_id(k1_id, blk_num);
 
             data_writer.write((char *) data_blk_buf, blk_size);
-            centroids_writer.write((char *) (&k2_centroids[i]), sizeof(float) * dim);
+            centroids_writer.write((char *) (k2_centroids + i * dim), sizeof(float) * dim);
             centroids_id_writer.write((char *) (&global_id), sizeof(uint32_t));
             blk_num++;
 
