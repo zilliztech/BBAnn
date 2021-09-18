@@ -503,14 +503,16 @@ void search_bbann(const std::string& index_path,
     //         char* buf_begin = buf + sizeof(uint32_t);
 
     //         for (uint32_t k = 0; k < entry_num; ++k) {
-    //                 vec = reinterpret_cast<DATAT*>(buf_begin + entry_size * j);
-    //                 auto dis = dis_computer(vec, q_idx, dim);
-    //                 if (HEAPT::cmp(answer_dists[topk * qid], dis)) {
-    //                     heap_swap_top<HEAPT>(topk,
-    //                                          answer_dists + topk * qid,
-    //                                          answer_ids + topk * qid,
-    //                                          dis,
-    //                                          *reinterpret_cast<uint32_t*>(vec + vec_size));
+    //             char *entry_begin = buf_begin + entry_size * k;
+    //             vec = reinterpret_cast<DATAT*>(entry_begin);
+    //             auto dis = dis_computer(vec, q_idx, dim);
+    //             if (HEAPT::cmp(answer_dists[topk * i], dis)) {
+    //                 heap_swap_top<HEAPT>(topk,
+    //                                      answer_dists + topk * i,
+    //                                      answer_ids + topk * i,
+    //                                      dis,
+    //                                      *reinterpret_cast<uint32_t*>(entry_begin + vec_size));
+    //             }
     //         }
     //     }
     // }
@@ -542,14 +544,15 @@ void search_bbann(const std::string& index_path,
                 const uint32_t qid = qv[i];
                 const DATAT* q_idx = pquery + qid * dq;
                 for (uint32_t j = 0; j < entry_num; ++j) {
-                    vec = reinterpret_cast<DATAT*>(buf_begin + entry_size * j);
+                    char *entry_begin = buf_begin + entry_size * j;
+                    vec = reinterpret_cast<DATAT*>(entry_begin);
                     auto dis = dis_computer(vec, q_idx, dim);
                     if (HEAPT::cmp(answer_dists[topk * qid], dis)) {
                         heap_swap_top<HEAPT>(topk,
                                              answer_dists + topk * qid,
                                              answer_ids + topk * qid,
                                              dis,
-                                             *reinterpret_cast<uint32_t*>(vec + vec_size));
+                                             *reinterpret_cast<uint32_t*>(entry_begin + vec_size));
                     }
                 }
             }
