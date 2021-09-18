@@ -386,8 +386,8 @@ void recursive_kmeans(uint32_t k1_id, uint32_t cluster_size,  T* data, uint32_t*
             char* beg_address = data_blk_buf + sizeof(uint32_t);
 
             for (int j = 0; j < bucket_size; j++) {
-                memcpy(beg_address + j * entry_size, ids + bucket_offest + j, id_size);
-                memcpy(beg_address + j * entry_size + id_size, data + dim * (bucket_offest + j), vector_size);
+                memcpy(beg_address + j * entry_size, data + dim * (bucket_offest + j), vector_size);
+                memcpy(beg_address + j * entry_size + vector_size, ids + bucket_offest + j, id_size);
             }
             global_id = gen_global_block_id(k1_id, blk_num);
 
