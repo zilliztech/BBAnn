@@ -1,11 +1,12 @@
 #!/bin/bash
 
+DATA_TYPE=uint8
+K=10
+METRIC_TYPE=L2
 # ================================================================================
 # ========================Begin Of Parameters=====================================
 # ================================================================================
-DATA_TYPE=uint8
-#DATA_TYPE=int8
-#DATA_TYPE=float
+# DATA_TYPE
 INDEX_PATH=/data/BIGANN-32-500-32-8-128-500-PQR/
 QUERY_FILE=/data/bigann-1B/query.public.10K.u8bin
 RESULT_OUTPUT=/data/answers/a.answer
@@ -17,8 +18,7 @@ EF=50
 PQ_M=32
 PQ_NBITS=8
 K1=128
-METRIC_TYPE=L2
-#METRIC_TYPE=IP
+# METRIC_TYPE
 #PQ_TYPE=PQ
 PQ_TYPE=PQRes
 
@@ -30,21 +30,13 @@ LOG_FILE=/data/0918bigann_search.log
 echo "Please run this script with root permission."
 echo "Copy this file to release/ folder, where project is compiled."
 
-if [ "$DATA_TYPE" = uint8 ]; then
-  echo "Data Type: uint8 for BIGANN, Facebook SimSearchNet++"
-elif [ "$DATA_TYPE" = int8 ]; then
-  echo "Data Type: int8 for Microsoft SPACEV"
-elif [ "$DATA_TYPE" = float ]; then
-  echo "float: float for Microsoft Turing-ANNS, Yandex DEEP, Yandex Text-to-Image"
-fi
-
+echo "Data Type: uint8 for BIGANN"
 echo "Index Folder: " $INDEX_PATH
 echo "QUERY_FILE: " $QUERY_FILE
 echo "Result Answer Path: " $RESULT_OUTPUT
 echo "TRUTH_SET_FILE: " $TRUTH_SET_FILE
 echo "nprobe: " $NPROBE
 echo "refine nprobe: " $REFINE_NPROBE
-K=10
 echo "Top K: " $K
 echo "EF Refine Topk" $EF
 echo "PQ's M: " $PQ_M
