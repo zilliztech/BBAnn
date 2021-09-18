@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <algorithm>
 #include <string>
 
 #include "util/defines.h"
@@ -11,6 +12,7 @@
 #include "util/heap.h"
 #include "ivf/clustering.h"
 #include "util/TimeRecorder.h"
+#include "flat/flat.h"
 
 template<typename DATAT, typename DISTT, typename HEAPT>
 void build_bbann(const std::string& raw_data_bin_file,
