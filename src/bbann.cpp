@@ -413,6 +413,32 @@ void search_flat(const std::string& index_path,
     delete[] values;
 }
 
+
+void check_answer_by_id(const uint32_t* answer_ids,
+                        const uint32_t nq,
+                        const int topk) {
+    for (uint32_t i = 0; i < nq; ++i) {
+        bool f = true;
+        auto pos = -1;
+        for (int j = 0; j < topk; ++j) {
+            // std::cout << answer_ids[i*topk+j] << " ";
+            if (answer_ids[i*topk+j] == i) {
+                f = false;
+                pos = j;
+                break;
+            }
+        }
+        // std::cout << std::endl;
+
+        if (f) {
+            std::cout << "Cound not find " << i << "th base vector" << std::endl;
+        } else {
+            std::cout << "Found " << i << "th base vector at top " << pos << std::endl;
+        }
+    }
+}
+
+
 template<typename DATAT, typename DISTT, typename HEAPT>
 void search_bbann(const std::string& index_path,
                    const std::string& query_bin_file,

@@ -468,3 +468,11 @@ uint64_t fsize(std::string& filename) {
     stat(filename.c_str(), &st);
     return st.st_size;
 }
+
+template<typename T>
+bool cmp_vec(const T* x, const T* y, uint32_t dim) {
+    for (auto i = 0; i < dim; ++i) {
+        if (x[i] != y[i]) return false;
+    }
+    return true;
+}
