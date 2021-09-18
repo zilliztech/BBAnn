@@ -470,7 +470,8 @@ void search_bbann(const std::string& index_path,
     }
 
     uint32_t dim = dq, gid;
-    const uint32_t entry_size = sizeof(uint32_t) + sizeof(DATAT) * dim;
+    const uint32_t vec_size = sizeof(DATAT) * dim;
+    const uint32_t entry_size =  vec_size + sizeof(uint32_t);
     DATAT* vec;
 
     // init answer heap
@@ -502,13 +503,14 @@ void search_bbann(const std::string& index_path,
     //         char* buf_begin = buf + sizeof(uint32_t);
 
     //         for (uint32_t k = 0; k < entry_num; ++k) {
-    //             gid = *reinterpret_cast<uint32_t*>(buf_begin + entry_size * k);
-    //             vec = reinterpret_cast<DATAT*>(buf_begin + entry_size * k + sizeof(uint32_t));
-
-    //             auto dis = dis_computer(vec, q_idx, dim);
-    //             if (HEAPT::cmp(answer_dists[topk * i], dis)) {
-    //                 heap_swap_top<HEAPT>(topk, answer_dists + topk * i, answer_ids + topk * i, dis, gid);
-    //             }
+    //                 vec = reinterpret_cast<DATAT*>(buf_begin + entry_size * j);
+    //                 auto dis = dis_computer(vec, q_idx, dim);
+    //                 if (HEAPT::cmp(answer_dists[topk * qid], dis)) {
+    //                     heap_swap_top<HEAPT>(topk,
+    //                                          answer_dists + topk * qid,
+    //                                          answer_ids + topk * qid,
+    //                                          dis,
+    //                                          *reinterpret_cast<uint32_t*>(vec + vec_size));
     //         }
     //     }
     // }
@@ -540,12 +542,14 @@ void search_bbann(const std::string& index_path,
                 const uint32_t qid = qv[i];
                 const DATAT* q_idx = pquery + qid * dq;
                 for (uint32_t j = 0; j < entry_num; ++j) {
-                    gid = *reinterpret_cast<uint32_t*>(buf_begin + entry_size * j);
-                    vec = reinterpret_cast<DATAT*>(buf_begin + entry_size * j + sizeof(uint32_t));
-
+                    vec = reinterpret_cast<DATAT*>(buf_begin + entry_size * j);
                     auto dis = dis_computer(vec, q_idx, dim);
                     if (HEAPT::cmp(answer_dists[topk * qid], dis)) {
-                        heap_swap_top<HEAPT>(topk, answer_dists + topk * qid, answer_ids + topk * qid, dis, gid);
+                        heap_swap_top<HEAPT>(topk,
+                                             answer_dists + topk * qid,
+                                             answer_ids + topk * qid,
+                                             dis,
+                                             *reinterpret_cast<uint32_t*>(vec + vec_size));
                     }
                 }
             }
