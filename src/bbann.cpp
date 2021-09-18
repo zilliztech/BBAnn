@@ -368,6 +368,51 @@ void save_answers(const std::string& answer_bin_file,
     rc.ElapseFromBegin("save answers done.");
 }
 
+template<typename DATAT>
+void search_flat(const std::string& index_path,
+                 const DATAT* pquery,
+                 const uint32_t nq,
+                 const uint32_t dq,
+                 const int nprobe,
+                 uint32_t* labels) {
+    std::string bucket_centroids_file = index_path + BUCKET + CENTROIDS + BIN;
+    std::string bucket_centroids_id_file = index_path + CLUSTER + COMBINE_IDS + BIN;
+
+    float* cen_data = nullptr;
+    uint32_t* cen_ids = nullptr;
+    
+    uint32_t cen_n, dim, temp;
+    read_bin_file<float>(bucket_centroids_file, cen_data, cen_n, dim);
+    std::cout << cen_n << " " << dim << std::endl;
+    assert(dim == dq);
+    read_bin_file<uint32_t>(bucket_centroids_id_file, cen_ids, cen_n, temp);
+    std::cout << cen_n << " " << temp << std::endl;
+
+    // for (int i = 0; i < cen_n; ++i) {
+    //     uint32_t cid, bid;
+    //     parse_global_block_id(cen_ids[i], cid, bid);
+    //     std::cout << cen_ids[i] << " " << cid << " " << bid << std::endl;
+    // }
+
+    float* values = new float[(int64_t)nq * nprobe];
+
+    knn_1<CMax<float, uint32_t>, DATAT, float>(pquery,
+                                               cen_data,
+                                               nq,
+                                               cen_n,
+                                               dim,
+                                               nprobe,
+                                               values,
+                                               labels,
+                                               L2sqr<const DATAT, const float, float>);
+    
+    for (uint64_t i = 0; i < (uint64_t)nq*nprobe; ++i) {
+        labels[i] = cen_ids[labels[i]];
+    }
+
+    delete[] values;
+}
+
 template<typename DATAT, typename DISTT, typename HEAPT>
 void search_bbann(const std::string& index_path,
                    const std::string& query_bin_file,
@@ -406,12 +451,13 @@ void search_bbann(const std::string& index_path,
 
     answer_dists = new DISTT[(int64_t)nq * topk];
     answer_ids = new uint32_t[(int64_t)nq * topk];
-    bucket_labels = new uint32_t[(int64_t)nq * nprobe]; // 100K * 40 * 4 = 16 M
+    bucket_labels = new uint32_t[(int64_t)nq * nprobe]; // 400K * nprobe
 
     // cid -> [bid -> [qid]]
     std::unordered_map<uint32_t, std::unordered_map<uint32_t, std::unordered_set<uint32_t> > > mp;
 
     search_graph<DATAT>(index_hnsw, nq, dq, nprobe, hnsw_ef, pquery, bucket_labels);
+    // search_flat<DATAT>(index_path, pquery, nq, dq, nprobe, bucket_labels);
     rc.RecordSection("search buckets done.");
 
     uint32_t cid, bid;
@@ -437,6 +483,36 @@ void search_bbann(const std::string& index_path,
     rc.RecordSection("heapify answers heaps");
 
     char* buf = new char[block_size];
+
+    /* flat */
+    // for (int64_t i = 0; i < nq; ++i) {
+    //     const auto ii = i * nprobe;
+    //     const DATAT* q_idx = pquery + i * dq;
+
+    //     for (int64_t j = 0; j < nprobe; ++j) {
+    //         parse_global_block_id(bucket_labels[ii+j], cid, bid);
+    //         std::string cluster_file_path = index_path + CLUSTER + std::to_string(cid) + "-" + RAWDATA + BIN;
+    //         auto fh = std::ifstream(cluster_file_path, std::ios::binary);
+    //         assert(!fh.fail());
+
+    //         fh.seekg(bid * block_size);
+    //         fh.read(buf, block_size);
+
+    //         const uint32_t entry_num = *reinterpret_cast<uint32_t*>(buf);
+    //         char* buf_begin = buf + sizeof(uint32_t);
+
+    //         for (uint32_t k = 0; k < entry_num; ++k) {
+    //             gid = *reinterpret_cast<uint32_t*>(buf_begin + entry_size * k);
+    //             vec = reinterpret_cast<DATAT*>(buf_begin + entry_size * k + sizeof(uint32_t));
+
+    //             auto dis = dis_computer(vec, q_idx, dim);
+    //             if (HEAPT::cmp(answer_dists[topk * i], dis)) {
+    //                 heap_swap_top<HEAPT>(topk, answer_dists + topk * i, answer_ids + topk * i, dis, gid);
+    //             }
+    //         }
+    //     }
+    // }
+
     for (const auto& [cid, bid_mp] : mp) {
         std::string cluster_file_path = index_path + CLUSTER + std::to_string(cid) + "-" + RAWDATA + BIN;
         auto fh = std::ifstream(cluster_file_path, std::ios::binary);
@@ -477,7 +553,7 @@ void search_bbann(const std::string& index_path,
     }
     delete[] buf;
     delete[] bucket_labels;
-    rc.RecordSection("flat");
+    rc.RecordSection("scanning blocks done");
 
     // write answers
     save_answers<DISTT, HEAPT>(answer_bin_file, topk, nq, answer_dists, answer_ids);
