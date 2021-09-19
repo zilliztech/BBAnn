@@ -1,22 +1,21 @@
-
+#!/usr/bin/python3
 
 file_name = "tana_res.txt"
 records = {}
 with open(file_name) as f:
 	while True:
-		line = f.readline()
+		line = f.readline() # Line 1: log file name
 		if not line:
 			break
 		print(line.strip())
-		key = f.readline().strip()
+		key = f.readline().strip() # Line 2: the key == nprobe, refine_nprobe
 		print("key: ${0}".format(key))
 		new_record = []
-		for x in range(16):
+		for x in range(13):  # Line 3-n
 			new_record.append(f.readline().strip())
 		records[key] = new_record
 
 sorted_records = sorted(records.items())
-
 
 outfile="form.txt"
 with open(outfile, 'w') as f:
@@ -26,4 +25,3 @@ with open(outfile, 'w') as f:
 			f.write(val)
 			f.write(' ')
 		f.write('\n')
-		
