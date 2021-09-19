@@ -6,10 +6,10 @@
 DATA_TYPE=uint8
 #DATA_TYPE=int8
 #DATA_TYPE=float
-INDEX_PATH=/data/BIGANN-32-500-32-8-128-500-PQR/
-QUERY_FILE=/data/bigann-1B/query.public.10K.u8bin
+INDEX_PATH=/data/GRIP_Indexes/BIGANN-32-500-32-8-128-500-PQR/
+QUERY_FILE=/data/diskann-T2-baseline-indices/bigann-1B/query.public.10K.u8bin
 RESULT_OUTPUT=/data/answers/a.answer
-TRUTH_SET_FILE=/data/bigann-1B/bigann-1B-gt
+TRUTH_SET_FILE=/data/diskann-T2-baseline-indices/bigann-1B/bigann-1B-gt
 NPROBE=50
 REFINE_NPROBE=250
 # K
