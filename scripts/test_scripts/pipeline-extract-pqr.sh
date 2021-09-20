@@ -15,8 +15,7 @@ do
     split3=(${split2[-1]//./ })
     refine_topk=${split3[0]}
     echo "refine_topk: " ${refine_topk}
-    echo $refine_topk >> $output
-    #cat $file |  grep "main: load pq codebook done." | awk -F' ' '{print $6}' >> $output
+    echo $nprobe"-"$refine_topk >> $output
     cat $file |  grep "main: load pq codebook done." | awk -F' ' '{print $6}' | awk -F'(' '{print $2}' >> $output
     cat $file | grep "main: load meta done." | awk -F' ' '{print $5}' | awk -F'(' '{print $2}' >> $output
     cat $file | grep "main: load hnsw done." | awk -F' ' '{print $5}' | awk -F'(' '{print $2}' >> $output

@@ -11,7 +11,7 @@ with open(file_name) as f:
 		key = f.readline().strip() # Line 2: the key == nprobe, refine_nprobe
 		print("key: ${0}".format(key))
 		new_record = []
-		for x in range(13):  # Line 3-n
+		for x in range(16):  # Line 3-n
 			new_record.append(f.readline().strip())
 		records[key] = new_record
 
