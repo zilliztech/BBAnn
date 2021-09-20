@@ -1,5 +1,7 @@
 #include "bbann.h"
 
+// #define COLLECT_VEC_NUM_PER_QUERY
+
 template<typename DATAT>
 void train_cluster(const std::string& raw_data_bin_file,
                    const std::string& output_path,
@@ -482,19 +484,15 @@ void search_bbann(const std::string& index_path,
     // cid -> [bid -> [qid]]
     std::unordered_map<uint32_t, std::unordered_map<uint32_t, std::unordered_set<uint32_t> > > mp;
 
+#ifdef COLLECT_VEC_NUM_PER_QUERY
+    std::unordered_map<uint32_t, uint64_t> vec_per_q_mp;
+#endif
+
     search_graph<DATAT>(index_hnsw, nq, dq, nprobe, hnsw_ef, pquery, bucket_labels);
     // search_flat<DATAT>(index_path, pquery, nq, dq, nprobe, bucket_labels);
     rc.RecordSection("search buckets done.");
 
     uint32_t cid, bid;
-    for (int64_t i = 0; i < nq; ++i) {
-        const auto ii = i * nprobe;
-        for (int64_t j = 0; j < nprobe; ++j) {
-            parse_global_block_id(bucket_labels[ii+j], cid, bid);
-            mp[cid][bid].insert(i);
-        }
-    }
-
     uint32_t dim = dq, gid;
     const uint32_t vec_size = sizeof(DATAT) * dim;
     const uint32_t entry_size =  vec_size + sizeof(uint32_t);
@@ -512,81 +510,95 @@ void search_bbann(const std::string& index_path,
     char* buf = new char[block_size];
 
     /* flat */
-    // for (int64_t i = 0; i < nq; ++i) {
-    //     const auto ii = i * nprobe;
-    //     const DATAT* q_idx = pquery + i * dq;
+    for (int64_t i = 0; i < nq; ++i) {
+        const auto ii = i * nprobe;
+        const DATAT* q_idx = pquery + i * dq;
 
-    //     for (int64_t j = 0; j < nprobe; ++j) {
-    //         parse_global_block_id(bucket_labels[ii+j], cid, bid);
-    //         std::string cluster_file_path = index_path + CLUSTER + std::to_string(cid) + "-" + RAWDATA + BIN;
-    //         auto fh = std::ifstream(cluster_file_path, std::ios::binary);
-    //         assert(!fh.fail());
+        for (int64_t j = 0; j < nprobe; ++j) {
+            parse_global_block_id(bucket_labels[ii+j], cid, bid);
+            std::string cluster_file_path = index_path + CLUSTER + std::to_string(cid) + "-" + RAWDATA + BIN;
+            auto fh = std::ifstream(cluster_file_path, std::ios::binary);
+            assert(!fh.fail());
 
-    //         fh.seekg(bid * block_size);
-    //         fh.read(buf, block_size);
-
-    //         const uint32_t entry_num = *reinterpret_cast<uint32_t*>(buf);
-    //         char* buf_begin = buf + sizeof(uint32_t);
-
-    //         for (uint32_t k = 0; k < entry_num; ++k) {
-    //             char *entry_begin = buf_begin + entry_size * k;
-    //             vec = reinterpret_cast<DATAT*>(entry_begin);
-    //             auto dis = dis_computer(vec, q_idx, dim);
-    //             if (HEAPT::cmp(answer_dists[topk * i], dis)) {
-    //                 heap_swap_top<HEAPT>(topk,
-    //                                      answer_dists + topk * i,
-    //                                      answer_ids + topk * i,
-    //                                      dis,
-    //                                      *reinterpret_cast<uint32_t*>(entry_begin + vec_size));
-    //             }
-    //         }
-    //     }
-    // }
-
-    for (const auto& [cid, bid_mp] : mp) {
-        std::string cluster_file_path = index_path + CLUSTER + std::to_string(cid) + "-" + RAWDATA + BIN;
-        auto fh = std::ifstream(cluster_file_path, std::ios::binary);
-        assert(!fh.fail());
-
-        for (const auto& [bid, qs] : bid_mp) {
             fh.seekg(bid * block_size);
             fh.read(buf, block_size);
+
             const uint32_t entry_num = *reinterpret_cast<uint32_t*>(buf);
             char* buf_begin = buf + sizeof(uint32_t);
-    /*
-     * A few options here. We can parallelize cid, bid, qs, dis_calculation.
-     * Parallelizing qs is the only option that does not require locks, but having
-     * potential waste of resources when qs is less than number of threads available.
-     * 
-     * TODO: need more investigation here
-     * 
-     * Other proposal like make hnsw_search, read_data and calculation as a pipeline
-     * may also worth investigating.
-     */
-            std::vector<uint32_t> qv(qs.begin(), qs.end());
 
-#pragma omp parallel for
-            for (uint32_t i = 0; i < qv.size(); ++i) {
-                const uint32_t qid = qv[i];
-                const DATAT* q_idx = pquery + qid * dq;
-                for (uint32_t j = 0; j < entry_num; ++j) {
-                    char *entry_begin = buf_begin + entry_size * j;
-                    vec = reinterpret_cast<DATAT*>(entry_begin);
-                    auto dis = dis_computer(vec, q_idx, dim);
-                    if (HEAPT::cmp(answer_dists[topk * qid], dis)) {
-                        heap_swap_top<HEAPT>(topk,
-                                             answer_dists + topk * qid,
-                                             answer_ids + topk * qid,
-                                             dis,
-                                             *reinterpret_cast<uint32_t*>(entry_begin + vec_size));
-                    }
+#ifdef COLLECT_VEC_NUM_PER_QUERY
+            vec_per_q_mp[i] += entry_num;
+#endif
+
+            for (uint32_t k = 0; k < entry_num; ++k) {
+                char *entry_begin = buf_begin + entry_size * k;
+                vec = reinterpret_cast<DATAT*>(entry_begin);
+                auto dis = dis_computer(vec, q_idx, dim);
+                if (HEAPT::cmp(answer_dists[topk * i], dis)) {
+                    heap_swap_top<HEAPT>(topk,
+                                         answer_dists + topk * i,
+                                         answer_ids + topk * i,
+                                         dis,
+                                         *reinterpret_cast<uint32_t*>(entry_begin + vec_size));
                 }
             }
         }
     }
+
+    /* remove duplications + parallel on queries when searching block */
+//     for (int64_t i = 0; i < nq; ++i) {
+//         const auto ii = i * nprobe;
+//         for (int64_t j = 0; j < nprobe; ++j) {
+//             parse_global_block_id(bucket_labels[ii+j], cid, bid);
+//             mp[cid][bid].insert(i);
+//         }
+//     }
+
+
+//     for (const auto& [cid, bid_mp] : mp) {
+//         std::string cluster_file_path = index_path + CLUSTER + std::to_string(cid) + "-" + RAWDATA + BIN;
+//         auto fh = std::ifstream(cluster_file_path, std::ios::binary);
+//         assert(!fh.fail());
+
+//         for (const auto& [bid, qs] : bid_mp) {
+//             fh.seekg(bid * block_size);
+//             fh.read(buf, block_size);
+//             const uint32_t entry_num = *reinterpret_cast<uint32_t*>(buf);
+//             char* buf_begin = buf + sizeof(uint32_t);
+//     /*
+//      * A few options here. We can parallelize cid, bid, qs, dis_calculation.
+//      * Parallelizing qs is the only option that does not require locks, but having
+//      * potential waste of resources when qs is less than number of threads available.
+//      * 
+//      * TODO: need more investigation here
+//      * 
+//      * Other proposal like make hnsw_search, read_data and calculation as a pipeline
+//      * may also worth investigating.
+//      */
+//             std::vector<uint32_t> qv(qs.begin(), qs.end());
+
+// #pragma omp parallel for
+//             for (uint32_t i = 0; i < qv.size(); ++i) {
+//                 const uint32_t qid = qv[i];
+//                 const DATAT* q_idx = pquery + qid * dq;
+//                 for (uint32_t j = 0; j < entry_num; ++j) {
+//                     char *entry_begin = buf_begin + entry_size * j;
+//                     vec = reinterpret_cast<DATAT*>(entry_begin);
+//                     auto dis = dis_computer(vec, q_idx, dim);
+//                     if (HEAPT::cmp(answer_dists[topk * qid], dis)) {
+//                         heap_swap_top<HEAPT>(topk,
+//                                              answer_dists + topk * qid,
+//                                              answer_ids + topk * qid,
+//                                              dis,
+//                                              *reinterpret_cast<uint32_t*>(entry_begin + vec_size));
+//                     }
+//                 }
+//             }
+//         }
+//     }
     delete[] buf;
     delete[] bucket_labels;
-    rc.RecordSection("scanning blocks done");
+    rc.RecordSection("scan blocks done");
 
     // write answers
     save_answers<DISTT, HEAPT>(answer_bin_file, topk, nq, answer_dists, answer_ids);
@@ -596,6 +608,17 @@ void search_bbann(const std::string& index_path,
     delete[] answer_ids;
     delete[] answer_dists;
     rc.ElapseFromBegin("search bigann totally done");
+
+
+#ifdef COLLECT_VEC_NUM_PER_QUERY
+    uint64_t stats[3] = {0, 0, std::numeric_limits<uint64_t>::max()}; // avg, max, min
+    for (const auto& [q, cnt] : vec_per_q_mp) {
+        stats[0] += cnt;
+        stats[1] = std::max(stats[1], cnt);
+        stats[2] = std::min(stats[2], cnt);
+    }
+    std::cout << "#vec/query avg: " << stats[0]*1.0f/nq << " max: " << stats[1] << " min: " << stats[2] << std::endl;
+#endif
 }
 
 #define BUILD_BBANN_DECL(DATAT, DISTT, HEAPT)                                                             \
