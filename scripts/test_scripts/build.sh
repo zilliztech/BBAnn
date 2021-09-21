@@ -26,7 +26,7 @@ LOG_PREFIX=${INDEX_PATH}log/
 # ================================================================================
 
 echo "Please run this script with root permission."
-echo "Copy this file to release/ folder, where project is compiled."
+echo "Copy this file as well as analyze_stat.py to release/ folder, where project is compiled."
 
 pkill -f "build_bigann"
 

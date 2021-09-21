@@ -22,7 +22,7 @@ LOG_PREFIX=${INDEX_PATH}log/
 # ================================================================================
 
 echo "Please run this script with root permission."
-echo "Copy this file to release/ folder, where project is compiled."
+echo "Copy this file as well as analyze_stat.py to release/ folder, where project is compiled."
 
 pkill -f "build_bbann"
 
@@ -60,7 +60,7 @@ else
   LOG_FILE=${LOG_PREFIX}.log
   echo "Log File: " $LOG_FILE
 
-  screen ./build_bbann $DATA_TYPE $DATA_FILE $INDEX_PATH $HNSW_M $HNSW_EF $METRIC_TYPE $K1 $PAGE_PER_BLOCK >$LOG_FILE 2>&1
+  screen ./build_bbann $DATA_TYPE $DATA_FILE $INDEX_PATH $HNSW_M $HNSW_EF $METRIC_TYPE $K1 $PAGE_PER_BLOCK > $LOG_FILE 2>&1
   pid=$!
   echo "PID: " $pid
   pidstat -rud -h -t -p $pid 5 > ${LOG_PREFIX}.stat
