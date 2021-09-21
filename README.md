@@ -22,7 +22,11 @@ $ cmake .. -D CMAKE_BUILD_TYPE=Release
 $ make -j
 ```
 
-### Build Index
+### Previous Approach: `build_bigann` & `search_bigann`
+
+**Please use script in `scripts/test_scripts`**
+
+#### Build Index
 
 To build, under the `build` directory, run `build_bigann` with the following arguments
  1. data type(string): [uint8|int8|float]
@@ -44,7 +48,7 @@ $ mkdir -p index_path
 $ ./build_bigann [uint8|int8|float] [raw_data_path] [index_path] [HNSW_M] [HNSW_efConstruction] [PQ_M] [PQ_nbits] [IP|L2] [K1] [bucket_threshold] [PQ|PQRes]
 ```
 
-### Search Query
+#### Search Query
 
 To search, run `search_bigann` with the following arguments
 args:
