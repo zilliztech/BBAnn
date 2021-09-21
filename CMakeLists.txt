@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.10)
 project(BigAnn)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -21,8 +21,12 @@ if (OPENMP_FOUND)
     set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
 endif()
 
-set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -O3 -fopenmp -mavx2 -mfma" )
-# set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native -O0 -g -mavx2 -mfma" )
+# -march=native: https://stackoverflow.com/a/54032969/10971650, https://stackoverflow.com/questions/3015306/what-exactly-does-march-native-do
+include(CheckCXXCompilerFlag)
+CHECK_CXX_COMPILER_FLAG("-march=native" COMPILER_SUPPORTS_MARCH_NATIVE)
+if(COMPILER_SUPPORTS_MARCH_NATIVE)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+endif()
 
 # Log with I/O statistics doing profiling
 set(IOPERF 1)
