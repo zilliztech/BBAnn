@@ -45,7 +45,7 @@ if [ "$?" = "1" ]; then
   echo "ABORT BUILDING INDEX!"
 else
   mkdir $LOG_PREFIX
-  LOG_PREFIX=$LOG_PREFIX/build_log
+  LOG_PREFIX=${LOG_PREFIX}build_log
 
   echo "HNSW's M: " $HNSW_M
   echo "HNSW efConstruction: " $HNSW_EF
