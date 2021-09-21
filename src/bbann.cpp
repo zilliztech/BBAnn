@@ -1,7 +1,5 @@
 #include "bbann.h"
 
-// #define COLLECT_VEC_NUM_PER_QUERY
-
 template<typename DATAT>
 void train_cluster(const std::string& raw_data_bin_file,
                    const std::string& output_path,
@@ -258,6 +256,44 @@ void build_graph(const std::string& index_path,
     rc.ElapseFromBegin("create index hnsw totally done");
 }
 
+void gather_buckets_stats(const::std::string index_path,
+                          const int K1,
+                          const uint64_t block_size) {
+    char* buf = new char[block_size];
+    uint64_t stats[3] = {0, 0, std::numeric_limits<uint64_t>::max()}; // avg, max, min
+    uint64_t bucket_cnt = 0;
+
+    for (int i = 0; i < K1; ++i) {
+        std::string cluster_file_path = index_path + CLUSTER + std::to_string(i) + "-" + RAWDATA + BIN;
+        uint64_t file_size = fsize(cluster_file_path);
+        auto fh = std::ifstream(cluster_file_path, std::ios::binary);
+        assert(!fh.fail());
+
+        for (uint32_t j = 0; j * block_size < file_size; ++j)  {
+            fh.seekg(j * block_size);
+            fh.read(buf, block_size);
+            const uint64_t entry_num = static_cast<const uint64_t>(*reinterpret_cast<uint32_t*>(buf));
+
+            stats[0] += entry_num;
+            stats[1] = std::max(stats[1], entry_num);
+            stats[2] = std::min(stats[2], entry_num);
+            ++bucket_cnt;
+        }
+    }
+
+    uint32_t cen_n, cen_dim;
+    get_bin_metadata(index_path + BUCKET + CENTROIDS + BIN, cen_n, cen_dim);
+    assert(cen_n == bucket_cnt);
+
+    std::cout << "Total number of buckets: " << bucket_cnt << std::endl;
+    std::cout << "#vectors in bucket avg: " << stats[0]*1.0f/bucket_cnt
+              << " max: " << stats[1]
+              << " min: " << stats[2]
+              << std::endl;
+
+    delete[] buf;
+}
+
 template<typename DATAT, typename DISTT, typename HEAPT>
 void build_bbann(const std::string& raw_data_bin_file,
                   const std::string& output_path,
@@ -290,6 +326,9 @@ void build_bbann(const std::string& raw_data_bin_file,
 
     build_graph(output_path, hnswM, hnswefC, metric_type);
     rc.RecordSection("build hnsw done.");
+
+    gather_buckets_stats(output_path, K1, block_size);
+    rc.RecordSection("gather statistics done");
 
     delete[] centroids;
     rc.ElapseFromBegin("build bigann totally done.");
@@ -440,6 +479,47 @@ void check_answer_by_id(const uint32_t* answer_ids,
     }
 }
 
+template<typename DATAT>
+void gather_vec_searched_per_query(const std::string index_path,
+                                   const DATAT* pquery,
+                                   const int nq,
+                                   const int nprobe,
+                                   const uint32_t dq,
+                                   const uint64_t block_size,
+                                   char *buf,
+                                   const uint32_t* bucket_labels) {
+    std::unordered_map<uint32_t, uint64_t> vec_per_q_mp;
+    uint32_t cid, bid;
+
+    for (int64_t i = 0; i < nq; ++i) {
+        const auto ii = i * nprobe;
+        const DATAT* q_idx = pquery + i * dq;
+
+        for (int64_t j = 0; j < nprobe; ++j) {
+            parse_global_block_id(bucket_labels[ii+j], cid, bid);
+            std::string cluster_file_path = index_path + CLUSTER + std::to_string(cid) + "-" + RAWDATA + BIN;
+            auto fh = std::ifstream(cluster_file_path, std::ios::binary);
+            assert(!fh.fail());
+
+            fh.seekg(bid * block_size);
+            fh.read(buf, block_size);
+
+            const uint32_t entry_num = *reinterpret_cast<uint32_t*>(buf);
+            vec_per_q_mp[i] += entry_num;
+        }
+    }
+
+    uint64_t stats[3] = {0, 0, std::numeric_limits<uint64_t>::max()}; // avg, max, min
+    for (const auto& [q, cnt] : vec_per_q_mp) {
+        stats[0] += cnt;
+        stats[1] = std::max(stats[1], cnt);
+        stats[2] = std::min(stats[2], cnt);
+    }
+    std::cout << "#vec/query avg: " << stats[0]*1.0f/nq
+              << " max: " << stats[1]
+              << " min: " << stats[2]
+              << std::endl;
+}
 
 template<typename DATAT, typename DISTT, typename HEAPT>
 void search_bbann(const std::string& index_path,
@@ -484,10 +564,6 @@ void search_bbann(const std::string& index_path,
     // cid -> [bid -> [qid]]
     std::unordered_map<uint32_t, std::unordered_map<uint32_t, std::unordered_set<uint32_t> > > mp;
 
-#ifdef COLLECT_VEC_NUM_PER_QUERY
-    std::unordered_map<uint32_t, uint64_t> vec_per_q_mp;
-#endif
-
     search_graph<DATAT>(index_hnsw, nq, dq, nprobe, hnsw_ef, pquery, bucket_labels);
     // search_flat<DATAT>(index_path, pquery, nq, dq, nprobe, bucket_labels);
     rc.RecordSection("search buckets done.");
@@ -525,10 +601,6 @@ void search_bbann(const std::string& index_path,
 
             const uint32_t entry_num = *reinterpret_cast<uint32_t*>(buf);
             char* buf_begin = buf + sizeof(uint32_t);
-
-#ifdef COLLECT_VEC_NUM_PER_QUERY
-            vec_per_q_mp[i] += entry_num;
-#endif
 
             for (uint32_t k = 0; k < entry_num; ++k) {
                 char *entry_begin = buf_begin + entry_size * k;
@@ -596,29 +668,22 @@ void search_bbann(const std::string& index_path,
 //             }
 //         }
 //     }
-    delete[] buf;
-    delete[] bucket_labels;
     rc.RecordSection("scan blocks done");
 
     // write answers
     save_answers<DISTT, HEAPT>(answer_bin_file, topk, nq, answer_dists, answer_ids);
     rc.RecordSection("write answers done");
 
+    gather_vec_searched_per_query(index_path, pquery, nq, nprobe, dq, block_size, buf, bucket_labels);
+    rc.RecordSection("gather statistics done");
+
+    delete[] buf;
+    delete[] bucket_labels;
     delete[] pquery;
     delete[] answer_ids;
     delete[] answer_dists;
+
     rc.ElapseFromBegin("search bigann totally done");
-
-
-#ifdef COLLECT_VEC_NUM_PER_QUERY
-    uint64_t stats[3] = {0, 0, std::numeric_limits<uint64_t>::max()}; // avg, max, min
-    for (const auto& [q, cnt] : vec_per_q_mp) {
-        stats[0] += cnt;
-        stats[1] = std::max(stats[1], cnt);
-        stats[2] = std::min(stats[2], cnt);
-    }
-    std::cout << "#vec/query avg: " << stats[0]*1.0f/nq << " max: " << stats[1] << " min: " << stats[2] << std::endl;
-#endif
 }
 
 #define BUILD_BBANN_DECL(DATAT, DISTT, HEAPT)                                                             \
