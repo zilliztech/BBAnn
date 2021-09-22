@@ -21,7 +21,6 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <fcntl.h>
-#include <liburing.h>
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -100,6 +99,25 @@ static void InMemory_MT(benchmark::State& st) {
     st.counters["SUM of L2 SQR"] = sum;
 }
 // ---------------------------------------------------------------------------
+static void CPP_Fread(benchmark::State& st) {
+    std::ifstream input(base_file_path, std::ios::binary);
+    uint32_t num_points;
+    uint32_t num_dimensions;
+    assert(input.is_open());
+    input.read(reinterpret_cast<char*>(&num_points), sizeof(num_points));
+    input.read(reinterpret_cast<char*>(&num_dimensions), sizeof(num_dimensions));
+    uint32_t slice_size = st.range(0);
+    assert(num_points >= slice_size);
+    const auto size = num_dimensions * slice_size * sizeof(uint8_t);
+    std::vector<uint8_t> buffer(size);
+    for (auto _ : st) {
+        input.read(reinterpret_cast<char*>(buffer.data()), size);
+    }
+//    st.counters["num_points"] = num_points;
+//    st.counters["num_dimensions"] = num_dimensions;
+    st.counters["slice_size"] = slice_size;
+}
+// ---------------------------------------------------------------------------
 static void SequentialRead(benchmark::State& st) {
     uint32_t slice_size = st.range(0);
     clean_page_cache();
@@ -127,9 +145,9 @@ static void SequentialRead_HT(benchmark::State& st) {
     for (auto _ : st) {
         int fd = open(base_file_path, O_RDONLY);
         assert(fd != -1);
-        void *buf;
 #pragma omp parallel for
         for (size_t i = 0; i < slice_size; i++) {
+            void *buf;
             posix_memalign(&buf, 4096, BLOCK_SZ);
             // Sequential read a file
             int size = pread(fd, buf, BLOCK_SZ, i * 128 * sizeof(float) + 8 /*header*/);
@@ -228,6 +246,7 @@ static void SequentialRead_HT(benchmark::State& st) {
 // ---------------------------------------------------------------------------
 BENCHMARK(InMemory)->Iterations(10)->Unit(benchmark::kMillisecond)->Arg(1'000'000)->Arg(10'000'000);
 BENCHMARK(InMemory_MT)->Iterations(10)->Unit(benchmark::kMillisecond)->Arg(1'000'000)->Arg(10'000'000);
+BENCHMARK(CPP_Fread)->Iterations(10)->Unit(benchmark::kMillisecond)->Arg(1'000'000)->Arg(10'000'000);
 BENCHMARK(SequentialRead)->Iterations(10)->Unit(benchmark::kMillisecond)->Arg(1'000'000)->Arg(10'000'000);
 BENCHMARK(SequentialRead_HT)->Iterations(10)->Unit(benchmark::kMillisecond)->Arg(1'000'000)->Arg(10'000'000);
 //BENCHMARK(iouringRead_DirectIO)->Iterations(10)->Unit(benchmark::kMillisecond)->Arg(1'000'000)->Arg(10'000'000);
