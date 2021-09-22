@@ -4,10 +4,13 @@ temp="tana_res.txt"
 py="form.txt"
 result="result.csv"
 
+rm -f $temp
+rm -f $py
+rm -f $result
 DIR=`pwd`
 for file in `ls ${DIR}/*.log`;
 do
-    echo "analysis file: " $file >> $temp
+    echo "Analysis Search Log File: " $file >> $temp
     split1=(${file//// })
     file_name=${split1[-1]}
     echo "file name: " ${file_name}
