@@ -6,8 +6,8 @@
 DATA_TYPE=uint8
 #DATA_TYPE=int8
 #DATA_TYPE=float
-DATA_FILE=/mnt/Billion-Scale/BIGANN/base.1B.u8bin
-INDEX_PATH=/data/BIGANN
+DATA_FILE=/data/diskann-T2-baseline-indices/bigann-1B/base.1B.u8bin
+INDEX_PATH=/data/BBANN-BIGANN
 HNSW_M=32
 HNSW_EF=500
 METRIC_TYPE=L2
@@ -44,7 +44,7 @@ if [ "$?" = "1" ]; then
   echo "Please check this folder!"
   echo "ABORT BUILDING INDEX!"
 else
-  mkdir $LOG_PREFIX
+  mkdir -p $LOG_PREFIX
   LOG_PREFIX=${LOG_PREFIX}build_log
 
   echo "HNSW's M: " $HNSW_M
