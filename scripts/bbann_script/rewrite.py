@@ -1,4 +1,8 @@
 #!/usr/bin/python3
+import sys
+
+column_num=eval(sys.argv[1])
+print("ARGUMENT column_num: ", column_num)
 
 file_name = "tana_res.txt"
 records = {}
@@ -11,7 +15,7 @@ with open(file_name) as f:
 		key = f.readline().strip() # Line 2: the key == nprobe, refine_nprobe
 		print("key: ${0}".format(key))
 		new_record = []
-		for x in range(10):  # Line 3-n
+		for x in range(column_num):  # Line 3-n
 			new_record.append(f.readline().strip())
 		records[key] = new_record
 

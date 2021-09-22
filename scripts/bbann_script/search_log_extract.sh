@@ -31,6 +31,7 @@ do
     cat $file | grep "avg recall@10" | awk -F' ' '{print $4}' | awk -F'%' '{print $1}' >> $temp
 done
 
-python3 rewrite.py
+# 10 for search log
+python3 rewrite.py 10
 cat $py | sort -n > $result
 echo "Done. Check table file without any header: " $result
