@@ -26,7 +26,14 @@ LOG_FILE=/data/0922bbann_search.log
 echo "Please run this script with root permission."
 echo "Copy this file as well as analyze_stat.py to release/ folder, where project is compiled."
 
-echo "Data Type: uint8 for BIGANN"
+if [ "$DATA_TYPE" = uint8 ]; then
+  echo "Data Type: uint8 for BIGANN, Facebook SimSearchNet++"
+elif [ "$DATA_TYPE" = int8 ]; then
+  echo "Data Type: int8 for Microsoft SPACEV"
+elif [ "$DATA_TYPE" = float ]; then
+  echo "float: float for Microsoft Turing-ANNS, Yandex DEEP, Yandex Text-to-Image"
+fi
+
 echo "Index Folder: " $INDEX_PATH
 echo "QUERY_FILE: " $QUERY_FILE
 echo "Result Answer Path: " $RESULT_OUTPUT
