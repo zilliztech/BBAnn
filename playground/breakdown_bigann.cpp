@@ -129,14 +129,14 @@ static void SequentialRead_HT(benchmark::State& st) {
         int fd = open(base_file_path, O_RDONLY);
         assert(fd != -1);
         void *buf;
-        if (posix_memalign(&buf, 4096, BLOCK_SZ)) return;
 #pragma omp parallel for
         for (size_t i = 0; i < slice_size; i++) {
+            if (posix_memalign(&buf, 4096, BLOCK_SZ)) return;
             // Sequential read a file
             int size = pread(fd, buf, BLOCK_SZ, i * 128 * sizeof(float) + 8 /*header*/);
 //            if (size != BLOCK_SZ) return;
+            free(buf);
         }
-        free(buf);
         close(fd);
     }
     st.counters["slice_size"] = slice_size;
