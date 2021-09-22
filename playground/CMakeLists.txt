@@ -9,3 +9,6 @@ add_executable(equal_width_histogram equal_width_histogram.cpp)
 add_executable(equal_height_histogram equal_height_histogram.cpp)
 
 add_executable(norm_bias_histogram norm_bias_histogram.cpp)
+
+add_executable(breakdown breakdown.cpp)
+target_link_libraries(breakdown benchmark::benchmark)
