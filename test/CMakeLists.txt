@@ -21,8 +21,8 @@ target_link_libraries(test_refine_id BigAnn)
 add_executable(test_distance test_distance.cpp)
 target_link_libraries(test_distance BigAnn)
 
-add_executable(test_recursive_kmeans recursive_kmeans_test.cpp)
-target_link_libraries(test_recursive_kmeans BigAnn)
+#add_executable(test_recursive_kmeans recursive_kmeans_test.cpp)
+#target_link_libraries(test_recursive_kmeans BigAnn)
 
 ## Google Test
 set(TEST_SOURCES
