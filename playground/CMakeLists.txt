@@ -10,5 +10,5 @@ add_executable(equal_height_histogram equal_height_histogram.cpp)
 
 add_executable(norm_bias_histogram norm_bias_histogram.cpp)
 
-add_executable(breakdown breakdown.cpp)
-target_link_libraries(breakdown benchmark::benchmark)
+add_executable(breakdown_bigann breakdown_bigann.cpp)
+target_link_libraries(breakdown_bigann benchmark::benchmark BigAnn uring)
