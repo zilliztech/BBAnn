@@ -1,7 +1,18 @@
+// ---------------------------------------------------------------------------
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <stdio.h>
+#include <string.h>
 #include <random>
 #include <iostream>
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/time.h>
-
+// ---------------------------------------------------------------------------
 void clean_page_cache() {
     sync();
     int fd = open("/proc/sys/vm/drop_caches", O_WRONLY);
@@ -9,7 +20,7 @@ void clean_page_cache() {
     if (1 != write(fd, "3", 1)) std::cout << "Fail to write drop cache file." << std::endl;
     close(fd);
 }
-
+// ---------------------------------------------------------------------------
 int L2sqr_PLAIN(uint8_t *a, uint8_t *b, size_t n) {
     size_t i = 0;
     size_t dis = 0, dif;
@@ -28,3 +39,4 @@ int L2sqr_PLAIN(uint8_t *a, uint8_t *b, size_t n) {
     }
     return dis;
 }
+// ---------------------------------------------------------------------------
