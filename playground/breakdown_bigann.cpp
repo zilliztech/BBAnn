@@ -86,7 +86,7 @@ static void InMemory_MT(benchmark::State& st) {
     uint64_t sum = 0;
     if (input.read(reinterpret_cast<char*>(buffer.data()), size)) {
         for (auto _ : st) {
-#pragma omp parallel for
+#pragma omp parallel for reduction(+: sum)
             for (int i = 0; i < slice_size; ++i){
                 const int len = L2sqr_PLAIN(buffer.data(), buffer.data() + num_dimensions * i, num_dimensions);
                 sum += len;
@@ -139,7 +139,7 @@ static void InMemory_SIMD_MT(benchmark::State& st) {
     uint64_t sum = 0;
     if (input.read(reinterpret_cast<char*>(buffer.data()), size)) {
         for (auto _ : st) {
-#pragma omp parallel for
+#pragma omp parallel for reduction(+: sum)
             for (int i = 0; i < slice_size; ++i){
                 const int len = L2sqr<uint8_t, uint8_t, int>(buffer.data(), buffer.data() + num_dimensions * i, num_dimensions);
                 sum += len;
