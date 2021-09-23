@@ -24,7 +24,15 @@ $ make -j
 
 ### Current Approach: Block-based index
 
-TODO: write script
+Build: 
+```
+$ cp scripts/bbann_script/build.sh release/
+$ chmod +x release/build.sh
+$ # You have to modify build necessary parameters
+$ sudo screen ./release/build.sh
+```
+
+TODO(jigao): recheck search's script
 
 ### Build Index
 

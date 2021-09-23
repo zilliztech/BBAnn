@@ -23,6 +23,7 @@ LOG_PREFIX=${INDEX_PATH}log/
 
 echo "Please run this script with root permission."
 echo "Copy this file as well as analyze_stat.py to release/ folder, where project is compiled."
+echo "Usage: $ sudo screen ./build.sh"
 
 pkill -f "build_bbann"
 
@@ -37,14 +38,14 @@ fi
 echo "Data File: " $DATA_FILE
 
 echo "Index Path Folder: " $INDEX_PATH
-mkdir $INDEX_PATH # new a folder for indexes
+sudo mkdir $INDEX_PATH # new a folder for indexes
 
 if [ "$?" = "1" ]; then
   echo "Fail to mkdir this folder: " $INDEX_PATH
   echo "Please check this folder!"
   echo "ABORT BUILDING INDEX!"
 else
-  mkdir -p $LOG_PREFIX
+  sudo mkdir -p $LOG_PREFIX
   LOG_PREFIX=${LOG_PREFIX}build_log
 
   echo "HNSW's M: " $HNSW_M
@@ -60,7 +61,7 @@ else
   LOG_FILE=${LOG_PREFIX}.log
   echo "Log File: " $LOG_FILE
 
-  screen ./build_bbann $DATA_TYPE $DATA_FILE $INDEX_PATH $HNSW_M $HNSW_EF $METRIC_TYPE $K1 $PAGE_PER_BLOCK > $LOG_FILE 2>&1
+  sudo ./build_bbann $DATA_TYPE $DATA_FILE $INDEX_PATH $HNSW_M $HNSW_EF $METRIC_TYPE $K1 $PAGE_PER_BLOCK 2>&1 | sudo tee $LOG_FILE
   pid=$!
   echo "PID: " $pid
   pidstat -rud -h -t -p $pid 5 > ${LOG_PREFIX}.stat
