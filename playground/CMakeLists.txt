@@ -12,3 +12,6 @@ add_executable(norm_bias_histogram norm_bias_histogram.cpp)
 
 add_executable(breakdown_bigann breakdown_bigann.cpp)
 target_link_libraries(breakdown_bigann benchmark::benchmark BigAnn)
+
+add_executable(breakdown_text2iamge breakdown_text2iamge.cpp)
+target_link_libraries(breakdown_text2iamge benchmark::benchmark BigAnn)
