@@ -111,6 +111,7 @@ static void CPP_Fread(benchmark::State& st) {
     const auto size = num_dimensions * slice_size * sizeof(uint8_t);
     std::vector<uint8_t> buffer(size);
     for (auto _ : st) {
+        st.PauseTiming(); clean_page_cache(); st.ResumeTiming();
         input.read(reinterpret_cast<char*>(buffer.data()), size);
     }
 //    st.counters["num_points"] = num_points;
@@ -128,6 +129,7 @@ static void SequentialRead(benchmark::State& st) {
         void *buf;
         if (posix_memalign(&buf, 4096, BLOCK_SZ)) return;
         for (size_t i = 0; i < slice_size; i++) {
+            st.PauseTiming(); clean_page_cache(); st.ResumeTiming();
             // Sequential read a file
             int size = pread(fd, buf, BLOCK_SZ, i * 128 * sizeof(float) + 8 /*header*/);
             if (size != BLOCK_SZ) return;
@@ -147,6 +149,7 @@ static void SequentialRead_HT(benchmark::State& st) {
         assert(fd != -1);
 #pragma omp parallel for
         for (size_t i = 0; i < slice_size; i++) {
+            st.PauseTiming(); clean_page_cache(); st.ResumeTiming();
             void *buf;
             posix_memalign(&buf, 4096, BLOCK_SZ);
             // Sequential read a file
