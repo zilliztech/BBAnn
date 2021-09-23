@@ -40,7 +40,7 @@ int L2sqr_PLAIN(uint8_t *a, uint8_t *b, size_t n) {
     return dis;
 }
 // ---------------------------------------------------------------------------
-float IP_PLAIN(float *a, float *b, size_t n) {
+double IP_PLAIN(float *a, float *b, size_t n) {
     size_t i = 0;
     float dis = 0;
     switch(n & 7) {

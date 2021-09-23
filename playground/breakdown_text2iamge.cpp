@@ -34,7 +34,7 @@ static void InMemory(benchmark::State& st) {
     if (input.read(reinterpret_cast<char*>(buffer.data()), size)) {
         for (auto _ : st) {
             for (int i = 0; i < slice_size; ++i){
-                const int len = IP_PLAIN(reinterpret_cast<float*>(buffer.data()), reinterpret_cast<float*>(buffer.data() + num_dimensions * sizeof(float) * i), num_dimensions);
+                const double len = IP_PLAIN(reinterpret_cast<float*>(buffer.data()), reinterpret_cast<float*>(buffer.data() + num_dimensions * sizeof(float) * i), num_dimensions);
                 sum += len;
             }
         }
@@ -61,7 +61,7 @@ static void InMemory_MT(benchmark::State& st) {
         for (auto _ : st) {
 #pragma omp parallel for reduction(+: sum)
             for (int i = 0; i < slice_size; ++i){
-                const int len = IP_PLAIN(reinterpret_cast<float*>(buffer.data()), reinterpret_cast<float*>(buffer.data() + num_dimensions * sizeof(float) * i), num_dimensions);
+                const double len = IP_PLAIN(reinterpret_cast<float*>(buffer.data()), reinterpret_cast<float*>(buffer.data() + num_dimensions * sizeof(float) * i), num_dimensions);
                 sum += len;
             }
         }
@@ -87,7 +87,7 @@ static void InMemory_SIMD(benchmark::State& st) {
     if (input.read(reinterpret_cast<char*>(buffer.data()), size)) {
         for (auto _ : st) {
             for (int i = 0; i < slice_size; ++i){
-                const int len = IP<float, float, int>(reinterpret_cast<float*>(buffer.data()), reinterpret_cast<float*>(buffer.data() + num_dimensions * sizeof(float) * i), num_dimensions);
+                const double len = IP<float, float, float>(reinterpret_cast<float*>(buffer.data()), reinterpret_cast<float*>(buffer.data() + num_dimensions * sizeof(float) * i), num_dimensions);
                 sum += len;
             }
         }
@@ -114,7 +114,7 @@ static void InMemory_SIMD_MT(benchmark::State& st) {
         for (auto _ : st) {
 #pragma omp parallel for reduction(+: sum)
             for (int i = 0; i < slice_size; ++i){
-                const int len = IP<float, float, int>(reinterpret_cast<float*>(buffer.data()), reinterpret_cast<float*>(buffer.data() + num_dimensions * sizeof(float) * i), num_dimensions);
+                const double len = IP<float, float, float>(reinterpret_cast<float*>(buffer.data()), reinterpret_cast<float*>(buffer.data() + num_dimensions * sizeof(float) * i), num_dimensions);
                 sum += len;
             }
         }
