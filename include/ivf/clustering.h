@@ -458,12 +458,12 @@ void recursive_kmeans(uint32_t k1_id, uint32_t cluster_size, T* data, uint32_t* 
                       uint32_t& blk_num, IOWriter& data_writer, IOWriter& centroids_writer, IOWriter& centroids_id_writer,
                       bool kmpp = false, float avg_len = 0.0, int64_t niter = 10, int64_t seed = 1234) {
 
-    float weight = 0;
+    float weight = 5000;
     int vector_size = sizeof(T) * dim;
     int id_size = sizeof(uint32_t);
     int k2;
     if ( weight!=0 && cluster_size < KMEANS_THRESHOLD) {
-        k2 = int(sqrt(cluster_size/threshold));
+        k2 = int(sqrt(cluster_size/threshold)) + 1;
     } else {
         k2 = int(cluster_size/threshold) + 1;
     }
