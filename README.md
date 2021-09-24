@@ -18,13 +18,21 @@ To compile the release mode, run
 ```shell
 $ mkdir -p release
 $ cd release
-$ cmake .. -D CMAKE_BUILD_TYPE=Release
+$ cmake .. -DCMAKE_BUILD_TYPE=Release
 $ make -j
 ```
 
 ### Current Approach: Block-based index
 
-TODO: write script
+Build: 
+```
+$ cp scripts/bbann_script/build.sh release/
+$ chmod +x release/build.sh
+$ # You have to modify build necessary parameters
+$ sudo screen ./release/build.sh
+```
+
+TODO(jigao): recheck search's script
 
 ### Build Index
 
