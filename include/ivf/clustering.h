@@ -458,7 +458,7 @@ void recursive_kmeans(uint32_t k1_id, uint32_t cluster_size, T* data, uint32_t* 
                       uint32_t& blk_num, IOWriter& data_writer, IOWriter& centroids_writer, IOWriter& centroids_id_writer,
                       bool kmpp = false, float avg_len = 0.0, int64_t niter = 10, int64_t seed = 1234) {
 
-    float weight = 5000;
+    float weight = 0;
     int vector_size = sizeof(T) * dim;
     int id_size = sizeof(uint32_t);
     int k2;
@@ -471,12 +471,13 @@ void recursive_kmeans(uint32_t k1_id, uint32_t cluster_size, T* data, uint32_t* 
     k2 = k2 < MAX_CLUSTER_K2 ? k2 : MAX_CLUSTER_K2;
     float* k2_centroids = new float[k2 * dim];
 
-    balance_kmeans<T>(cluster_size, data, dim, k2, k2_centroids, weight, kmpp, avg_len, niter, seed);
+    kmeans<T>(cluster_size, data, dim, k2, k2_centroids, kmpp, avg_len, niter, seed);
+    // Dynamic balance constraint K-means:
+    //balance_kmeans<T>(cluster_size, data, dim, k2, k2_centroids, weight, kmpp, avg_len, niter, seed);
     std::vector<int64_t> cluster_id(cluster_size, -1);
     std::vector<float> dists(cluster_size, -1);
     std::vector<float> bucket_pre_size(k2 + 1, 0);
     if( weight!=0 && cluster_size <= KMEANS_THRESHOLD ) {
-
         dynamic_assign<T, float, float>(data, k2_centroids, dim, cluster_size, k2, weight, cluster_id.data(), dists.data());
     } else {
         elkan_L2_assign<T, float, float>(data, k2_centroids, dim, cluster_size, k2, cluster_id.data(), dists.data());
