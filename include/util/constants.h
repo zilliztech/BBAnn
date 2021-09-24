@@ -22,6 +22,8 @@ constexpr static int SPLIT_THRESHOLD = 500;
 // the max cluster number in hierarchical_cluster
 constexpr static int MAX_CLUSTER_K2 = 500;
 
+constexpr static int KMEANS_THRESHOLD = 2000;
+
 
 
 // file prefix strings and suffix strings
