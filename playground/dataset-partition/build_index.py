@@ -206,7 +206,7 @@ if __name__ == '__main__':
     plt.title('histogram_' + args.partition_type + "_" + args.dataset_name)
     plt.xlabel('number of vector in a cluster: VALUE RANGE as a BIN')
     plt.ylabel('number of clusters in each bin')
-    plt.savefig('histogram_' + args.partition_type + "_" + args.dataset_name + '.png') # Let figure in repo.
+    plt.savefig(result_path + 'histogram_' + args.partition_type + "_" + args.dataset_name + '.png')
 
     with open('%s/cluster2item.json' % save_basic_dir, 'w') as f:
         json.dump(label_map_l, f)
