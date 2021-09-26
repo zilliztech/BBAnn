@@ -21,7 +21,12 @@ def parse_args():
     parser.add_argument('--partition_type', default='kmeans', type=str,
                         help='type of partition method, kmeans or graph_partition')
     parser.add_argument('--dataset_name', default='sift10K', type=str, help='dataset name')
-    # parser.add_argument('--fast_kmeans', default=False, help='whether using fast kmeans, non-sklearn')
+    parser.add_argument('--data_set_path', default='/mnt/Billion-Scale/BIGANN/base.1B.u8bin', type=str, help='data_set_path')
+    parser.add_argument('--result_path', default='/home/zilliz/jigao/', type=str, help='result_path')
+    parser.add_argument('--kahip_dir', default="/home/zilliz/jigao/KaHIP", type=str, help='kahip_dir')
+
+
+# parser.add_argument('--fast_kmeans', default=False, help='whether using fast kmeans, non-sklearn')
     opt = parser.parse_args()
     return opt
 
@@ -142,18 +147,23 @@ def graph_partition(base, n_cluster, save_dir):
 
 
 if __name__ == '__main__':
+    print("ONLY FOR BIGANN DATASET!")
     args = parse_args()
     print("The partition type: ", args.partition_type)
     print("The dataset name: ", args.dataset_name)
     print("The n_cluster: ", args.n_cluster)
+    print("The data_set_path: ", args.data_set_path)
+    print("The result_path: ", args.result_path)
+    print("The kahip_dir: ", args.kahip_dir)
+
 
     # basic_dir = '/home/zhengbian/nips-competition/data/%s' % args.dataset_name
-    data_set_path = input("Enter data_set_path: ")
+    data_set_path = args.data_set_path
     print('The entered data_set_path: ', data_set_path)
     # basic_dir = data_set_path + args.dataset_name
 
     # save_basic_dir = '/home/zhengbian/nips-competition/dataset-partition/result/%s' % file_name
-    result_path = input("Enter result_path (end with /): ")
+    result_path = args.result_path
     print('The entered result_path: ', result_path)
 
     file_name = '%s-%s' % (args.dataset_name, args.partition_type)
@@ -166,8 +176,7 @@ if __name__ == '__main__':
     delete_dir_if_exist(save_basic_dir)
     os.mkdir(save_basic_dir)
 
-    # TODO: you can change this path :D
-    kahip_dir = "/home/zilliz/jigao/KaHIP"
+    kahip_dir = args.kahip_dir
     # kahip_dir = input("Enter kahip_dir (NOT end with /): ")
     print('The kahip_dir: ', kahip_dir)
 
@@ -196,7 +205,7 @@ if __name__ == '__main__':
     plt.hist(n_point_cluster_l)
     plt.xlabel('number of vector in a cluster: VALUE RANGE as a BIN')
     plt.ylabel('number of clusters in each bin')
-    plt.savefig(result_path + 'histogram.png')
+    plt.savefig(result_path + 'histogram_' + args.partition_type + "_" + args.dataset_name + '.png')
 
     with open('%s/cluster2item.json' % save_basic_dir, 'w') as f:
         json.dump(label_map_l, f)
