@@ -8,6 +8,7 @@ import numpy as np
 import sklearn.cluster as cls
 import multiprocessing
 import faiss
+import statistics
 
 graph_knn_k = 30
 # kahip_dir = '/home/zhengbian/software/KaHIP'
@@ -48,6 +49,13 @@ def get_labels(labels, n_cluster):
         base_idx_i = np.argwhere(labels == cluster_i).reshape(-1)
         label_map_l.append(base_idx_i.tolist())
         n_point_cluster_l.append(len(base_idx_i))
+
+    print(n_point_cluster_l)
+    print("max: ", max(n_point_cluster_l))
+    print("min: ", min(n_point_cluster_l))
+    print("avg: ", statistics.mean(n_point_cluster_l))
+    print("median: ", statistics.median(n_point_cluster_l))
+    # TODO: a list?? I need to min, max, mean, median. histogram of it
     return label_map_l, n_point_cluster_l
 
 
