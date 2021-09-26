@@ -166,7 +166,9 @@ if __name__ == '__main__':
     delete_dir_if_exist(save_basic_dir)
     os.mkdir(save_basic_dir)
 
-    kahip_dir = input("Enter kahip_dir (NOT end with /): ")
+    # TODO: you can change this path :D
+    kahip_dir = "/home/zilliz/jigao/KaHIP"
+    # kahip_dir = input("Enter kahip_dir (NOT end with /): ")
     print('The kahip_dir: ', kahip_dir)
 
     # base, n_base, vec_dim = bin_io.bbin_read("%s/base.bbin" % basic_dir)
@@ -188,10 +190,12 @@ if __name__ == '__main__':
     print(n_point_cluster_l)
     print("max: ", max(n_point_cluster_l))
     print("min: ", min(n_point_cluster_l))
-    print("SUM (should be the same of the number of clusters): ", sum(n_point_cluster_l))
+    print("SUM (should be the same of the number of vector in base file): ", sum(n_point_cluster_l))
     print("avg: ", statistics.mean(n_point_cluster_l))
     print("median: ", statistics.median(n_point_cluster_l))
     plt.hist(n_point_cluster_l)
+    plt.xlabel('number of vector in a cluster: VALUE RANGE as a BIN')
+    plt.ylabel('number of clusters in each bin')
     plt.savefig(result_path + 'histogram.png')
 
     with open('%s/cluster2item.json' % save_basic_dir, 'w') as f:
