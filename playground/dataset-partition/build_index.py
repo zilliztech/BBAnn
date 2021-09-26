@@ -177,7 +177,6 @@ if __name__ == '__main__':
     os.mkdir(save_basic_dir)
 
     kahip_dir = args.kahip_dir
-    # kahip_dir = input("Enter kahip_dir (NOT end with /): ")
     print('The kahip_dir: ', kahip_dir)
 
     # base, n_base, vec_dim = bin_io.bbin_read("%s/base.bbin" % basic_dir)
