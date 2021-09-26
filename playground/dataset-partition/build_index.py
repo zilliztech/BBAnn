@@ -195,6 +195,7 @@ if __name__ == '__main__':
     print("Building index is a success.")
 
     # Statistics of distribution of elements in clusters.
+    # TODO: add to JSON
     print(n_point_cluster_l)
     print("max: ", max(n_point_cluster_l))
     print("min: ", min(n_point_cluster_l))
@@ -204,7 +205,7 @@ if __name__ == '__main__':
     plt.hist(n_point_cluster_l)
     plt.xlabel('number of vector in a cluster: VALUE RANGE as a BIN')
     plt.ylabel('number of clusters in each bin')
-    plt.savefig(result_path + 'histogram_' + args.partition_type + "_" + args.dataset_name + '.png')
+    plt.savefig('histogram_' + args.partition_type + "_" + args.dataset_name + '.png') # Let figure in repo.
 
     with open('%s/cluster2item.json' % save_basic_dir, 'w') as f:
         json.dump(label_map_l, f)
