@@ -223,6 +223,14 @@ int64_t split_clusters_half (int64_t dim, int64_t k, int64_t n, const T* x_in,
                         int64_t * hassign, int64_t * assign, float * centroids, float avg_len = 0.0) {
     /* Take care of void clusters */
     int64_t nsplit = 0;
+    bool set_hassign = (hassign == nullptr);
+    if(set_hassign) {
+        hassign = new int64_t [k];
+        memset(hassign, 0, sizeof(int64_t)*k);
+        for (int i = 0; i < n; i++) {
+            hassign[assign[i]]++;
+        }
+    }
 
     for (int64_t ci = 0; ci < k; ci++) {
         if (hassign[ci] == 0) { /* need to redefine a centroid */
@@ -241,7 +249,7 @@ int64_t split_clusters_half (int64_t dim, int64_t k, int64_t n, const T* x_in,
             hassign[ci] = hassign[cj] = 0;
 
             for (int64_t i = 0; i < n; i++) {
-                if(assign[i] = cj) {
+                if(assign[i] == cj) {
                     if(hassign[ci] < split_point) {
                         hassign[ci]++;
                         assign[i] = ci;
@@ -257,28 +265,26 @@ int64_t split_clusters_half (int64_t dim, int64_t k, int64_t n, const T* x_in,
                 }
             }
 
-            if (avg_len != 0.0) {
-                float len = avg_len / sqrt(IP<float, float, double>(c, c, dim));
-                for (int64_t j = 0; j < dim; j++){
-                    c[j] *= len;
-                }
-            } else {
-                float norm = 1.0 / hassign[ci];
-                for (int64_t j = 0; j < dim; j++) {
-                    c[j] *= norm;
-                }
-            }
             float leni, lenj;
             if(avg_len != 0.0) {
-                leni = avg_len / sqrt(IP<float, float, double>(ci * dim, ci * dim, dim));
+                leni = avg_len / sqrt(IP<float, float, double>(centroids + ci * dim, centroids + ci * dim, dim));
+                lenj = avg_len / sqrt(IP<float, float, double>(centroids + cj * dim, centroids + cj * dim, dim));
+            } else {
+                leni = 1.0 / hassign[ci];
+                lenj = 1.0 / hassign[cj];
             }
             for (int64_t j =0; j< dim ; j++) {
-                centroids[ci * dim + j] /= hassign[ci];
-                centroids[cj * dim + j] /= hassign[cj];
+                centroids[ci * dim + j] *= leni;
+                centroids[cj * dim + j] *= lenj;
             }
             nsplit++;
         }
     }
+    if(set_hassign) {
+        delete [] hassign;
+        hassign = nullptr;
+    }
+
     /* The distance between centroids and x_in change in the assign function*/
     return nsplit;
 }
@@ -330,7 +336,7 @@ void kmeanspp(const DATAT* pdata, const int64_t nb, const int64_t dim,
 template <typename T>
 void kmeans (int64_t nx, const T* x_in, int64_t dim, int64_t k, float* centroids,
              bool kmpp = false, float avg_len = 0.0, int64_t niter = 10, 
-             int64_t seed = 1234, bool is_split = false) {
+             int64_t seed = 1234) {
 
     if (k > 1000)
         nx = k * 40;
@@ -385,7 +391,7 @@ void kmeans (int64_t nx, const T* x_in, int64_t dim, int64_t k, float* centroids
         compute_centroids<T>(dim, k, nx, x_in, assign.get(), hassign.get(), centroids, avg_len);
 
         //int64_t split = split_clusters(dim, k, nx, hassign.get(), centroids);
-        int64_t split = split_clusters_half(dim, k, nx, x_in, hassign.get(), assign.get(), centroids);
+        int64_t split = split_clusters_half(dim, k, nx, x_in, hassign.get(), assign.get(), centroids, avg_len);
         if (split != 0) {
             printf("split %ld\n", split);
         } else {
@@ -549,7 +555,7 @@ void recursive_kmeans(uint32_t k1_id, uint32_t cluster_size, T* data, uint32_t* 
         elkan_L2_assign<T, float, float>(data, k2_centroids, dim, cluster_size, k2, cluster_id.data(), dists.data());
     }
 
-    split_clusters2();
+    split_clusters_half(dim, k2, cluster_size, data, nullptr, cluster_id.data(), k2_centroids, avg_len);
 
     //dists is useless, so delete first
     std::vector<float>().swap(dists);
@@ -572,8 +578,8 @@ void recursive_kmeans(uint32_t k1_id, uint32_t cluster_size, T* data, uint32_t* 
         ids[offest] = ids_temp[i];
         memcpy(data + offest * dim, x_temp + i * dim, vector_size);
     }
-    delete []x_temp;
-    delete []ids_temp;
+    delete [] x_temp;
+    delete [] ids_temp;
 
     int64_t bucket_size;
     int64_t bucket_offest;
