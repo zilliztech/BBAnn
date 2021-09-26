@@ -11,7 +11,7 @@
 #include "ivf/clustering.h"
 #include "util/file_handler.h"
 using namespace std;
-int64_t blk_size = 3*1024;
+int64_t blk_size = 12*1024;
 
 void  hierarchical_clusters() {
     //  TimeRecorder rc("hierarchical clusters");
@@ -94,10 +94,53 @@ void  hierarchical_clusters() {
     return ;
 }
 
+void test_split_clusters_half() {
+    int64_t dim = 128;
+    int64_t k = 2;
+    int64_t n = 200;
+    int64_t* hassign = nullptr;
+    uint8_t* x_in = new uint8_t [n*dim];
+    cout <<"init x_in"<<endl;
+    for (int i=0; i<n ;i++) {
+        for (int j=0; j<dim; j++) {
+            x_in[i*dim + j] = (i*11+j)%255;
+            //x_in[i*dim + j] = 1;
+        }
+    }
+    int64_t * assign = new int64_t[n];
+    memset(assign, 0, n);
+    cout<<"init centroids"<<endl;
+    float* centroids = new float [k*dim];
+    for (int i=0; i<k; i++) {
+        for(int j=0;j<dim;j++){
+            centroids[i*dim + j] = i*1.1+j;
+        }
+    }
+    cout<<"begin split"<<endl;
+    split_clusters_half<uint8_t> (dim, k, n, x_in, hassign, assign, centroids);
+    if(hassign) {
+        cout<<"delete hassign"<<endl;
+        delete [] hassign;
+    }
+    //cout<<"hassign"<<endl;
+  //  for (int i =0; i<k;i++) cout<<hassign[i]<<endl;
+    cout<<"assign"<<endl;
+    for (int i=0;i<n;i++) cout<<assign[i]<<endl;
+    cout<<"centroids"<<endl;
+    for (int i=0;i<k;i++) {
+        cout<<endl;
+        for (int j=0;j<dim;j++)
+        cout<<centroids[i*dim +j]<<" ";
+    }
+
+}
+
+
 
 int main() {
   //  int32_t blk_num = test_recursive_kmeans();
    // test_hierarchical_clusters(blk_num);
-    hierarchical_clusters();
+   // hierarchical_clusters();
+   test_split_clusters_half();
     return 0;
 }
