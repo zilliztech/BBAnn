@@ -1,4 +1,4 @@
-pip3 install numpy sklearn faiss-cpu
+pip3 install numpy sklearn faiss-cpu matplotlib
 sudo apt-get install openmpi-bin openmpi-common openssh-client openssh-server libopenmpi2 libopenmpi-dev openmpi-doc
 
 echo "Installing kahip at /tmp: https://github.com/KaHIP/KaHIP"
