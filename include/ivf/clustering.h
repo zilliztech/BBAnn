@@ -218,6 +218,71 @@ int64_t split_clusters (int64_t dim, int64_t k, int64_t n,
     return nsplit;
 }
 
+template <typename T>
+int64_t split_clusters_half (int64_t dim, int64_t k, int64_t n, const T* x_in,
+                        int64_t * hassign, int64_t * assign, float * centroids, float avg_len = 0.0) {
+    /* Take care of void clusters */
+    int64_t nsplit = 0;
+
+    for (int64_t ci = 0; ci < k; ci++) {
+        if (hassign[ci] == 0) { /* need to redefine a centroid */
+            int64_t cj;
+            for (cj = 0; 1; cj = (cj + 1) % k) {
+                /* probability to pick this cluster for split */
+                float p = (hassign[cj] - 1.0) / (float) (n - k);
+                float r = rand_float();
+                if (r < p) {
+                    break; /* found our cluster to be split */
+                }
+            }
+            int64_t split_point = hassign[cj] / 2;
+            memset (centroids + ci * dim, 0, sizeof(float) * dim);
+            memset (centroids + cj * dim, 0, sizeof(float) * dim);
+            hassign[ci] = hassign[cj] = 0;
+
+            for (int64_t i = 0; i < n; i++) {
+                if(assign[i] = cj) {
+                    if(hassign[ci] < split_point) {
+                        hassign[ci]++;
+                        assign[i] = ci;
+                        for (int64_t j = 0; j < dim; j++) {
+                            centroids[ci * dim + j] += x_in[i * dim + j];
+                        }
+                    } else {
+                        hassign[cj]++;
+                        for(int64_t j = 0; j < dim; j++) {
+                            centroids[cj * dim + j] += x_in[i * dim + j];
+                        }
+                    }
+                }
+            }
+
+            if (avg_len != 0.0) {
+                float len = avg_len / sqrt(IP<float, float, double>(c, c, dim));
+                for (int64_t j = 0; j < dim; j++){
+                    c[j] *= len;
+                }
+            } else {
+                float norm = 1.0 / hassign[ci];
+                for (int64_t j = 0; j < dim; j++) {
+                    c[j] *= norm;
+                }
+            }
+            float leni, lenj;
+            if(avg_len != 0.0) {
+                leni = avg_len / sqrt(IP<float, float, double>(ci * dim, ci * dim, dim));
+            }
+            for (int64_t j =0; j< dim ; j++) {
+                centroids[ci * dim + j] /= hassign[ci];
+                centroids[cj * dim + j] /= hassign[cj];
+            }
+            nsplit++;
+        }
+    }
+    /* The distance between centroids and x_in change in the assign function*/
+    return nsplit;
+}
+
 
 template <typename DATAT>
 void kmeanspp(const DATAT* pdata, const int64_t nb, const int64_t dim,
@@ -265,7 +330,7 @@ void kmeanspp(const DATAT* pdata, const int64_t nb, const int64_t dim,
 template <typename T>
 void kmeans (int64_t nx, const T* x_in, int64_t dim, int64_t k, float* centroids,
              bool kmpp = false, float avg_len = 0.0, int64_t niter = 10, 
-             int64_t seed = 1234) {
+             int64_t seed = 1234, bool is_split = false) {
 
     if (k > 1000)
         nx = k * 40;
@@ -315,12 +380,12 @@ void kmeans (int64_t nx, const T* x_in, int64_t dim, int64_t k, float* centroids
 
     float err = std::numeric_limits<float>::max();
     for (int64_t i = 0; i < niter; i++) {
-        // printf("iter %d ", i);
 
         elkan_L2_assign<T, float, float>(x_in, centroids, dim, nx, k, assign.get(), dis.get());
         compute_centroids<T>(dim, k, nx, x_in, assign.get(), hassign.get(), centroids, avg_len);
 
-        int64_t split = split_clusters(dim, k, nx, hassign.get(), centroids);
+        //int64_t split = split_clusters(dim, k, nx, hassign.get(), centroids);
+        int64_t split = split_clusters_half(dim, k, nx, x_in, hassign.get(), assign.get(), centroids);
         if (split != 0) {
             printf("split %ld\n", split);
         } else {
@@ -418,6 +483,7 @@ void balance_kmeans (int64_t nx, const T* x_in, int64_t dim, int64_t k, float* c
         compute_centroids<T>(dim, k, nx, x_in, assign.get(), hassign.get(), centroids, avg_len);
 
         int64_t split = split_clusters(dim, k, nx, hassign.get(), centroids);
+
         if (split != 0) {
             printf("split %ld\n", split);
         } else {
@@ -482,6 +548,9 @@ void recursive_kmeans(uint32_t k1_id, uint32_t cluster_size, T* data, uint32_t* 
     } else {
         elkan_L2_assign<T, float, float>(data, k2_centroids, dim, cluster_size, k2, cluster_id.data(), dists.data());
     }
+
+    split_clusters2();
+
     //dists is useless, so delete first
     std::vector<float>().swap(dists);
 
