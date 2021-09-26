@@ -141,43 +141,50 @@ def graph_partition(base, n_cluster, save_dir):
 
 if __name__ == '__main__':
     args = parse_args()
+    print("The partition type: ", args.partition_type)
+    print("The dataset name: ", args.dataset_name)
+    print("The n_cluster: ", args.n_cluster)
+
     # basic_dir = '/home/zhengbian/nips-competition/data/%s' % args.dataset_name
     data_set_path = input("Enter data_set_path: ")
-    print('data_set_path: ', data_set_path)
+    print('The entered data_set_path: ', data_set_path)
     # basic_dir = data_set_path + args.dataset_name
-    # base, n_base, vec_dim = bin_io.bbin_read("%s/base.bbin" % basic_dir)
-    base, n_base, vec_dim = bin_io.bbin_read(data_set_path)
+
+    # save_basic_dir = '/home/zhengbian/nips-competition/dataset-partition/result/%s' % file_name
+    result_path = input("Enter result_path (end with /): ")
+    print('The entered result_path: ', result_path)
 
     file_name = '%s-%s' % (args.dataset_name, args.partition_type)
     if args.partition_type == 'kmeans':
         pass
     elif args.partition_type == 'graph_partition':
         file_name = '%s-%s-knn-k_%d' % (args.dataset_name, args.partition_type, graph_knn_k)
-
-    # save_basic_dir = '/home/zhengbian/nips-competition/dataset-partition/result/%s' % file_name
-    result_path = input("Enter result_path (end with /): ")
-    print('result_path: ', result_path)
     save_basic_dir = result_path + file_name
-    print('save_basic_dir: ', save_basic_dir)
+    print('The save_basic_dir: ', save_basic_dir)
     delete_dir_if_exist(save_basic_dir)
     os.mkdir(save_basic_dir)
 
     kahip_dir = input("Enter kahip_dir (NOT end with /): ")
-    print('kahip_dir: ', kahip_dir)
+    print('The kahip_dir: ', kahip_dir)
+
+    # base, n_base, vec_dim = bin_io.bbin_read("%s/base.bbin" % basic_dir)
+    base, n_base, vec_dim = bin_io.bbin_read(data_set_path)
 
     para_result = {}
     partition_method = partition_factory(args.partition_type)
+
+    print("Start building index.")
     start_time = time.time()
     centroids, labels = partition_method(base, args.n_cluster, save_basic_dir)
     label_map_l, n_point_cluster_l = get_labels(labels, args.n_cluster)
     end_time = time.time()
     para_result['build_index_time'] = end_time - start_time
     para_result['cluster_len'] = n_point_cluster_l
-    print("build index success")
+    print("Building index is a success.")
 
     with open('%s/cluster2item.json' % save_basic_dir, 'w') as f:
         json.dump(label_map_l, f)
     with open('%s/index_para_result.json' % save_basic_dir, 'w') as f:
         json.dump(para_result, f)
     np.save('%s/centroids.npy' % save_basic_dir, centroids)
-    print("save index success")
+    print("Saving index is a success")
