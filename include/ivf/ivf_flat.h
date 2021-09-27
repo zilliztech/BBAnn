@@ -12,7 +12,7 @@ template<typename T>
 void ivf_flat_insert(int64_t nx, const T* x_in, int64_t dim,
                      int64_t nlist, const float* centroids,
                      std::vector<std::vector<T>> &codes,
-                     std::vector<std::vector<int32_t>> &ids) {
+                     std::vector<std::vector<uint32_t>> &ids) {
 
     std::unique_ptr<int64_t []> assign(new int64_t[nx]);
     std::unique_ptr<float []> dis(new float[nx]);
@@ -47,15 +47,15 @@ template<class C, typename T, typename R>
 void ivf_flat_search(int64_t nq, const T* q_in, int64_t dim,
                      int64_t nlist, const float* centroids,
                      std::vector<std::vector<T>> &codes,
-                     std::vector<std::vector<int32_t>> &ids,
+                     std::vector<std::vector<uint32_t>> &ids,
                      int64_t nprobe, int64_t topk,
                      typename C::T * value,
                      typename C::TI * labels,
                      Computer<T, T, typename C::T> comptuer) {
 
-    std::unique_ptr<int32_t[]> idx(new int32_t[nq * nprobe]);
+    std::unique_ptr<uint32_t[]> idx(new uint32_t[nq * nprobe]);
     std::unique_ptr<float[]> coarse_dis(new float[nq * nprobe]);
-    knn_1<CMax<float, int32_t>, T, float> (
+    knn_1<CMax<float, uint32_t>, T, float> (
         q_in, centroids, nq, nlist, dim, nprobe, coarse_dis.get(), idx.get(), L2sqr<const T, const float, float>);
     coarse_dis = nullptr;
 

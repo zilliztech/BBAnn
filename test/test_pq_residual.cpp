@@ -18,7 +18,7 @@
     using DIS_T = int32_t;
     const char* Learn_Path = "../../data/BIGANN/learn.100M.u8bin";
     const char* Query_Path = "../../data/BIGANN/query.public.10K.u8bin";
-    #define Dis_Compare     CMax<int,int>
+    #define Dis_Compare     CMax<int32_t,uint32_t>
     #define Dis_Computer    L2sqr<const CODE_T, const CODE_T, DIS_T>
     #define PQ_DIS_Computer L2sqr<const CODE_T, const float, float>
     #define OUT_PUT         "bigann"
@@ -50,9 +50,9 @@ long int getTime(timeval end, timeval start) {
 }
 
 DIS_T *tmp_dis = new DIS_T[Query_Batch * topk];
-int *tmp_lab = new int[Query_Batch * topk];
+uint32_t *tmp_lab = new uint32_t[Query_Batch * topk];
 
-void Output(const char* file_name, DIS_T *dis, int *lab) {
+void Output(const char* file_name, DIS_T *dis, uint32_t *lab) {
     FILE *fi = fopen(file_name, "w");
     for(int i=0;i<nq;i++){
         for(int j=0;j<topk;j++){
@@ -114,7 +114,7 @@ int main() {
 
 
     std::vector<std::vector<CODE_T>> codes;
-    std::vector<std::vector<int32_t>> ids;
+    std::vector<std::vector<uint32_t>> ids;
     ivf_flat_insert(batch_num, xb, dim,
                     nlist, centroids,
                     codes, ids);
@@ -125,7 +125,7 @@ int main() {
     std::vector<uint32_t> buckets(nlist, 0);
     CODE_T *xb2 = new CODE_T[dim * batch_num];
     float *cent2 = new float[dim * batch_num];
-    int32_t *id2 = new int32_t[batch_num];
+    uint32_t *id2 = new uint32_t[batch_num];
 
     int64_t train_count = 0;
     {
@@ -139,7 +139,7 @@ int main() {
             memcpy(xb2_tmp, codes[i].data(), codes[i].size()*sizeof(CODE_T));
             xb2_tmp += codes[i].size();
 
-            memcpy(id2_tmp, ids[i].data(), ids[i].size()*sizeof(int32_t));
+            memcpy(id2_tmp, ids[i].data(), ids[i].size()*sizeof(uint32_t));
             id2_tmp += ids[i].size();
 
             if ((cent2_tmp - cent2) / dim < 100000){
@@ -176,7 +176,7 @@ int main() {
 /*
     int nprobe = 4;
     float *val = new float[nq * nprobe];
-    int32_t *label = new int32_t[nq * nprobe];
+    uint32_t *label = new uint32_t[nq * nprobe];
     knn_2<CMax<float,int>,CODE_T,float>(xq, centroids, nq, nlist, dim, nprobe,
                                         val, label, L2sqr<const CODE_T, const float, float>);
 */
