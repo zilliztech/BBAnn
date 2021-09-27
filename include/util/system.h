@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <stdio.h>
 
-int64_t get_L3_Size() {
+inline int64_t get_L3_Size() {
     static int64_t l3_size = -1;
     constexpr int64_t KB = 1024;
     if (l3_size == -1) {

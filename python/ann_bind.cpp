@@ -1,4 +1,3 @@
-#include "util/defines.h"
 #include <fstream>
 #include <iostream>
 #include <pybind11/numpy.h>
@@ -7,6 +6,8 @@
 #include <pybind11/stl.h>
 #include <pybind11/stl_bind.h>
 #include <string>
+
+#include "bbann.h"
 
 namespace py = pybind11;
 
@@ -40,16 +41,13 @@ template <typename dataT> struct BBAnnIndex {
 template <typename dataT>
 void BuildBBAnnIndex(const std::string &dataFilePath,
                      const std::string indexPrefixPath, MetricType metric) {
-  std::cout << "Build:";
+  std::cout << "Build from data type";
   // TODO(!!!!);
 }
 
-static const char * getStr(){
-	return "PyName";
-}
-
-template <typename dataT> void IndexBindWrapper(py::module_ &m) {
-  py::class_<BBAnnIndex<dataT>> (m, getStr())
+template <typename dataT, class StringWrapper>
+void IndexBindWrapper(py::module_ &m) {
+  py::class_<BBAnnIndex<dataT>>(m, StringWrapper::Get())
       .def(py::init([](MetricType metric) {
         return std::unique_ptr<BBAnnIndex<dataT>>(
             new BBAnnIndex<dataT>(metric));
@@ -75,7 +73,21 @@ PYBIND11_MODULE(bbannpy, m) {
       .value("INNER_PRODUCT", MetricType::IP)
       .export_values();
 
-  IndexBindWrapper<float>(m);
-  // IndexBindWrapper<uint8_t>("UInt8Index");
-  // IndexBindWrapper<int8_t>("Int8Index");
+  class FloatWrapper {
+  public:
+    static const char *Get() { return "FloatIndex"; }
+  };
+  class UInt8Wrapper {
+  public:
+    static const char *Get() { return "Uint8Index"; }
+  };
+
+  class Int8Wrapper {
+  public:
+    static const char *Get() { return "Int8Index"; }
+  };
+
+  IndexBindWrapper<float, FloatWrapper>(m);
+  IndexBindWrapper<uint8_t, UInt8Wrapper>(m);
+  IndexBindWrapper<int8_t, Int8Wrapper>(m);
 }

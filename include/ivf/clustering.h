@@ -177,7 +177,7 @@ void compute_centroids (int64_t dim, int64_t k, int64_t n,
     }
 }
 
-int64_t split_clusters (int64_t dim, int64_t k, int64_t n,
+inline int64_t split_clusters (int64_t dim, int64_t k, int64_t n,
                         int64_t * hassign, float * centroids)
 {
     const double EPS = (1 / 1024.);
