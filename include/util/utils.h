@@ -47,7 +47,7 @@ inline void set_bin_metadata(const std::string& bin_file, const uint32_t& nrows,
     std::cout << "set meta to " << bin_file << ", nrows = " << nrows << ", ncols = " << ncols << std::endl;
 }
 
-void load_meta_impl(const std::string& index_path,
+inline void load_meta_impl(const std::string& index_path,
                std::vector<std::vector<uint32_t>>& meta,
                const int K1) {
     for (int i = 0; i < K1; i ++) {
@@ -463,7 +463,7 @@ void recall(const std::string& groundtruth_file, const std::string& answer_file,
     std::cout << "check sum recall: " << check_sum << ", which should equal nq: " << answer_nq << std::endl;
 }
 
-uint64_t fsize(std::string& filename) {
+inline uint64_t fsize(std::string& filename) {
     struct stat st;
     stat(filename.c_str(), &st);
     return st.st_size;
