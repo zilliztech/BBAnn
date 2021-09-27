@@ -179,6 +179,9 @@ if __name__ == '__main__':
 
     # base, num_base, dim = bin_io.bbin_read("%s/base.bbin" % basic_dir)
     base_vector, num_vector, dim = bin_io.bbin_read(data_set_path)
+    print("base_vector's num_vector: ", num_vector)
+    print("base_vector's DIM: ", dim)
+    print("base_vector's .shape[1]: ", base_vector.shape[1])
 
     para_result = {}
     partition_method = partition_factory(args.partition_type)
@@ -222,7 +225,7 @@ if __name__ == '__main__':
     num_vector_per_page = 93 # FIX VALUE WITH 93
 
     # Build a FLAT index on base vector as float
-    index = faiss.IndexFlatL2(dim)
+    index = faiss.IndexFlatL2(dim) # TODO: debuggy
     tmp_vector_base = base_vector.astype(np.float32)
     index.add(tmp_vector_base)
 
