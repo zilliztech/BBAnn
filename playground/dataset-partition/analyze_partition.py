@@ -253,6 +253,9 @@ if __name__ == '__main__':
             tmp_page_number += int((len(label_map_l[tmp_idx]) + num_vector_per_page - 1)  / num_vector_per_page)
             tmp_page_l.append(tmp_page_number)
 
+        if i % 100 == 0:
+            print(i, "-th query is processed")
+
         total_item_l += np.array(tmp_item_l)
         total_page_l += np.array(tmp_page_l)
         total_recall_l += np.array(tmp_recall_l)
