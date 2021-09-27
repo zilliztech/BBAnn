@@ -54,7 +54,7 @@ int main(int argc, char **argv) {
   if (argv[1] == std::string("float")) {
     if (MetricType::L2 == metric_type) {
       build_bigann<float, float, CMax<float, uint32_t>>(
-             raw_data_bin_file, output_path, hnswM, hnswefC, PQM, PQnbits, K1,
+          raw_data_bin_file, output_path, hnswM, hnswefC, PQM, PQnbits, K1,
           threshold, metric_type, quantizer_type);
     } else if (MetricType::IP == metric_type) {
       build_bigann<float, float, CMin<float, uint32_t>>(
