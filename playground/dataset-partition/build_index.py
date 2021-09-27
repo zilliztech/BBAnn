@@ -64,9 +64,6 @@ def graph_partition(base_vector, n_cluster, save_dir):
         tmp_base = base_vector.astype(np.float32)
         tmp_query = query.astype(np.float32)
         base_dim = base_vector.shape[1]
-        print("DEBUG base_dim: ", type(base_vector.shape[1]))
-        print("DEBUG base_dim: ", base_vector.shape[1])
-        print("DEBUG base_dim: ", base_dim)
         index = faiss.IndexFlatL2(base_dim)
         index.add(tmp_base)
         gnd_distance, gnd_idx = index.search(tmp_query, k)
@@ -234,7 +231,9 @@ if __name__ == '__main__':
 
     # Build a FLAT index on base vector as float
     print("DEBUG dim: ", dim)
-    index = faiss.IndexFlatL2(dim) # TODO: debuggy
+    base_vector_dim = base_vector.shape[1]
+    print("DEBUG dim: ", base_vector_dim)
+    index = faiss.IndexFlatL2(base_vector_dim) # TODO: debuggy
     tmp_vector_base = base_vector.astype(np.float32)
     index.add(tmp_vector_base)
 
