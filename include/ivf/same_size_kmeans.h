@@ -25,8 +25,8 @@ void ssk_compute_dist_tab(int64_t nx,
     for (int64_t i = 0; i < nx; ++i) {
         const T* x = x_in + i * dim;
         const int64_t ii = i * k;
-        for (int64_t j = 0; j < k; ++k) {
-            dis_tab[ii+j] = L2sqr<const T, const float, float>(x, centroids + j * dim, dim);
+        for (int64_t j = 0; j < k; ++j) {
+            dis_tab[ii + j] = L2sqr<const T, const float, float>(x, centroids + j * dim, dim);
         }
     }
 }
@@ -94,6 +94,16 @@ void ssk_init_assign(int64_t nx,
     }
 }
 
+void ssk_print_cluster_size_stats(int64_t k, const int64_t* hassign) {
+    float mini = std::numeric_limits<float>::max(), maxi = 0, avg = 0;
+    for (int64_t i = 0; i < k; ++i) {
+        avg += hassign[i];
+        mini = std::min(mini, 1.0f * hassign[i]);
+        maxi = std::max(maxi, 1.0f * hassign[i]);
+    }
+    std::cout << "avg: " << avg/k << " min: " << mini << " max: " << maxi << std::endl;
+}
+
 template<typename T>
 void same_size_kmeans(int64_t nx,
                       const T* x_in,
@@ -133,8 +143,14 @@ void same_size_kmeans(int64_t nx,
     }
 
     float* dis_tab = new float[nx * k];
+    assert(dis_tab != nullptr);
+
     ssk_compute_dist_tab(nx, x_in, dim, k, centroids, dis_tab);
+    std::cout << "init compute dis_tab done" << std::endl;
+
     ssk_init_assign(nx, k, max_target_size, dis_tab, hassign, assign);
+
+    std::cout << "Initialization done" << std::endl;
 
     int64_t* xs = new int64_t[nx];
     for (int64_t i = 0; i < nx; ++i) {
@@ -149,22 +165,27 @@ void same_size_kmeans(int64_t nx,
     auto delta_cur_best = [&](const auto& x) {
         float min_dis = std::numeric_limits<float>::max();
         for (int64_t i = 0; i < k; ++i) {
-            min_dis = std::min(min_dis, dis_tab[x*k+i]);
+            min_dis = std::min(min_dis, dis_tab[x * k + i]);
         }
-        return dis_tab[x*k+assign[x]] - min_dis;
+        return dis_tab[x * k + assign[x]] - min_dis;
     };
 
     auto gain = [&](const auto& x, int64_t i) {
-        return dis_tab[x*k+assign[x]] - dis_tab[x+k+i];
+        return dis_tab[x * k + assign[x]] - dis_tab[x * k + i];
     };
 
+    compute_centroids(dim, k, nx, x_in, assign, hassign, centroids);
+
     std::vector<std::deque<int64_t>> transfer_lists(k);
+    float err = std::numeric_limits<float>::max();
+
     for (int64_t iter = 0; iter < niter; ++iter) {
+        std::cout << "Start " << iter << "th iteration" << std::endl;
+
         int64_t transfer_cnt = 0;
-        compute_centroids(dim, k, nx, x_in, assign, hassign, centroids);
         ssk_compute_dist_tab(nx, x_in, dim, k, centroids, dis_tab);
 
-        std::sort(xs, xs+nx, [&](const auto& x, const auto& y){
+        std::sort(xs, xs + nx, [&](const auto& x, const auto& y){
             return delta_cur_best(x) > delta_cur_best(y);
         });
 
@@ -208,12 +229,36 @@ void same_size_kmeans(int64_t nx,
             }
         }
 
+        int64_t skip_cnt = 0;
+        for (auto& l : transfer_lists) {
+            skip_cnt += l.size();
+            l.clear();
+        }
+
+        std::cout << "Transfered " << transfer_cnt << ", skipped " << skip_cnt << " points." << std::endl;
+
+        float cur_err = 0.0;
+        for (auto i = 0; i < nx; ++i) {
+            cur_err += dis_tab[i * k + assign[i]];
+        }
+        std::cout << "Current Error: " << cur_err << std::endl;
+
+        if (fabs(cur_err - err) < err * 0.01) {
+            std::cout << "exit kmeans iteration after the " << iter << "th iteration, err = " << err << ", cur_err = " << cur_err << std::endl;
+            break;
+        }
+        err = cur_err;
+
         if (transfer_cnt == 0) {
             std::cout << "No tranfer occurs in the last iteration. Terminate." << std::endl;
             break;
         }
-        std::cout << "Transfered " << transfer_cnt << " points." << std::endl;
+
+        compute_centroids(dim, k, nx, x_in, assign, hassign, centroids);
     }
+
+    ssk_print_cluster_size_stats(k, hassign);
+
     delete[] xs;
     delete[] ks;
 
