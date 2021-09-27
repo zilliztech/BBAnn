@@ -105,10 +105,13 @@ template <typename dataT> struct BBAnnIndex {
     case MetricType::L2: {
       Computer<dataT, dataT, distanceT> dis_computer =
           L2sqr<constDataT, constDataT, distanceT>;
+      // TODO(!!!!);
+      /*
       search_bbann_exec<dataT, distanceT, CMax<distanceT, uint32_t>>(
           indexPrefix_, para.nProbe, para.hnswefC, knn, index_hnsw_, para.K1,
           para.blockSize, dis_computer, nq, dq, pquery, bucket_labels,
-          answer_dists, answer_ids);
+          answer_dists, answer_ids);*/
+
       break;
     }
     default:
@@ -170,27 +173,28 @@ void IndexBindWrapper(py::module_ &m) {
              return BuildBBAnnIndex<dataT>(para);
            },
            py::arg("para"));
-    m.def("load_aligned_bin",
-           [](const std::string &path, std::vector<dataT> &data) {
-             size_t num, dim, aligned_dims;
-             // TODO(!!!!!!)  check disann implementaion, what is rounded dims?
-             std::ifstream reader(path, std::ios::binary);
-             reader.read((char *)&num, sizeof(uint32_t));
-             reader.read((char *)&dim, sizeof(uint32_t));
-             data.resize(num * dim);
-             reader.read((char *)(&data[0]), sizeof(dataT) * (uint64_t)num * dim);
-             reader.close();
-             std::cout << "read binary file from " << path
-                       << " done in ... seconds, n = " << num << ", dim = " << dim
-                       << std::endl;
-             aligned_dims = dim;
-             auto l = py::list(3);
-             l[0] = py::int_(num);
-             l[1] = py::int_(dim);
-             l[2] = py::int_(aligned_dims);
-             return l;
-           },
-           py::arg("path"), py::arg("data"));
+
+  m.def("load_aligned_bin",
+        [](const std::string &path, std::vector<dataT> &data) {
+          size_t num, dim, aligned_dims;
+          // TODO(!!!!!!)  check disann implementaion, what is rounded dims?
+          std::ifstream reader(path, std::ios::binary);
+          reader.read((char *)&num, sizeof(uint32_t));
+          reader.read((char *)&dim, sizeof(uint32_t));
+          data.resize(num * dim);
+          reader.read((char *)(&data[0]), sizeof(dataT) * (uint64_t)num * dim);
+          reader.close();
+          std::cout << "read binary file from " << path
+                    << " done in ... seconds, n = " << num << ", dim = " << dim
+                    << std::endl;
+          aligned_dims = dim;
+          auto l = py::list(3);
+          l[0] = py::int_(num);
+          l[1] = py::int_(dim);
+          l[2] = py::int_(aligned_dims);
+          return l;
+        },
+        py::arg("path"), py::arg("data"));
 }
 
 PYBIND11_MODULE(bbannpy, m) {

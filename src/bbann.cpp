@@ -515,16 +515,34 @@ void gather_vec_searched_per_query(const std::string index_path,
 template <typename DATAT, typename DISTT, typename HEAPT>
 void search_bbann_exec(
     const std::string &index_path, const std::string &query_bin_file,
-    const int nprobe, const int hnsw_ef, const int topk,
-    std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw, const int K1,
-    const uint64_t block_size, Computer<DATAT, DATAT, DISTT> &dis_computer,
-    uint32_t &nq, uint32_t &dq, const DATAT *pquery, uint32_t *bucket_labels,
-    DISTT *answer_dists, uint32_t *answer_ids) {
-  TimeRecorder rc("search_bbann");
+    const std::string &answer_bin_file, const int nprobe, const int hnsw_ef,
+    const int topk, std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+    const int K1, const uint64_t block_size,
+    Computer<DATAT, DATAT, DISTT> &dis_computer) {
+  TimeRecorder rc("search bigann");
 
+  std::cout << "search bigann parameters:" << std::endl;
+  std::cout << " index_path: " << index_path
+            << " query_bin_file: " << query_bin_file
+            << " answer_bin_file: " << answer_bin_file << " nprobe: " << nprobe
+            << " hnsw_ef: " << hnsw_ef << " topk: " << topk << " K1: " << K1
+            << std::endl;
+
+  DATAT *pquery = nullptr;
+  DISTT *answer_dists = nullptr;
+  uint32_t *answer_ids = nullptr;
+  uint32_t *bucket_labels = nullptr;
+
+  uint32_t nq, dq;
+
+  read_bin_file<DATAT>(query_bin_file, pquery, nq, dq);
   rc.RecordSection("load query done.");
 
   std::cout << "query numbers: " << nq << " query dims: " << dq << std::endl;
+
+  answer_dists = new DISTT[(int64_t)nq * topk];
+  answer_ids = new uint32_t[(int64_t)nq * topk];
+  bucket_labels = new uint32_t[(int64_t)nq * nprobe]; // 400K * nprobe
 
   // cid -> [bid -> [qid]]
   std::unordered_map<uint32_t,
@@ -641,9 +659,23 @@ void search_bbann_exec(
   //         }
   //     }
   rc.RecordSection("scan blocks done");
+
+  // write answers
+  save_answers<DISTT, HEAPT>(answer_bin_file, topk, nq, answer_dists,
+                             answer_ids);
+  rc.RecordSection("write answers done");
+
+  gather_vec_searched_per_query(index_path, pquery, nq, nprobe, dq, block_size,
+                                buf, bucket_labels);
+  rc.RecordSection("gather statistics done");
+
   delete[] buf;
   delete[] bucket_labels;
   delete[] pquery;
+  delete[] answer_ids;
+  delete[] answer_dists;
+
+  rc.ElapseFromBegin("search bigann totally done");
 }
 
 template <typename DATAT, typename DISTT, typename HEAPT>
@@ -654,39 +686,9 @@ void search_bbann(const std::string &index_path,
                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
                   const int K1, const uint64_t block_size,
                   Computer<DATAT, DATAT, DISTT> &dis_computer) {
-  TimeRecorder rc("search bigann");
-  uint32_t nq, dq;
-  std::cout << "search bigann parameters:" << std::endl;
-  std::cout << " index_path: " << index_path
-            << " query_bin_file: " << query_bin_file
-            << " answer_bin_file: " << answer_bin_file << " nprobe: " << nprobe
-            << " hnsw_ef: " << hnsw_ef << " topk: " << topk << " K1: " << K1
-            << std::endl;
-
-  DATAT *pquery = nullptr;
-  read_bin_file<DATAT>(query_bin_file, pquery, nq, dq);
-  DISTT *answer_dists = new DISTT[(int64_t)nq * topk];
-  uint32_t *answer_ids = new uint32_t[(int64_t)nq * topk];
-  uint32_t *bucket_labels = new uint32_t[(int64_t)nq * nprobe]; // 400K * nprobe
-
-  search_bbann_exec<DATAT, DISTT, HEAPT>(
-      index_path, nprobe, hnsw_ef, topk, index_hnsw, K1, block_size,
-      dis_computer, nq, dq, pquery, bucket_labels, answer_dists, answer_ids);
-
-  // write answers
-  save_answers<DISTT, HEAPT>(answer_bin_file, topk, nq, answer_dists,
-                             answer_ids);
-  rc.RecordSection("write answers done");
-
-  char *buf = new char[block_size];
-  gather_vec_searched_per_query(index_path, pquery, nq, nprobe, dq, block_size,
-                                buf, bucket_labels);
-  rc.RecordSection("gather statistics done");
-
-  delete[] answer_ids;
-  delete[] answer_dists;
-
-  rc.ElapseFromBegin("search bigann totally done");
+  search_bbann<DATAT, DISTT, HEAPT>(index_path, query_bin_file, answer_bin_file,
+                                    nprobe, hnsw_ef, topk, index_hnsw, K1,
+                                    block_size, dis_computer);
 }
 
 #define BUILD_BBANN_DECL(DATAT, DISTT, HEAPT)                                  \
