@@ -269,6 +269,6 @@ if __name__ == '__main__':
 
     item_recall_l = []
     for i in range(len(total_item_l)):
-        item_recall_l.append({'n_candidate': total_item_l[i], 'nprobe': i, 'recall': total_recall_l[i]})
+        item_recall_l.append({'n_candidate': total_item_l[i], 'nprobe': i, 'recall': total_recall_l[i], 'num accessed pages': total_page_l[i]})
     with open('%s/item_recall_curve.json' % save_basic_dir, 'w') as f:
         json.dump(item_recall_l, f)
