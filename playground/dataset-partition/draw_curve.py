@@ -30,7 +30,8 @@ if __name__ == '__main__':
         'graph_partition-knn-k_30', 'kmeans'
     ]
     dir_arr = [
-        '/tmp/1.json', '/tmp/2.json'
+        '/tmp/1.json',
+        '/tmp/2.json'
         # '/home/jigao/ssh_mount2/-bigann10K-graph_partition-knn-k_30/item_recall_curve.json',
         # '/home/jigao/ssh_mount2/bigann10K-kmeans/item_recall_curve.json'
     ]
