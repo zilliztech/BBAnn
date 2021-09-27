@@ -3,7 +3,7 @@ import json
 import bin_io
 import argparse
 import time
-
+#TODO: add faiss's FLAT to get gnt
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -15,13 +15,14 @@ def parse_args():
 
 if __name__ == '__main__':
     args = parse_args()
-    basic_index_dir = '/home/zhengbian/nips-competition/dataset-partition/result/%s' % args.filename
+    basic_index_dir = args.filename
+    print("basic_index_dir: ", basic_index_dir)
     basic_data_dir = '/home/zhengbian/nips-competition/data/%s' % args.dataset_name
 
     centroid_dir = '%s/centroids.npy' % basic_index_dir
-    centroids = np.load(centroid_dir)
+    centroids = np.load(centroid_dir) # centroids
     with open('%s/cluster2item.json' % basic_index_dir, 'r') as fp:
-        cluster_item_l = json.load(fp)
+        cluster_item_l = json.load(fp) # label_map_l
 
     gnd, n_query, topk = bin_io.ibin_read('%s/gnd.ibin' % basic_data_dir)
     query, n_query, vec_dim = bin_io.bbin_read('%s/query.bbin' % basic_data_dir)

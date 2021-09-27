@@ -8,10 +8,10 @@ import struct
 
 def bbin_read(fname):
     a = np.fromfile(fname, dtype='uint8')
-    n_data = a[:4].view('int32')[0]
+    num_vector = a[:4].view('int32')[0]
     dim = a[4:8].view('int32')[0]
     a = a[8:].reshape(-1, dim)
-    return a.reshape(-1, dim), n_data, dim
+    return a.reshape(-1, dim), num_vector, dim
 
 
 def ibin_read(fname):

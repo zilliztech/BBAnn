@@ -24,12 +24,9 @@ def parse_args():
     parser.add_argument('--data_set_path', default='/mnt/Billion-Scale/BIGANN/base.1B.u8bin', type=str, help='data_set_path')
     parser.add_argument('--result_path', default='/home/zilliz/jigao/', type=str, help='result_path')
     parser.add_argument('--kahip_dir', default="/home/zilliz/jigao/KaHIP", type=str, help='kahip_dir')
-
-
-# parser.add_argument('--fast_kmeans', default=False, help='whether using fast kmeans, non-sklearn')
+    parser.add_argument('--query_file_path', default="/mnt/Billion-Scale/BIGANN/query.public.10K.128.u8bin", type=str, help='query_file_path')
     opt = parser.parse_args()
     return opt
-
 
 def partition_factory(partition_type):
     if partition_type == 'kmeans':
@@ -38,7 +35,6 @@ def partition_factory(partition_type):
         return graph_partition
     else:
         raise Exception("not support partition type")
-
 
 def delete_dir_if_exist(dire):
     if os.path.isdir(dire):
@@ -63,19 +59,19 @@ def kmeans(base, n_cluster, save_dir):
     return ins.cluster_centers_, ins.labels_
 
 
-def graph_partition(base, n_cluster, save_dir):
-    def groundtruth(base, query, k):
-        tmp_base = base.astype(np.float32)
+def graph_partition(base_vector, n_cluster, save_dir):
+    def groundtruth(base_vector, query, k):
+        tmp_base = base_vector.astype(np.float32)
         tmp_query = query.astype(np.float32)
-        base_dim = base.shape[1]
+        base_dim = base_vector.shape[1]
         index = faiss.IndexFlatL2(base_dim)
         index.add(tmp_base)
         gnd_distance, gnd_idx = index.search(tmp_query, k)
         print("search")
         return gnd_idx
 
-    def build_graph(base, base_base_gnd):
-        n_base = len(base)
+    def build_graph(base_vector, base_base_gnd):
+        num_base = len(base_vector)
         index_arr = base_base_gnd
         index_arr = index_arr[:, :] + 1  # kahip need the index start from 1, so +1
         weightless_graph = index_arr.tolist()
@@ -94,8 +90,8 @@ def graph_partition(base, n_cluster, save_dir):
         res_graph = []
         for i in range(len(weightless_graph)):
             tmp_line = {}
-            for n_base in weightless_graph[i]:
-                tmp_line[n_base] = 1
+            for num_base in weightless_graph[i]:
+                tmp_line[num_base] = 1
             res_graph.append(tmp_line)
         # print("change the rank into graph successfully")
         return res_graph
@@ -119,8 +115,8 @@ def graph_partition(base, n_cluster, save_dir):
                 f.write(row_index + '\n')
         print("save graph complete")
 
-    base_base_gnd = groundtruth(base, base, graph_knn_k)
-    graph = build_graph(base, base_base_gnd)
+    base_base_gnd = groundtruth(base_vector, base_vector, graph_knn_k)
+    graph = build_graph(base_vector, base_base_gnd)
     save_fname = '%s/knn.graph' % save_dir
     save_graph(graph, save_fname)
     # graph partition
@@ -134,13 +130,13 @@ def graph_partition(base, n_cluster, save_dir):
     label_l = np.loadtxt('%s/partition.txt' % save_dir)
 
     centroids = []
-    vec_dim = len(base[0])
+    vec_dim = len(base_vector[0])
 
     for cluster_i in range(n_cluster):
         tmp_centroid = np.zeros(shape=vec_dim)
         base_idx_i = np.argwhere(label_l == cluster_i).reshape(-1)
         for tmp in base_idx_i:
-            tmp_centroid += base[tmp]
+            tmp_centroid += base_vector[tmp]
         tmp_centroid = tmp_centroid / len(base_idx_i) if len(base_idx_i) != 0 else tmp_centroid
         centroids.append(tmp_centroid)
     return centroids, label_l
@@ -155,7 +151,9 @@ if __name__ == '__main__':
     print("The data_set_path: ", args.data_set_path)
     print("The result_path: ", args.result_path)
     print("The kahip_dir: ", args.kahip_dir)
+    print("The query_file_path: ", args.query_file_path)
 
+# TODO: replace varibla with args.varaible
 
     # basic_dir = '/home/zhengbian/nips-competition/data/%s' % args.dataset_name
     data_set_path = args.data_set_path
@@ -179,15 +177,15 @@ if __name__ == '__main__':
     kahip_dir = args.kahip_dir
     print('The kahip_dir: ', kahip_dir)
 
-    # base, n_base, vec_dim = bin_io.bbin_read("%s/base.bbin" % basic_dir)
-    base, n_base, vec_dim = bin_io.bbin_read(data_set_path)
+    # base, num_base, dim = bin_io.bbin_read("%s/base.bbin" % basic_dir)
+    base_vector, num_vector, dim = bin_io.bbin_read(data_set_path)
 
     para_result = {}
     partition_method = partition_factory(args.partition_type)
 
     print("Start building index.")
     start_time = time.time()
-    centroids, labels = partition_method(base, args.n_cluster, save_basic_dir)
+    centroids, labels = partition_method(base_vector, args.n_cluster, save_basic_dir)
     label_map_l, n_point_cluster_l = get_labels(labels, args.n_cluster)
     end_time = time.time()
     para_result['build_index_time'] = end_time - start_time
@@ -214,3 +212,65 @@ if __name__ == '__main__':
         json.dump(para_result, f)
     np.save('%s/centroids.npy' % save_basic_dir, centroids)
     print("Saving index is a success")
+
+
+    # TODO: move query.py here
+
+    # TODO: read query file
+    query, num_query, query_dim = bin_io.bbin_read(args.query_file_path)
+    top_k = 10
+    num_vector_per_page = 93 # FIX VALUE WITH 93
+
+    # Build a FLAT index on base vector as float
+    index = faiss.IndexFlatL2(dim)
+    tmp_vector_base = base_vector.astype(np.float32)
+    index.add(tmp_vector_base)
+
+    # Search each query in this FLAT index to get the Ground-Truth
+    total_item_l = np.zeros(shape = args.n_cluster)   # number of hits in each cluster
+    total_page_l = np.zeros(shape = args.n_cluster)   # number of hits in each cluster
+    total_recall_l = np.zeros(shape = args.n_cluster) # recall in each cluster
+    for i, tmp_query in enumerate(query, 0):
+        # Use FLAT to get the Ground-Truth
+        tmp_query = query.astype(np.float32)
+        gnd_distance, gnd_idx = index.search(tmp_query, top_k)
+        # TODO: I only use gnd index, not using the distance
+
+        # nprobe with finding centroids
+        distance_l = [np.linalg.norm(tmp_query - _) for _ in centroids]
+        distance_sort_l = np.argsort(distance_l)  # Sort distance&index with each centroids
+        tmp_set = [] # search result: vector ids
+        tmp_set_len = 0
+        tmp_page_number = 0
+        tmp_item_l = []
+        tmp_page_l = []
+        tmp_recall_l = []
+
+        # Each iteration is one-more nprobe
+        for tmp_idx in distance_sort_l:
+            tmp_set = np.union1d(tmp_set, label_map_l[tmp_idx])
+            tmp_set = np.intersect1d(tmp_set, gnd_idx[i]) # compare search result with the Ground Truth
+            tmp_recall = len(tmp_set) / top_k
+            tmp_recall_l.append(tmp_recall)
+            tmp_set_len += len(label_map_l[tmp_idx]) # Add the number of elements in this cluster
+            tmp_item_l.append(tmp_set_len)
+            tmp_page_number += int((len(label_map_l[tmp_idx]) + num_vector_per_page - 1)  / num_vector_per_page)
+            tmp_page_l.append(tmp_page_number)
+        print(i) # TODO: what is this??? delete this line
+
+        total_item_l += np.array(tmp_item_l)
+        total_page_l += np.array(tmp_page_l)
+        total_recall_l += np.array(tmp_recall_l)
+
+    total_item_l /= num_query
+    total_page_l /= num_query
+    total_recall_l /= num_query
+    print("AVG number of calculated vectors (distance calculation) per Query: ", total_item_l)
+    print("AVG number of Accessed Pages (having ", num_vector_per_page, " vectors)  per Query: ", total_page_l)
+    print("AVG RECALL@10 per Query: ", total_recall_l)
+
+    item_recall_l = []
+    for i in range(len(total_item_l)):
+        item_recall_l.append({'n_candidate': total_item_l[i], 'nprobe': i, 'recall': total_recall_l[i]})
+    with open('%s/item_recall_curve.json' % save_basic_dir, 'w') as f:
+        json.dump(item_recall_l, f)
