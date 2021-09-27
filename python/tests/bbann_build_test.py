@@ -11,8 +11,8 @@ parser.add_argument('--data_path', type=str,
 parser.add_argument('--save_path', type=str, help='Path to the built index.')
 parser.add_argument('--M', type=int, default=32, help='Parameter for hnsw')
 parser.add_argument('--efC', type=int, default=200, help='Parameter for hnsw')
-parser.add_argument('--metric', type=bbannpy.Metric, default=bbannpy.Metric.L2,
-                     help='Metric type, can be L2 or INNER_PRODUCT')
+parser.add_argument('--metric', type=str, default='L2',
+                    help='Metric type, can be L2 or INNER_PRODUCT')
 parser.add_argument('--K1', type=int, default=20,
                     help=' number of centroid of the first round kmeans')
 parser.add_argument('--page_per_block', type=int, default=1,
@@ -27,7 +27,7 @@ if 'float' == args.type:
 
 para =  bbannpy.BBAnnParameters()
 
-para.metric = args.metric
+para.metric = bbannpy.Metric.L2
 para.dataFilePath = args.data_path
 para.indexPrefixPath = args.save_path
 para.hnswM = args.M

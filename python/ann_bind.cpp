@@ -47,7 +47,9 @@ template <> struct TypeWrapper<int8_t> {
 };
 
 template <typename dataT> struct BBAnnIndex {
-  BBAnnIndex(MetricType metric) : metric_(metric) {}
+  BBAnnIndex(MetricType metric) : metric_(metric) {
+    std::cout << "BBAnnIndex constructor" << std::endl;
+  }
   MetricType metric_;
 
   bool LoadIndex(std::string &indexPathPrefix) {
@@ -84,14 +86,6 @@ template <typename dataT> struct BBAnnIndex {
     using constDataT = typename TypeWrapper<dataT>::constDataT;
     py::array_t<unsigned> ids({numQuery, knn});
     py::array_t<float> dists({numQuery, knn});
-    /*
-    dataT *pquery = new dataT[numQuery * dim];
-    for (int i = 0; i < numQuery; i++) {
-      for (int j = 0; j < dim; j++) {
-        pquery[i * dim + j] = query.data(i*dim+j);
-      }
-    }
-    */
     constDataT *pquery = query.data();
 
     distanceT *answer_dists = new distanceT[(int64_t)numQuery * knn];
@@ -105,6 +99,11 @@ template <typename dataT> struct BBAnnIndex {
     case MetricType::L2: {
       Computer<dataT, dataT, distanceT> dis_computer =
           L2sqr<constDataT, constDataT, distanceT>;
+      for (int i = 0; i < numQuery; i++) {
+        for (int j = 0; j < dim; j++)
+          std::cout << pquery[i * dim + j] << " ";
+        std::cout << std::endl;
+      }
       // TODO(!!!!);
       /*
       search_bbann_exec<dataT, distanceT, CMax<distanceT, uint32_t>>(
@@ -163,7 +162,7 @@ void IndexBindWrapper(py::module_ &m) {
         return std::unique_ptr<BBAnnIndex<dataT>>(
             new BBAnnIndex<dataT>(metric));
       }))
-      .def("load_index", &BBAnnIndex<dataT>::LoadIndex,
+      .def("LoadIndex", &BBAnnIndex<dataT>::LoadIndex,
            py::arg("index_path_prefix"))
       .def("batch_search", &BBAnnIndex<dataT>::BatchSearch, py::arg("query"),
            py::arg("dim"), py::arg("num_query"), py::arg("knn"),
@@ -174,13 +173,19 @@ void IndexBindWrapper(py::module_ &m) {
            },
            py::arg("para"));
 
-  m.def("load_aligned_bin",
+  m.def(StringWrapper::ReaderName(),
         [](const std::string &path, std::vector<dataT> &data) {
           size_t num, dim, aligned_dims;
           // TODO(!!!!!!)  check disann implementaion, what is rounded dims?
+
+          std::cout << "read binary file from " << path << std::endl;
           std::ifstream reader(path, std::ios::binary);
+          num = 0; // not sure why but this one is necessary.
+          dim = 0;
           reader.read((char *)&num, sizeof(uint32_t));
           reader.read((char *)&dim, sizeof(uint32_t));
+
+          std::cout << num << ", dim = " << dim << std::endl;
           data.resize(num * dim);
           reader.read((char *)(&data[0]), sizeof(dataT) * (uint64_t)num * dim);
           reader.close();
@@ -199,6 +204,9 @@ void IndexBindWrapper(py::module_ &m) {
 
 PYBIND11_MODULE(bbannpy, m) {
   m.doc() = "TBD"; // optional module docstring
+
+  py::bind_vector<std::vector<unsigned>>(m, "VectorUnsigned");
+  py::bind_vector<std::vector<float>>(m, "VectorFloat");
 
   py::enum_<MetricType>(m, "Metric")
       .value("L2", MetricType::L2)
@@ -221,15 +229,18 @@ PYBIND11_MODULE(bbannpy, m) {
   class FloatWrapper {
   public:
     static const char *Get() { return "FloatIndex"; }
+    static const char *ReaderName() { return "read_bin_float"; }
   };
   class UInt8Wrapper {
   public:
     static const char *Get() { return "Uint8Index"; }
+    static const char *ReaderName() { return "read_bin_uint8"; }
   };
 
   class Int8Wrapper {
   public:
     static const char *Get() { return "Int8Index"; }
+    static const char *ReaderName() { return "read_bin_int8"; }
   };
 
   IndexBindWrapper<float, FloatWrapper>(m);
