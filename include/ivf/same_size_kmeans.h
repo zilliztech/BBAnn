@@ -13,6 +13,7 @@
 #include "util/random.h"
 #include "ivf/clustering.h"
 
+// #define SSK_LOG
 
 template<typename T>
 void ssk_compute_dist_tab(int64_t nx,
@@ -146,11 +147,16 @@ void same_size_kmeans(int64_t nx,
     assert(dis_tab != nullptr);
 
     ssk_compute_dist_tab(nx, x_in, dim, k, centroids, dis_tab);
+
+#ifdef SSK_LOG
     std::cout << "init compute dis_tab done" << std::endl;
+#endif
 
     ssk_init_assign(nx, k, max_target_size, dis_tab, hassign, assign);
 
+#ifdef SSK_LOG
     std::cout << "Initialization done" << std::endl;
+#endif
 
     int64_t* xs = new int64_t[nx];
     for (int64_t i = 0; i < nx; ++i) {
@@ -180,7 +186,9 @@ void same_size_kmeans(int64_t nx,
     float err = std::numeric_limits<float>::max();
 
     for (int64_t iter = 0; iter < niter; ++iter) {
+#ifdef SSK_LOG
         std::cout << "Start " << iter << "th iteration" << std::endl;
+#endif
 
         int64_t transfer_cnt = 0;
         ssk_compute_dist_tab(nx, x_in, dim, k, centroids, dis_tab);
@@ -235,22 +243,27 @@ void same_size_kmeans(int64_t nx,
             l.clear();
         }
 
-        std::cout << "Transfered " << transfer_cnt << ", skipped " << skip_cnt << " points." << std::endl;
-
         float cur_err = 0.0;
         for (auto i = 0; i < nx; ++i) {
             cur_err += dis_tab[i * k + assign[i]];
         }
+#ifdef SSK_LOG
+        std::cout << "Transfered " << transfer_cnt << ", skipped " << skip_cnt << " points." << std::endl;
         std::cout << "Current Error: " << cur_err << std::endl;
+#endif
 
         if (fabs(cur_err - err) < err * 0.01) {
+#ifdef SSK_LOG
             std::cout << "exit kmeans iteration after the " << iter << "th iteration, err = " << err << ", cur_err = " << cur_err << std::endl;
+#endif
             break;
         }
         err = cur_err;
 
         if (transfer_cnt == 0) {
+#ifdef SSK_LOG
             std::cout << "No tranfer occurs in the last iteration. Terminate." << std::endl;
+#endif
             break;
         }
 
