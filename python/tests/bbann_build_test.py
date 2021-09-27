@@ -18,9 +18,10 @@ parser.add_argument('--page_per_block', type=int, default=1,
                     help='number of pages in a block')
 
 args = parser.parse_args()
-
+print ("here1")
 start = time.time()
 if 'float' == args.type:
+    print("Building float index")
     index = bbannpy.FloatIndex(args.metric)
 
 para =  bbannpy.BBAnnParameters()
