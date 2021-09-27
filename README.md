@@ -1,4 +1,4 @@
-# NIPS Competition
+#NIPS Competition
 
 ## Prerequisites
 * CMake >= 3.10
