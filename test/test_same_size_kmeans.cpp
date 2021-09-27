@@ -1,52 +1,50 @@
-#include "util/read_file.h"
-#include "util/utils.h"
-#include "util/merge.h"
 #include "flat/flat.h"
 #include "ivf/ivf_flat.h"
 #include "ivf/same_size_kmeans.h"
+#include "util/merge.h"
+#include "util/read_file.h"
+#include "util/utils.h"
 
-#include "hnswlib/space_ui8_l2.h"
-#include "hnswlib/hnswlib.h"
 #include "hnswlib/hnswalg.h"
+#include "hnswlib/hnswlib.h"
+#include "hnswlib/space_ui8_l2.h"
 
-#include <sys/types.h>
+#include <fstream>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/types.h>
 #include <unistd.h>
-#include <fstream>
-
-
 
 // test ivfflat
 
 #define BigAnn
 
 #ifdef BigAnn
-    using CODE_T = uint8_t;
-    using DIS_T = uint32_t;
-    const char* Learn_Path = "../../data/BIGANN/base.1M.u8bin";
-    const char* Query_Path = "../../data/BIGANN/query.public.10K.128.u8bin";
-    #define Dis_Compare     CMax<DIS_T,uint32_t>
-    #define Dis_Computer    L2sqr<const CODE_T, const CODE_T, DIS_T>
-    #define OUT_PUT         "bigann"
-    #define METRIC          MetricType::L2
+using CODE_T = uint8_t;
+using DIS_T = uint32_t;
+const char *Learn_Path = "../../data/BIGANN/base.1M.u8bin";
+const char *Query_Path = "../../data/BIGANN/query.public.10K.128.u8bin";
+#define Dis_Compare CMax<DIS_T, uint32_t>
+#define Dis_Computer L2sqr<const CODE_T, const CODE_T, DIS_T>
+#define OUT_PUT "bigann"
+#define METRIC MetricType::L2
 #endif
 
 #ifdef Yandex_Text_to_Image
-    using CODE_T = float;
-    using DIS_T = float;
-    const char* Learn_Path = "data/Yandex_Text-to-Image/query.learn.50M.fbin";
-    const char* Query_Path = "data/Yandex_Text-to-Image/query.public.100K.fbin";
-    #define Dis_Compare     CMin<float,int>
-    #define Dis_Computer    IP<const CODE_T, const CODE_T, DIS_T>
-    #define OUT_PUT         "yandex_text_to_image"
-    #define METRIC          MetricType::IP
+using CODE_T = float;
+using DIS_T = float;
+const char *Learn_Path = "data/Yandex_Text-to-Image/query.learn.50M.fbin";
+const char *Query_Path = "data/Yandex_Text-to-Image/query.public.100K.fbin";
+#define Dis_Compare CMin<float, int>
+#define Dis_Computer IP<const CODE_T, const CODE_T, DIS_T>
+#define OUT_PUT "yandex_text_to_image"
+#define METRIC MetricType::IP
 #endif
-
 
 timeval t1, t2;
 long int getTime(timeval end, timeval start) {
-    return 1000*(end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec)/1000;
+  return 1000 * (end.tv_sec - start.tv_sec) +
+         (end.tv_usec - start.tv_usec) / 1000;
 }
 
 uint32_t nb, nq, dim;
@@ -63,90 +61,96 @@ DIS_T *tmp_dis = new DIS_T[Query_Batch * topk];
 uint32_t *tmp_lab = new uint32_t[Query_Batch * topk];
 
 void Flat(int batch_from, int batch_num) {
-    gettimeofday(&t1, 0);
+  gettimeofday(&t1, 0);
 
-    // knn_1<Dis_Compare, CODE_T, CODE_T> (xq, xb, nq, batch_num, dim, topk, tmp_dis, tmp_lab, Dis_Computer);
-    knn_1<Dis_Compare, CODE_T, CODE_T> (xq, xb, nq, batch_num, dim, topk, global_dis, global_lab, Dis_Computer);
+  // knn_1<Dis_Compare, CODE_T, CODE_T> (xq, xb, nq, batch_num, dim, topk,
+  // tmp_dis, tmp_lab, Dis_Computer);
+  knn_1<Dis_Compare, CODE_T, CODE_T>(xq, xb, nq, batch_num, dim, topk,
+                                     global_dis, global_lab, Dis_Computer);
 
-    gettimeofday(&t2, 0);
-    printf("flat seg %d cost %ldms\n", batch_from/Base_Batch, getTime(t2,t1));
+  gettimeofday(&t2, 0);
+  printf("flat seg %d cost %ldms\n", batch_from / Base_Batch, getTime(t2, t1));
 
-    // merge<Dis_Compare>(global_dis, global_lab, tmp_dis, tmp_lab, nq, topk, batch_from);
+  // merge<Dis_Compare>(global_dis, global_lab, tmp_dis, tmp_lab, nq, topk,
+  // batch_from);
 }
 
 uint32_t nlist = 10;
 uint32_t nprobe = 10;
-float* centroids = nullptr;
+float *centroids = nullptr;
 std::vector<std::vector<CODE_T>> codes;
 std::vector<std::vector<uint32_t>> ids;
 
 void IVF_Train(int batch_num) {
-    centroids = new float[nlist * dim];
+  centroids = new float[nlist * dim];
 
-    gettimeofday(&t1, 0);
+  gettimeofday(&t1, 0);
 
-    // kmeans(batch_num, xb, dim, nlist, centroids);
-    same_size_kmeans(batch_num, xb, dim, nlist, centroids);
+  // kmeans(batch_num, xb, dim, nlist, centroids);
+  same_size_kmeans(batch_num, xb, dim, nlist, centroids);
 
-    gettimeofday(&t2, 0);
-    printf("kmeans cost %ld ms\n", getTime(t2,t1));
+  gettimeofday(&t2, 0);
+  printf("kmeans cost %ld ms\n", getTime(t2, t1));
 }
 
 void IVF_Insert(int batch_num) {
-    gettimeofday(&t1, 0);
+  gettimeofday(&t1, 0);
 
-    ivf_flat_insert(batch_num, xb, dim, nlist, centroids, codes, ids);
+  ivf_flat_insert(batch_num, xb, dim, nlist, centroids, codes, ids);
 
-    gettimeofday(&t2, 0);
-    printf("insert cost %ld ms\n", getTime(t2,t1));
+  gettimeofday(&t2, 0);
+  printf("insert cost %ld ms\n", getTime(t2, t1));
 }
 
 void IVF_Search(int batch_num, int iter = 1) {
 
-    long min_time = std::numeric_limits<long>::max();
-    while (iter--) {
-        gettimeofday(&t1, 0);
-        // ivf_flat_search<Dis_Compare, CODE_T, DIS_T>(
-        //     nq, xq, dim, nlist, centroids, codes, ids, nprobe, topk, tmp_dis, tmp_lab, Dis_Computer);
-        ivf_flat_search<Dis_Compare, CODE_T, DIS_T>(
-            nq, xq, dim, nlist, centroids, codes, ids, nprobe, topk, global_dis, global_lab, Dis_Computer);
+  long min_time = std::numeric_limits<long>::max();
+  while (iter--) {
+    gettimeofday(&t1, 0);
+    // ivf_flat_search<Dis_Compare, CODE_T, DIS_T>(
+    //     nq, xq, dim, nlist, centroids, codes, ids, nprobe, topk, tmp_dis,
+    //     tmp_lab, Dis_Computer);
+    ivf_flat_search<Dis_Compare, CODE_T, DIS_T>(
+        nq, xq, dim, nlist, centroids, codes, ids, nprobe, topk, global_dis,
+        global_lab, Dis_Computer);
 
-        gettimeofday(&t2, 0);
-        min_time = std::min(min_time, getTime(t2,t1));
-    }
+    gettimeofday(&t2, 0);
+    min_time = std::min(min_time, getTime(t2, t1));
+  }
 
-    printf("min query cost %ld ms\n", min_time);
+  printf("min query cost %ld ms\n", min_time);
 }
 
-void save_answer(const std::string answer_bin_file, DIS_T* answer_dists, uint32_t* answer_ids) {
-    std::ofstream answer_writer(answer_bin_file, std::ios::binary);
-    answer_writer.write((char*)&nq, sizeof(uint32_t));
-    answer_writer.write((char*)&topk, sizeof(uint32_t));
+void save_answer(const std::string answer_bin_file, DIS_T *answer_dists,
+                 uint32_t *answer_ids) {
+  std::ofstream answer_writer(answer_bin_file, std::ios::binary);
+  answer_writer.write((char *)&nq, sizeof(uint32_t));
+  answer_writer.write((char *)&topk, sizeof(uint32_t));
 
-    // for (int i = 0; i < nq; i ++) {
-    //     auto ans_disi = answer_dists + topk * i;
-    //     auto ans_idsi = answer_ids + topk * i;
-    //     heap_reorder<Dis_Compare>(topk, ans_disi, ans_idsi);
-    // }
+  // for (int i = 0; i < nq; i ++) {
+  //     auto ans_disi = answer_dists + topk * i;
+  //     auto ans_idsi = answer_ids + topk * i;
+  //     heap_reorder<Dis_Compare>(topk, ans_disi, ans_idsi);
+  // }
 
-    uint32_t tot = nq * topk;
-    answer_writer.write((char*)answer_ids, tot * sizeof(uint32_t));
-    answer_writer.write((char*)answer_dists, tot * sizeof(DIS_T));
+  uint32_t tot = nq * topk;
+  answer_writer.write((char *)answer_ids, tot * sizeof(uint32_t));
+  answer_writer.write((char *)answer_dists, tot * sizeof(DIS_T));
 
-    answer_writer.close();
+  answer_writer.close();
 }
 
 int main() {
-    // init heap
-    heap_heapify<Dis_Compare>(Query_Batch * topk, global_dis, global_lab);
+  // init heap
+  heap_heapify<Dis_Compare>(Query_Batch * topk, global_dis, global_lab);
 
-    get_bin_metadata(Query_Path, nq, dim);
-    read_bin_file(Query_Path, xq, nq, dim);
-    nq = Query_Batch;
+  get_bin_metadata(Query_Path, nq, dim);
+  read_bin_file(Query_Path, xq, nq, dim);
+  nq = Query_Batch;
 
-    // for each learn
-    read_bin_file(Learn_Path, xb, nb, dim);
-    nb = Base_Batch;
+  // for each learn
+  read_bin_file(Learn_Path, xb, nb, dim);
+  nb = Base_Batch;
 
 #if 0
     Flat(0, nb);
@@ -165,23 +169,23 @@ int main() {
     answer_writer.write((char*)tmp_gt_dis, tot * sizeof(float));
     answer_writer.close();
 #else
-    IVF_Train(nb);
-    codes.clear();
-    ids.clear();
-    IVF_Insert(nb);
-    IVF_Search(nb);
+  IVF_Train(nb);
+  codes.clear();
+  ids.clear();
+  IVF_Insert(nb);
+  IVF_Search(nb);
 
-    save_answer("ivf_answer.bin", global_dis, global_lab);
+  save_answer("ivf_answer.bin", global_dis, global_lab);
 #endif
 
+  // for (auto i = 0; i < nq; ++i) {
+  //     for (auto j = 0; j < topk; ++j) {
+  //         std::cout << global_dis[i*topk+j] << " " << global_lab[i*topk+j] <<
+  //         std::endl;
+  //     }
+  // }
 
-    // for (auto i = 0; i < nq; ++i) {
-    //     for (auto j = 0; j < topk; ++j) {
-    //         std::cout << global_dis[i*topk+j] << " " << global_lab[i*topk+j] << std::endl;
-    //     }
-    // }
-
-    recall<DIS_T, uint32_t>("flat_gt.bin", "ivf_answer.bin", METRIC);
+  recall<DIS_T, uint32_t>("flat_gt.bin", "ivf_answer.bin", METRIC);
 
 #if 0
     // hnsw
@@ -233,13 +237,13 @@ int main() {
     }
 #endif
 
-    delete []global_dis;
-    delete []global_lab;
-    delete []tmp_dis;
-    delete []tmp_lab;
+  delete[] global_dis;
+  delete[] global_lab;
+  delete[] tmp_dis;
+  delete[] tmp_lab;
 
-    delete []xb;
-    delete []xq;
+  delete[] xb;
+  delete[] xq;
 
-    return 0;
+  return 0;
 }
