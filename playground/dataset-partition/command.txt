@@ -1,2 +1,0 @@
-python3 build_index.py --partition_type kmeans --dataset_name sift10K --n_cluster 16
-python3 build_index.py --partition_type graph_partition --dataset_name sift10K --n_cluster 16

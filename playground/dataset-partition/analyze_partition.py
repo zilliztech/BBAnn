@@ -150,41 +150,36 @@ if __name__ == '__main__':
     print("The n_cluster: ", args.n_cluster)
     print("The data_set_path: ", args.data_set_path)
     print("The result_path: ", args.result_path)
+    kahip_dir = args.kahip_dir # Set the global variable
     print("The kahip_dir: ", args.kahip_dir)
     print("The query_file_path: ", args.query_file_path)
-
-# TODO: replace varibla with args.varaible
-
-    # basic_dir = '/home/zhengbian/nips-competition/data/%s' % args.dataset_name
-    data_set_path = args.data_set_path
-    print('The entered data_set_path: ', data_set_path)
-    # basic_dir = data_set_path + args.dataset_name
-
-    # save_basic_dir = '/home/zhengbian/nips-competition/dataset-partition/result/%s' % file_name
-    result_path = args.result_path
-    print('The entered result_path: ', result_path)
 
     file_name = '%s-%s' % (args.dataset_name, args.partition_type)
     if args.partition_type == 'kmeans':
         pass
     elif args.partition_type == 'graph_partition':
         file_name = '%s-%s-knn-k_%d' % (args.dataset_name, args.partition_type, graph_knn_k)
-    save_basic_dir = result_path + file_name
+    save_basic_dir = args.result_path + file_name
     print('The save_basic_dir: ', save_basic_dir)
     delete_dir_if_exist(save_basic_dir)
     os.mkdir(save_basic_dir)
 
-    kahip_dir = args.kahip_dir
-    print('The kahip_dir: ', kahip_dir)
-
     # base, num_base, dim = bin_io.bbin_read("%s/base.bbin" % basic_dir)
-    base_vector, num_vector, dim = bin_io.bbin_read(data_set_path)
+    base_vector, num_vector, dim = bin_io.bbin_read(args.data_set_path)
     print("base_vector's num_vector: ", num_vector)
     print("base_vector's DIM: ", dim)
     print("base_vector's .shape[1]: ", base_vector.shape[1])
 
     para_result = {}
     partition_method = partition_factory(args.partition_type)
+
+    # Build a FLAT index on base vector as float
+    print("Start building FAISS index as the GROUNG TRUTH.")
+    base_vector_dim = base_vector.shape[1]
+    index = faiss.IndexFlatL2(base_vector_dim)
+    tmp_vector_base = base_vector.astype(np.float32)
+    index.add(tmp_vector_base)
+    print("Building FAISS index is a success.")
 
     print("Start building index.")
     start_time = time.time()
@@ -204,22 +199,15 @@ if __name__ == '__main__':
     print("avg: ", statistics.mean(n_point_cluster_l))
     print("median: ", statistics.median(n_point_cluster_l))
     plt.hist(n_point_cluster_l)
-    plt.title('histogram_' + args.partition_type + "_" + args.dataset_name)
+    plt.title('histogram_' + args.partition_type + "_" + args.dataset_name + "_numCluster_" + args.n_cluster)
     plt.xlabel('number of vector in a cluster: VALUE RANGE as a BIN')
     plt.ylabel('number of clusters in each bin')
-    plt.savefig(result_path + 'histogram_' + args.partition_type + "_" + args.dataset_name + '.png')
+    plt.savefig(args.result_path + 'histogram_' + args.partition_type + "_" + args.dataset_name + '.png')
 
-    with open('%s/cluster2item.json' % save_basic_dir, 'w') as f:
-        json.dump(label_map_l, f)
     with open('%s/index_para_result.json' % save_basic_dir, 'w') as f:
         json.dump(para_result, f)
-    np.save('%s/centroids.npy' % save_basic_dir, centroids)
-    print("Saving index is a success")
 
-
-    # TODO: move query.py here
-
-    # TODO: read query file
+    # START TO QUERY
     query, num_query, query_dim = bin_io.bbin_read(args.query_file_path)
     print("query_vector's num_query: ", num_query)
     print("query_vector's DIM: ", query_dim)
@@ -228,14 +216,6 @@ if __name__ == '__main__':
     print("top_k: ", top_k)
     num_vector_per_page = 93 # FIX VALUE WITH 93
     print("num_vector_per_page: ", num_vector_per_page)
-
-    # Build a FLAT index on base vector as float
-    print("DEBUG dim: ", dim)
-    base_vector_dim = base_vector.shape[1]
-    print("DEBUG dim: ", base_vector_dim)
-    index = faiss.IndexFlatL2(base_vector_dim) # TODO: debuggy
-    tmp_vector_base = base_vector.astype(np.float32)
-    index.add(tmp_vector_base)
 
     # Search each query in this FLAT index to get the Ground-Truth
     total_item_l = np.zeros(shape = args.n_cluster)   # number of hits in each cluster
@@ -267,7 +247,6 @@ if __name__ == '__main__':
             tmp_item_l.append(tmp_set_len)
             tmp_page_number += int((len(label_map_l[tmp_idx]) + num_vector_per_page - 1)  / num_vector_per_page)
             tmp_page_l.append(tmp_page_number)
-        print(i) # TODO: what is this??? delete this line
 
         total_item_l += np.array(tmp_item_l)
         total_page_l += np.array(tmp_page_l)
