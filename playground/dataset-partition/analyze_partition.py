@@ -199,7 +199,7 @@ if __name__ == '__main__':
     print("avg: ", statistics.mean(n_point_cluster_l))
     print("median: ", statistics.median(n_point_cluster_l))
     plt.hist(n_point_cluster_l)
-    plt.title('histogram_' + args.partition_type + "_" + args.dataset_name + "_numCluster_" + args.n_cluster)
+    plt.title('histogram_' + args.partition_type + "_" + args.dataset_name + "_numCluster_" + str(args.n_cluster))
     plt.xlabel('number of vector in a cluster: VALUE RANGE as a BIN')
     plt.ylabel('number of clusters in each bin')
     plt.savefig(args.result_path + 'histogram_' + args.partition_type + "_" + args.dataset_name + '.png')
