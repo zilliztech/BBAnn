@@ -221,8 +221,13 @@ if __name__ == '__main__':
 
     # TODO: read query file
     query, num_query, query_dim = bin_io.bbin_read(args.query_file_path)
+    print("query_vector's num_query: ", num_query)
+    print("query_vector's DIM: ", query_dim)
+    print("query_vector's .shape[1]: ", query.shape[1])
     top_k = 10
+    print("top_k: ", top_k)
     num_vector_per_page = 93 # FIX VALUE WITH 93
+    print("num_vector_per_page: ", num_vector_per_page)
 
     # Build a FLAT index on base vector as float
     index = faiss.IndexFlatL2(dim) # TODO: debuggy
