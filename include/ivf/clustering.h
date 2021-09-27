@@ -362,7 +362,6 @@ void kmeans (int64_t nx, const T* x_in, int64_t dim, int64_t k, float* centroids
     }
 
     std::unique_ptr<int64_t []> hassign(new int64_t[k]);
-    std::unique_ptr<float []> sum(new float[k * dim]);
 
     std::unique_ptr<int64_t []> assign(new int64_t[nx]);
     std::unique_ptr<float []> dis(new float[nx]);
@@ -372,14 +371,12 @@ void kmeans (int64_t nx, const T* x_in, int64_t dim, int64_t k, float* centroids
     } else {
         rand_perm(assign.get(), nx, k, seed);
         for (int64_t i = 0; i < k; i++) {
-           // std::cout<<i<<assign[i]<<std::endl;
             const T* x = x_in + assign[i] * dim;
 
             float* c = centroids + i * dim;
 
             for (int64_t d = 0; d < dim; d++){
                 c[d] = x[d];
-
             }
         }
     }
