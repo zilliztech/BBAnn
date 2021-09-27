@@ -159,7 +159,7 @@ if __name__ == '__main__':
         pass
     elif args.partition_type == 'graph_partition':
         file_name = '%s-%s-knn-k_%d' % (args.dataset_name, args.partition_type, graph_knn_k)
-    save_basic_dir = args.result_path + file_name
+    save_basic_dir = args.result_path + "-" + file_name
     print('The save_basic_dir: ', save_basic_dir)
     delete_dir_if_exist(save_basic_dir)
     os.mkdir(save_basic_dir)
