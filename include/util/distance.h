@@ -30,7 +30,7 @@ R L2sqr(T1 *a, T2 *b, size_t n) {
 
 
 template<>
-float L2sqr<float, float, float>(float *a, float *b, size_t n) {
+inline float L2sqr<float, float, float>(float *a, float *b, size_t n) {
     __m256 msum1 = _mm256_setzero_ps();
 
     while (n >= 8) {
@@ -73,7 +73,7 @@ float L2sqr<float, float, float>(float *a, float *b, size_t n) {
 
 
 template<>
-int L2sqr<uint8_t, uint8_t, int>(uint8_t *a, uint8_t *b, size_t n) {
+inline int L2sqr<uint8_t, uint8_t, int>(uint8_t *a, uint8_t *b, size_t n) {
     __m256i msum1 = _mm256_setzero_si256();
 
     while (n >= 16) {
@@ -120,7 +120,7 @@ int L2sqr<uint8_t, uint8_t, int>(uint8_t *a, uint8_t *b, size_t n) {
 }
 
 template<>
-int L2sqr<int8_t, int8_t, int>(int8_t *a, int8_t *b, size_t n) {
+inline int L2sqr<int8_t, int8_t, int>(int8_t *a, int8_t *b, size_t n) {
     __m256i msum1 = _mm256_setzero_si256();
 
     while (n >= 16) {
@@ -169,7 +169,7 @@ int L2sqr<int8_t, int8_t, int>(int8_t *a, int8_t *b, size_t n) {
 }
 
 template<>
-float L2sqr<int8_t, float, float>(int8_t *a, float *b, size_t n) {
+inline float L2sqr<int8_t, float, float>(int8_t *a, float *b, size_t n) {
     float afloatbuffer[256];
     for (int i=0; i< n; i++) {
         afloatbuffer[i] = (float) a[i];
@@ -178,7 +178,7 @@ float L2sqr<int8_t, float, float>(int8_t *a, float *b, size_t n) {
 }
 
 template<>
-float L2sqr<uint8_t, float, float>(uint8_t *a, float *b, size_t n) {
+inline float L2sqr<uint8_t, float, float>(uint8_t *a, float *b, size_t n) {
     float afloatbuffer[256];
     for (int i=0; i< n; i++) {
         afloatbuffer[i] = (float) a[i];
@@ -207,7 +207,7 @@ R IP(T1 *a, T2 *b, size_t n) {
 }
 
 template<typename T1, typename T2, typename R>
-void compute_residual(T1* x, T2* c, R* res, size_t d) {
+inline void compute_residual(T1* x, T2* c, R* res, size_t d) {
     size_t i = 0;
     switch(d & 7) {
         default:
@@ -225,7 +225,7 @@ void compute_residual(T1* x, T2* c, R* res, size_t d) {
 }
 
 template<>
-float IP<float, float, float>(float* a, float* b, size_t n) {
+inline float IP<float, float, float>(float* a, float* b, size_t n) {
     __m256 msum1 = _mm256_setzero_ps();
 
     while (n >= 8) {
@@ -271,7 +271,7 @@ float IP<float, float, float>(float* a, float* b, size_t n) {
 // n: sub_dim;
 // m: the number of centroids, m is divisible by 32.
 template<typename T1>
-void compute_lookuptable_IP(T1* a, float* b, float* c, size_t n, size_t m) {
+inline void compute_lookuptable_IP(T1* a, float* b, float* c, size_t n, size_t m) {
     float* a_buffer = new float[n];
     for (int i=0; i<n; i++) {
         a_buffer[i] = (float) a[i];
@@ -283,7 +283,7 @@ void compute_lookuptable_IP(T1* a, float* b, float* c, size_t n, size_t m) {
 }
 
 template<>
-void compute_lookuptable_IP<float>(float* a, float* b, float* c, size_t n, size_t m) {
+inline void compute_lookuptable_IP<float>(float* a, float* b, float* c, size_t n, size_t m) {
 
     size_t offest = 0;
     __m256 msum1, msum2, msum3, msum4;
@@ -325,7 +325,7 @@ void compute_lookuptable_IP<float>(float* a, float* b, float* c, size_t n, size_
 }
 
 template<typename T1>
-void compute_lookuptable_L2(T1* a, float* b, float* c, size_t n, size_t m) {
+inline void compute_lookuptable_L2(T1* a, float* b, float* c, size_t n, size_t m) {
     float* a_buffer = new float[n];
     for (int i=0; i<n; i++) {
         a_buffer[i] = (float) a[i];
@@ -338,7 +338,7 @@ void compute_lookuptable_L2(T1* a, float* b, float* c, size_t n, size_t m) {
 
 
 template<>
-void compute_lookuptable_L2<float>(float* a, float* b, float* c, size_t n, size_t m) {
+inline void compute_lookuptable_L2<float>(float* a, float* b, float* c, size_t n, size_t m) {
 
     size_t offest = 0;
     __m256 msum1, msum2, msum3, msum4;
@@ -385,7 +385,7 @@ void compute_lookuptable_L2<float>(float* a, float* b, float* c, size_t n, size_
     return ;
 }
 
-void matrix_transpose(const float* src, float* des, int64_t row, int64_t col) {
+inline void matrix_transpose(const float* src, float* des, int64_t row, int64_t col) {
     assert(src != nullptr);
     assert(des != nullptr);
 
