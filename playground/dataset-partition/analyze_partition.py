@@ -188,11 +188,16 @@ if __name__ == '__main__':
     end_time = time.time()
     para_result['build_index_time'] = end_time - start_time
     para_result['cluster_len'] = n_point_cluster_l
+    print('build_index_time', end_time - start_time)
+    print('cluster_len', n_point_cluster_l)
     print("Building index is a success.")
 
     # Statistics of distribution of elements in clusters.
-    # TODO: add to JSON
-    print(n_point_cluster_l)
+    para_result['max'] = max(n_point_cluster_l)
+    para_result['min'] = min(n_point_cluster_l)
+    para_result['SUM'] = sum(n_point_cluster_l)
+    para_result['avg'] = statistics.mean(n_point_cluster_l)
+    para_result['median'] = statistics.median(n_point_cluster_l)
     print("max: ", max(n_point_cluster_l))
     print("min: ", min(n_point_cluster_l))
     print("SUM (should be the same of the number of vector in base file): ", sum(n_point_cluster_l))
