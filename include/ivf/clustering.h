@@ -553,7 +553,7 @@ void recursive_kmeans(uint32_t k1_id, uint32_t cluster_size, T* data, uint32_t* 
     std::vector<float> bucket_pre_size(k2 + 1, 0);
 
     if(cluster_size <= SAME_SIZE_THRESHOLD) {
-
+        //use same size kmeans or graph partition 
         same_size_kmeans (cluster_size, data, dim, k2, k2_centroids, cluster_id.data(), dists.data(), kmpp, avg_len, niter, seed);
 
     } else {
