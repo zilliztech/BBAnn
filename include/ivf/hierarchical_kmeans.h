@@ -4,6 +4,10 @@
 #include "ivf/balanced_kmeans.h"
 #include "ivf/same_size_kmeans.h"
 
+#include <mutex>
+
+std::mutex mutex;
+
 template <typename T>
 void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* ids, int64_t dim, uint32_t threshold, const uint64_t blk_size,
                       uint32_t& blk_num, IOWriter& data_writer, IOWriter& centroids_writer, IOWriter& centroids_id_writer,
@@ -69,30 +73,28 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
     delete [] x_temp;
     delete [] ids_temp;
 
-    int64_t bucket_size;
-    int64_t bucket_offest;
+    int64_t bucket_size[k2];
+    int64_t bucket_offest[k2];
     int entry_size = vector_size + id_size;
     uint32_t global_id;
 
     char* data_blk_buf = new char[blk_size];
-    for(int i=0; i < k2; i++) {
-        if (i == 0) {
-            bucket_size = bucket_pre_size[i];
-            bucket_offest = 0;
-        } else {
-            bucket_size = bucket_pre_size[i] - bucket_pre_size[i - 1];
-            bucket_offest = bucket_pre_size[i - 1];
-        }
-        // std::cout<<"after kmeans : centroids i"<<i<<" has vectors "<<(int)bucket_size<<std::endl;
-        if (bucket_size <= threshold) {
-            //write a blk to file
+    bucket_size[0] = bucket_pre_size[0];
+    bucket_offest[0] = 0;
+    for(int64_t i = 1; i < k2; ++i) {
+        bucket_size[i] = bucket_pre_size[i] - bucket_pre_size[i - 1];
+        bucket_offest[i] = bucket_pre_size[i - 1];
+
+        if (bucket_size[i] <= threshold) {
+            std::lock_guard<std::mutex> lock(mutex);
+
             memset(data_blk_buf, 0, blk_size);
-            *reinterpret_cast<uint32_t*>(data_blk_buf) = bucket_size;
+            *reinterpret_cast<uint32_t*>(data_blk_buf) = bucket_size[i];
             char* beg_address = data_blk_buf + sizeof(uint32_t);
 
-            for (int j = 0; j < bucket_size; j++) {
-                memcpy(beg_address + j * entry_size, data + dim * (bucket_offest + j), vector_size);
-                memcpy(beg_address + j * entry_size + vector_size, ids + bucket_offest + j, id_size);
+            for (int j = 0; j < bucket_size[i]; j++) {
+                memcpy(beg_address + j * entry_size, data + dim * (bucket_offest[i] + j), vector_size);
+                memcpy(beg_address + j * entry_size + vector_size, ids + bucket_offest[i] + j, id_size);
             }
             global_id = gen_global_block_id(k1_id, blk_num);
 
@@ -100,13 +102,26 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
             centroids_writer.write((char *) (k2_centroids + i * dim), sizeof(float) * dim);
             centroids_id_writer.write((char *) (&global_id), sizeof(uint32_t));
             blk_num++;
-
-        } else {
-            recursive_kmeans(k1_id, (uint32_t)bucket_size, data + bucket_offest * dim, ids + bucket_offest, dim, threshold, blk_size,
-                             blk_num, data_writer, centroids_writer, centroids_id_writer, kmpp, avg_len, niter, seed);
         }
     }
     delete [] data_blk_buf;
+
+#pragma omp parallel for
+    for(int64_t i = 1; i < k2; ++i) {
+        if (threshold < bucket_size[i] <= SAME_SIZE_THRESHOLD) {
+            recursive_kmeans(k1_id, (uint32_t)bucket_size[i], data + bucket_offest[i] * dim, ids + bucket_offest[i], dim, threshold, blk_size,
+                             blk_num, data_writer, centroids_writer, centroids_id_writer, kmpp, avg_len, niter, seed);
+        }
+    }
+
+    for(int64_t i = 0; i < k2; ++i) {
+        // std::cout<<"after kmeans : centroids i"<<i<<" has vectors "<<(int)bucket_size<<std::endl;
+        if (bucket_size[i] > SAME_SIZE_THRESHOLD) {
+            recursive_kmeans(k1_id, (uint32_t)bucket_size[i], data + bucket_offest[i] * dim, ids + bucket_offest[i], dim, threshold, blk_size,
+                             blk_num, data_writer, centroids_writer, centroids_id_writer, kmpp, avg_len, niter, seed);
+        }
+    }
+
     delete [] k2_centroids;
 
 }

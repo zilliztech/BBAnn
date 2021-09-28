@@ -17,7 +17,7 @@
 template <typename T>
 void ssk_compute_dist_tab(int64_t nx, const T *x_in, int64_t dim, int64_t k,
                           const float *centroids, float *dis_tab) {
-#pragma omp parallel for
+// #pragma omp parallel for
   for (int64_t i = 0; i < nx; ++i) {
     const T *x = x_in + i * dim;
     const int64_t ii = i * k;
