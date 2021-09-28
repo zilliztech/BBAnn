@@ -24,6 +24,7 @@ constexpr static int MAX_CLUSTER_K2 = 500;
 
 constexpr static int KMEANS_THRESHOLD = 2000;
 
+constexpr static int SAME_SIZE_THRESHOLD = 5000;
 
 
 // file prefix strings and suffix strings

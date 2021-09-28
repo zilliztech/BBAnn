@@ -521,6 +521,14 @@ void balance_kmeans (int64_t nx, const T* x_in, int64_t dim, int64_t k, float* c
               << std::endl;
 }
 
+template <typename T, typename R>
+void same_size_kmeans (int64_t nx, const T* x_in, int64_t dim, int64_t k, float* centroids,
+             int64_t* assign, R* dists, bool kmpp = false, float avg_len = 0.0, int64_t niter = 10,
+             int64_t seed = 1234) {
+
+
+}
+
 
 template <typename T>
 void recursive_kmeans(uint32_t k1_id, uint32_t cluster_size, T* data, uint32_t* ids, int64_t dim, uint32_t threshold, const uint64_t blk_size,
@@ -531,7 +539,7 @@ void recursive_kmeans(uint32_t k1_id, uint32_t cluster_size, T* data, uint32_t* 
     int vector_size = sizeof(T) * dim;
     int id_size = sizeof(uint32_t);
     int k2;
-    if ( weight!=0 && cluster_size < KMEANS_THRESHOLD) {
+    if ( weight!=0 && cluster_size > SAME_SIZE_THRESHOLD) {
         k2 = int(sqrt(cluster_size/threshold)) + 1;
     } else {
         k2 = int(cluster_size/threshold) + 1;
@@ -540,16 +548,26 @@ void recursive_kmeans(uint32_t k1_id, uint32_t cluster_size, T* data, uint32_t* 
     k2 = k2 < MAX_CLUSTER_K2 ? k2 : MAX_CLUSTER_K2;
     float* k2_centroids = new float[k2 * dim];
 
-    kmeans<T>(cluster_size, data, dim, k2, k2_centroids, kmpp, avg_len, niter, seed);
-    // Dynamic balance constraint K-means:
-    //balance_kmeans<T>(cluster_size, data, dim, k2, k2_centroids, weight, kmpp, avg_len, niter, seed);
     std::vector<int64_t> cluster_id(cluster_size, -1);
     std::vector<float> dists(cluster_size, -1);
     std::vector<float> bucket_pre_size(k2 + 1, 0);
-    if( weight!=0 && cluster_size <= KMEANS_THRESHOLD ) {
-        dynamic_assign<T, float, float>(data, k2_centroids, dim, cluster_size, k2, weight, cluster_id.data(), dists.data());
+
+    if(cluster_size <= SAME_SIZE_THRESHOLD) {
+
+        same_size_kmeans (cluster_size, data, dim, k2, k2_centroids, cluster_id.data(), dists.data(), kmpp, avg_len, niter, seed);
+
     } else {
-        elkan_L2_assign<T, float, float>(data, k2_centroids, dim, cluster_size, k2, cluster_id.data(), dists.data());
+
+        kmeans<T>(cluster_size, data, dim, k2, k2_centroids, kmpp, avg_len, niter, seed);
+        // Dynamic balance constraint K-means:
+        //balance_kmeans<T>(cluster_size, data, dim, k2, k2_centroids, weight, kmpp, avg_len, niter, seed);
+
+        if( weight!=0 && cluster_size <= KMEANS_THRESHOLD ) {
+            dynamic_assign<T, float, float>(data, k2_centroids, dim, cluster_size, k2, weight, cluster_id.data(), dists.data());
+        } else {
+            elkan_L2_assign<T, float, float>(data, k2_centroids, dim, cluster_size, k2, cluster_id.data(), dists.data());
+        }
+
     }
 
     split_clusters_half(dim, k2, cluster_size, data, nullptr, cluster_id.data(), k2_centroids, avg_len);
