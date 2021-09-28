@@ -90,24 +90,25 @@ template <typename dataT> struct BBAnnIndex {
 
     distanceT *answer_dists = new distanceT[(int64_t)numQuery * knn];
     uint32_t *answer_ids = new uint32_t[(int64_t)numQuery * knn];
-    uint32_t *bucket_labels =
-        new uint32_t[(int64_t)numQuery * para.nProbe]; // 400K * nprobe
-
+    
     switch (para.metric) {
     case MetricType::L2: {
       Computer<dataT, dataT, distanceT> dis_computer =
           L2sqr<constDataT, constDataT, distanceT>;
+      /* 
       for (int i = 1; i < numQuery; i *= 2) {
         for (int j = 0; j < dim; j++)
           std::cout << pquery[i * dim + j] << " ";
         std::cout << std::endl;
       }
+      */
+    /*
       search_bbann_queryonly<dataT, distanceT, CMax<distanceT, uint32_t>>(
           indexPrefix_, para.nProbe, para.hnswefC, knn, index_hnsw_, para.K1,
           para.blockSize, dis_computer, 
           pquery, answer_ids, 
           answer_dists, numQuery, dim);
-
+      */
       break;
     }
     default:
