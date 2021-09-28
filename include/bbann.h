@@ -10,7 +10,7 @@
 #include "hnswlib/hnswlib.h"
 #include "util/statistics.h"
 #include "util/heap.h"
-#include "ivf/clustering.h"
+#include "ivf/hierarchical_kmeans.h"
 #include "util/TimeRecorder.h"
 #include "flat/flat.h"
 

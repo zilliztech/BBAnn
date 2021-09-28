@@ -5,7 +5,7 @@
 #include "flat/flat.h"
 #include "util/read_file.h"
 #include "util/merge.h"
-#include "ivf/clustering.h"
+#include "ivf/kmeans.h"
 #include "ivf/ivf_flat.h"
 
 #include <sys/time.h>

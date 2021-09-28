@@ -8,7 +8,7 @@
 #include <random>
 #include <unistd.h>
 #include <stdio.h>
-#include "ivf/clustering.h"
+#include "ivf/hierarchical_kmeans.h"
 #include "util/file_handler.h"
 using namespace std;
 int64_t blk_size = 12*1024;
