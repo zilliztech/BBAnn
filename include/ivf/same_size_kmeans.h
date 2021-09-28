@@ -2,15 +2,15 @@
 
 #include <omp.h>
 
-#include <algorithm>
-#include <string.h>
-#include <assert.h>
-#include <memory>
-#include <unistd.h>
 #include "util/distance.h"
-#include "util/utils.h"
 #include "util/random.h"
+#include "util/utils.h"
+#include <algorithm>
+#include <assert.h>
 #include <deque>
+#include <memory>
+#include <string.h>
+#include <unistd.h>
 
 // #define SSK_LOG
 
@@ -102,7 +102,8 @@ void ssk_print_cluster_size_stats(int64_t k, const int64_t *hassign) {
 template <typename T>
 void same_size_kmeans(int64_t nx, const T *x_in, int64_t dim, int64_t k,
                       float *centroids, int64_t *assign, bool kmpp = false,
-                      int64_t niter = 10, int64_t seed = 1234) {
+                      float avg_len = 0.0, int64_t niter = 10,
+                      int64_t seed = 1234) {
   assert(x_in != nullptr);
   assert(centroids != nullptr);
   assert(assign != nullptr);
@@ -169,7 +170,7 @@ void same_size_kmeans(int64_t nx, const T *x_in, int64_t dim, int64_t k,
     return dis_tab[x * k + assign[x]] - dis_tab[x * k + i];
   };
 
-  compute_centroids(dim, k, nx, x_in, assign, hassign, centroids);
+  compute_centroids(dim, k, nx, x_in, assign, hassign, centroids, avg_len);
 
   std::vector<std::deque<int64_t>> transfer_lists(k);
   float err = std::numeric_limits<float>::max();
@@ -263,7 +264,7 @@ void same_size_kmeans(int64_t nx, const T *x_in, int64_t dim, int64_t k,
       break;
     }
 
-    compute_centroids(dim, k, nx, x_in, assign, hassign, centroids);
+    compute_centroids(dim, k, nx, x_in, assign, hassign, centroids, avg_len);
   }
 
   ssk_print_cluster_size_stats(k, hassign);
