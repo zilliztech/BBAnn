@@ -28,7 +28,7 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
 
     if(cluster_size <= SAME_SIZE_THRESHOLD) {
         //use same size kmeans or graph partition 
-        same_size_kmeans<T>(cluster_size, data, dim, k2, k2_centroids, cluster_id.data(), kmpp, niter, seed);
+        same_size_kmeans<T>(cluster_size, data, dim, k2, k2_centroids, cluster_id.data(), kmpp, avg_len, niter, seed);
     } else {
 
         kmeans<T>(cluster_size, data, dim, k2, k2_centroids, kmpp, avg_len, niter, seed);
