@@ -14,6 +14,14 @@ $ sudo ./install.sh
 
 ## Get Started
 
+To compile the debug mode, run
+```shell
+$ mkdir -p debug
+$ cd debug
+$ cmake ..
+$ make -j
+```
+
 To compile the release mode, run
 ```shell
 $ mkdir -p release
