@@ -74,7 +74,6 @@ template <typename dataT> struct BBAnnIndex {
     std::cout << "Query: ";
 
     using distanceT = typename TypeWrapper<dataT>::distanceT;
-    using constDataT = typename TypeWrapper<dataT>::constDataT;
     py::array_t<unsigned> ids({numQuery, knn});
     py::array_t<float> dists({numQuery, knn});
     const dataT *pquery = query.data();
