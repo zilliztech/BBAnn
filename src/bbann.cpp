@@ -513,7 +513,7 @@ void gather_vec_searched_per_query(const std::string index_path,
 }
 
 template <typename DATAT, typename DISTT, typename HEAPT>
-void search_bbann_exec(
+void search_bbann(
     const std::string &index_path, const std::string &query_bin_file,
     const std::string &answer_bin_file, const int nprobe, const int hnsw_ef,
     const int topk, std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
