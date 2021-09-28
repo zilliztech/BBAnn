@@ -513,12 +513,13 @@ void gather_vec_searched_per_query(const std::string index_path,
 }
 
 template <typename DATAT, typename DISTT, typename HEAPT>
-void search_bbann_exec(
-    const std::string &index_path, const std::string &query_bin_file,
-    const std::string &answer_bin_file, const int nprobe, const int hnsw_ef,
-    const int topk, std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
-    const int K1, const uint64_t block_size,
-    Computer<DATAT, DATAT, DISTT> &dis_computer) {
+void search_bbann(const std::string &index_path,
+                  const std::string &query_bin_file,
+                  const std::string &answer_bin_file, const int nprobe,
+                  const int hnsw_ef, const int topk,
+                  std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                  const int K1, const uint64_t block_size,
+                  Computer<DATAT, DATAT, DISTT> &dis_computer) {
   TimeRecorder rc("search bigann");
 
   std::cout << "search bigann parameters:" << std::endl;
@@ -676,19 +677,6 @@ void search_bbann_exec(
   delete[] answer_dists;
 
   rc.ElapseFromBegin("search bigann totally done");
-}
-
-template <typename DATAT, typename DISTT, typename HEAPT>
-void search_bbann(const std::string &index_path,
-                  const std::string &query_bin_file,
-                  const std::string &answer_bin_file, const int nprobe,
-                  const int hnsw_ef, const int topk,
-                  std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
-                  const int K1, const uint64_t block_size,
-                  Computer<DATAT, DATAT, DISTT> &dis_computer) {
-  search_bbann<DATAT, DISTT, HEAPT>(index_path, query_bin_file, answer_bin_file,
-                                    nprobe, hnsw_ef, topk, index_hnsw, K1,
-                                    block_size, dis_computer);
 }
 
 #define BUILD_BBANN_DECL(DATAT, DISTT, HEAPT)                                  \

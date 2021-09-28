@@ -99,7 +99,7 @@ template <typename dataT> struct BBAnnIndex {
     case MetricType::L2: {
       Computer<dataT, dataT, distanceT> dis_computer =
           L2sqr<constDataT, constDataT, distanceT>;
-      for (int i = 0; i < numQuery; i++) {
+      for (int i = 1; i < numQuery; i*=2) {
         for (int j = 0; j < dim; j++)
           std::cout << pquery[i * dim + j] << " ";
         std::cout << std::endl;
