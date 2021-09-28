@@ -1,7 +1,6 @@
 import time
 import argparse
 import bbannpy
-print ("Here1")
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--type', type=str, default=float,
@@ -19,12 +18,8 @@ parser.add_argument('--page_per_block', type=int, default=1,
                     help='number of pages in a block')
 
 args = parser.parse_args()
-print ("here1")
-start = time.time()
-if 'float' == args.type:
-    print("Building float index")
-    index = bbannpy.FloatIndex(args.metric)
 
+start = time.time()
 para =  bbannpy.BBAnnParameters()
 
 para.metric = bbannpy.Metric.L2
@@ -34,6 +29,11 @@ para.hnswM = args.M
 para.hnswefC = args.efC
 para.K1 = args.K1
 para.blockSize = args.page_per_block * 4096 # pagesize=4096
+
+
+if 'float' == args.type:
+    print("Building float index")
+    index = bbannpy.FloatIndex(para.metric)
 
 index.build(para)
 

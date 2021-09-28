@@ -33,18 +33,9 @@ struct BBAnnParameters {
 };
 
 template <typename T> struct TypeWrapper;
-template <> struct TypeWrapper<float> {
-  using distanceT = float;
-  using constDataT = const float;
-};
-template <> struct TypeWrapper<uint8_t> {
-  using distanceT = uint32_t;
-  using constDataT = const uint8_t;
-};
-template <> struct TypeWrapper<int8_t> {
-  using distanceT = int32_t;
-  using constDataT = const int8_t;
-};
+template <> struct TypeWrapper<float> { using distanceT = float; };
+template <> struct TypeWrapper<uint8_t> { using distanceT = uint32_t; };
+template <> struct TypeWrapper<int8_t> { using distanceT = int32_t; };
 
 template <typename dataT> struct BBAnnIndex {
   BBAnnIndex(MetricType metric) : metric_(metric) {
@@ -86,29 +77,19 @@ template <typename dataT> struct BBAnnIndex {
     using constDataT = typename TypeWrapper<dataT>::constDataT;
     py::array_t<unsigned> ids({numQuery, knn});
     py::array_t<float> dists({numQuery, knn});
-    constDataT *pquery = query.data();
+    const dataT *pquery = query.data();
 
     distanceT *answer_dists = new distanceT[(int64_t)numQuery * knn];
     uint32_t *answer_ids = new uint32_t[(int64_t)numQuery * knn];
-    
+
     switch (para.metric) {
     case MetricType::L2: {
       Computer<dataT, dataT, distanceT> dis_computer =
-          L2sqr<constDataT, constDataT, distanceT>;
-      /* 
-      for (int i = 1; i < numQuery; i *= 2) {
-        for (int j = 0; j < dim; j++)
-          std::cout << pquery[i * dim + j] << " ";
-        std::cout << std::endl;
-      }
-      */
-    /*
+          L2sqr<const dataT, const dataT, distanceT>;
       search_bbann_queryonly<dataT, distanceT, CMax<distanceT, uint32_t>>(
           indexPrefix_, para.nProbe, para.hnswefC, knn, index_hnsw_, para.K1,
-          para.blockSize, dis_computer, 
-          pquery, answer_ids, 
-          answer_dists, numQuery, dim);
-      */
+          para.blockSize, dis_computer, pquery, answer_ids, answer_dists,
+          numQuery, dim);
       break;
     }
     default:
@@ -127,47 +108,45 @@ template <typename dataT> struct BBAnnIndex {
   }
   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw_;
   std::string indexPrefix_;
+
+  static void BuildIndex(const BBAnnParameters para) {
+    std::cout << "Build start " << std::endl;
+    using distanceT = typename TypeWrapper<dataT>::distanceT;
+    switch (para.metric) {
+    case MetricType::L2: {
+      std::cout << "Build With L2" << std::endl;
+      std::cout << "dataT" << typeid(dataT).name() << std::endl;
+      std::cout << "distanceT" << typeid(distanceT).name() << std::endl;
+      build_bbann<dataT, distanceT, CMax<distanceT, uint32_t>>(
+          para.dataFilePath, para.indexPrefixPath, para.hnswM, para.hnswefC,
+          para.metric, para.K1, para.blockSize);
+      return;
+    }
+    case MetricType::IP: {
+      build_bbann<dataT, distanceT, CMin<distanceT, uint32_t>>(
+          para.dataFilePath, para.indexPrefixPath, para.hnswM, para.hnswefC,
+          para.metric, para.K1, para.blockSize);
+      return;
+    }
+    default:
+      std::cerr << "not supported" << std::endl;
+    }
+  }
 };
 
-template <typename dataT> void BuildBBAnnIndex(const BBAnnParameters para) {
-  std::cout << "Build start " << std::endl;
-  using distanceT = typename TypeWrapper<dataT>::distanceT;
-  switch (para.metric) {
-  case MetricType::L2: {
-    std::cout << "Build With L2" << std::endl;
-    std::cout << "dataT" << typeid(dataT).name() << std::endl;
-    std::cout << "distanceT" << typeid(distanceT).name() << std::endl;
-    build_bbann<dataT, distanceT, CMax<distanceT, uint32_t>>(
-        para.dataFilePath, para.indexPrefixPath, para.hnswM, para.hnswefC,
-        para.metric, para.K1, para.blockSize);
-    return;
-  }
-  case MetricType::IP: {
-    build_bbann<dataT, distanceT, CMin<distanceT, uint32_t>>(
-        para.dataFilePath, para.indexPrefixPath, para.hnswM, para.hnswefC,
-        para.metric, para.K1, para.blockSize);
-    return;
-  }
-  default:
-    std::cerr << "not supported" << std::endl;
-  }
-}
-
-template <typename dataT, class StringWrapper>
+template <typename dataT, typename indexT, class StringWrapper>
 void IndexBindWrapper(py::module_ &m) {
-  py::class_<BBAnnIndex<dataT>>(m, StringWrapper::Get())
+  py::class_<indexT>(m, StringWrapper::Get())
       .def(py::init([](MetricType metric) {
-        return std::unique_ptr<BBAnnIndex<dataT>>(
-            new BBAnnIndex<dataT>(metric));
+        return std::unique_ptr<indexT>(new indexT(metric));
       }))
-      .def("LoadIndex", &BBAnnIndex<dataT>::LoadIndex,
-           py::arg("index_path_prefix"))
-      .def("batch_search", &BBAnnIndex<dataT>::BatchSearch, py::arg("query"),
+      .def("LoadIndex", &indexT::LoadIndex, py::arg("index_path_prefix"))
+      .def("batch_search", &indexT::BatchSearch, py::arg("query"),
            py::arg("dim"), py::arg("num_query"), py::arg("knn"),
            py::arg("para"))
       .def("build",
-           [](BBAnnIndex<dataT> &self, BBAnnParameters para) {
-             return BuildBBAnnIndex<dataT>(para);
+           [](indexT &self, BBAnnParameters para) {
+             return indexT::BuildIndex(para);
            },
            py::arg("para"));
 
@@ -241,7 +220,7 @@ PYBIND11_MODULE(bbannpy, m) {
     static const char *ReaderName() { return "read_bin_int8"; }
   };
 
-  IndexBindWrapper<float, FloatWrapper>(m);
-  IndexBindWrapper<uint8_t, UInt8Wrapper>(m);
-  IndexBindWrapper<int8_t, Int8Wrapper>(m);
+  IndexBindWrapper<float, BBAnnIndex<float>, FloatWrapper>(m);
+  IndexBindWrapper<uint8_t, BBAnnIndex<uint8_t>, UInt8Wrapper>(m);
+  IndexBindWrapper<int8_t, BBAnnIndex<int8_t>, Int8Wrapper>(m);
 }
