@@ -513,12 +513,13 @@ void gather_vec_searched_per_query(const std::string index_path,
 }
 
 template <typename DATAT, typename DISTT, typename HEAPT>
-void search_bbann_exec(
-    const std::string &index_path, const std::string &query_bin_file,
-    const std::string &answer_bin_file, const int nprobe, const int hnsw_ef,
-    const int topk, std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
-    const int K1, const uint64_t block_size,
-    Computer<DATAT, DATAT, DISTT> &dis_computer) {
+void search_bbann(const std::string &index_path,
+                  const std::string &query_bin_file,
+                  const std::string &answer_bin_file, const int nprobe,
+                  const int hnsw_ef, const int topk,
+                  std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                  const int K1, const uint64_t block_size,
+                  Computer<DATAT, DATAT, DISTT> &dis_computer) {
   TimeRecorder rc("search bigann");
 
   std::cout << "search bigann parameters:" << std::endl;
@@ -679,17 +680,99 @@ void search_bbann_exec(
 }
 
 template <typename DATAT, typename DISTT, typename HEAPT>
-void search_bbann(const std::string &index_path,
-                  const std::string &query_bin_file,
-                  const std::string &answer_bin_file, const int nprobe,
-                  const int hnsw_ef, const int topk,
-                  std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
-                  const int K1, const uint64_t block_size,
-                  Computer<DATAT, DATAT, DISTT> &dis_computer) {
-  search_bbann<DATAT, DISTT, HEAPT>(index_path, query_bin_file, answer_bin_file,
-                                    nprobe, hnsw_ef, topk, index_hnsw, K1,
-                                    block_size, dis_computer);
+void search_bbann_queryonly(
+    const std::string &index_path, const int nprobe, const int hnsw_ef,
+    const int topk, std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+    const int K1, const uint64_t block_size,
+    Computer<DATAT, DATAT, DISTT> &dis_computer,
+    /* for IO */
+    const DATAT *pquery, uint32_t *answer_ids, DISTT *answer_dists,
+    uint32_t num_query, uint32_t dim) {
+  TimeRecorder rc("search bigann");
+
+  uint32_t *bucket_labels = nullptr;
+
+  uint32_t nq = num_query;
+
+  std::cout << "query numbers: " << nq << " query dims: " << dim << std::endl;
+
+  bucket_labels = new uint32_t[(int64_t)nq * nprobe]; // 400K * nprobe
+
+  // cid -> [bid -> [qid]]
+  std::unordered_map<uint32_t,
+                     std::unordered_map<uint32_t, std::unordered_set<uint32_t>>>
+      mp;
+
+  search_graph<DATAT>(index_hnsw, nq, dim, nprobe, hnsw_ef, pquery,
+                      bucket_labels);
+  // search_flat<DATAT>(index_path, pquery, nq, dq, nprobe, bucket_labels);
+  rc.RecordSection("search buckets done.");
+
+  uint32_t cid, bid;
+  uint32_t gid;
+  const uint32_t vec_size = sizeof(DATAT) * dim;
+  const uint32_t entry_size = vec_size + sizeof(uint32_t);
+  DATAT *vec;
+
+  // init answer heap
+#pragma omp parallel for schedule(static, 128)
+  for (int i = 0; i < nq; i++) {
+    auto ans_disi = answer_dists + topk * i;
+    auto ans_idsi = answer_ids + topk * i;
+    heap_heapify<HEAPT>(topk, ans_disi, ans_idsi);
+  }
+  rc.RecordSection("heapify answers heaps");
+
+  char *buf = new char[block_size];
+
+  /* flat */
+  for (int64_t i = 0; i < nq; ++i) {
+    const auto ii = i * nprobe;
+    const DATAT *q_idx = pquery + i * dim;
+
+    for (int64_t j = 0; j < nprobe; ++j) {
+      parse_global_block_id(bucket_labels[ii + j], cid, bid);
+      std::string cluster_file_path =
+          index_path + CLUSTER + std::to_string(cid) + "-" + RAWDATA + BIN;
+      auto fh = std::ifstream(cluster_file_path, std::ios::binary);
+      assert(!fh.fail());
+
+      fh.seekg(bid * block_size);
+      fh.read(buf, block_size);
+
+      const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
+      char *buf_begin = buf + sizeof(uint32_t);
+
+      for (uint32_t k = 0; k < entry_num; ++k) {
+        char *entry_begin = buf_begin + entry_size * k;
+        vec = reinterpret_cast<DATAT *>(entry_begin);
+        auto dis = dis_computer(vec, q_idx, dim);
+        if (HEAPT::cmp(answer_dists[topk * i], dis)) {
+          heap_swap_top<HEAPT>(
+              topk, answer_dists + topk * i, answer_ids + topk * i, dis,
+              *reinterpret_cast<uint32_t *>(entry_begin + vec_size));
+        }
+      }
+    }
+  }
+
+  // write answers
+  // save_answers<DISTT, HEAPT>(answer_bin_file, topk, nq, answer_dists,
+  //                           answer_ids);
+
+  delete[] buf;
+  delete[] bucket_labels;
 }
+
+#define SEARCH_BBANN_ONLY_DECL(DATAT, DISTT, HEAPT)                            \
+  template void search_bbann_queryonly<DATAT, DISTT, HEAPT<DISTT, uint32_t>>(  \
+      const std::string &index_path, const int nprobe, const int hnsw_ef,      \
+      const int topk,                                                          \
+      std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,             \
+      const int K1, const uint64_t block_size,                                 \
+      Computer<DATAT, DATAT, DISTT> &dis_computer, /* for IO */                \
+      const DATAT *pquery, uint32_t *answer_ids, DISTT *answer_dists,          \
+      uint32_t num_query, uint32_t dim);
 
 #define BUILD_BBANN_DECL(DATAT, DISTT, HEAPT)                                  \
   template void build_bbann<DATAT, DISTT, HEAPT<DISTT, uint32_t>>(             \
@@ -719,3 +802,10 @@ SEARCH_BBANN_DECL(int8_t, int32_t, CMin)
 SEARCH_BBANN_DECL(int8_t, int32_t, CMax)
 SEARCH_BBANN_DECL(float, float, CMin)
 SEARCH_BBANN_DECL(float, float, CMax)
+
+SEARCH_BBANN_ONLY_DECL(uint8_t, uint32_t, CMin)
+SEARCH_BBANN_ONLY_DECL(uint8_t, uint32_t, CMax)
+SEARCH_BBANN_ONLY_DECL(int8_t, int32_t, CMin)
+SEARCH_BBANN_ONLY_DECL(int8_t, int32_t, CMax)
+SEARCH_BBANN_ONLY_DECL(float, float, CMin)
+SEARCH_BBANN_ONLY_DECL(float, float, CMax)
