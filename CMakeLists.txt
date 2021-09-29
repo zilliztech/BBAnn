@@ -51,9 +51,10 @@ add_executable(search_bigann search_bigann.cpp)
 add_executable(build_bbann build_bbann.cpp)
 add_executable(search_bbann search_bbann.cpp)
 
-add_subdirectory(test)
-add_subdirectory(playground)
-add_subdirectory(scripts)
+add_subdirectory(test EXCLUDE_FROM_ALL)
+add_subdirectory(playground EXCLUDE_FROM_ALL)
+add_subdirectory(scripts EXCLUDE_FROM_ALL)
+
 target_link_libraries(build_bigann BigAnn)
 target_link_libraries(search_bigann BigAnn)
 target_link_libraries(build_bbann BBAnn)
