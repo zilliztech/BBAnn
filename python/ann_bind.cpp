@@ -257,6 +257,6 @@ PYBIND11_MODULE(bbannpy, m) {
   };
 
   IndexBindWrapper<BBAnnIndex<float, BBAnnParameters>, FloatWrapper>(m);
-  IndexBindWrapper<uint8_t, BBAnnIndex<uint8_t>, UInt8Wrapper>(m);
-  IndexBindWrapper<int8_t, BBAnnIndex<int8_t>, Int8Wrapper>(m);
+  IndexBindWrapper<BBAnnIndex<uint8_t, BBAnnParameters>, UInt8Wrapper>(m);
+  IndexBindWrapper<BBAnnIndex<int8_t, BBAnnParameters>,Int8Wrapper>(m);
 }
