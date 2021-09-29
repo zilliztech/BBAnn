@@ -37,6 +37,8 @@ void dynamic_assign(
         val[i] = min_value;
         hassign[min]++;
     }
+
+    delete[] hassign;
 }
 
 
