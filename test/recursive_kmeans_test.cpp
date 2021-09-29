@@ -80,7 +80,8 @@ void  hierarchical_clusters() {
         threshold = blk_size / entry_size;
         cout<<"threshold"<<threshold<<endl;
 
-        recursive_kmeans<uint8_t>(i, 10000000, datai, idi, cluster_dim, threshold, blk_size, blk_num, data_writer, centroids_writer, centroids_id_writer, false);
+        std::mutex mutex;
+        recursive_kmeans<uint8_t>(i, 10000000, datai, idi, cluster_dim, threshold, blk_size, blk_num, data_writer, centroids_writer, centroids_id_writer, mutex, false);
 
         global_centroids_number += blk_num;
 

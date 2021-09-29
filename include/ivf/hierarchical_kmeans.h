@@ -6,11 +6,9 @@
 
 #include <mutex>
 
-std::mutex mutex;
-
 template <typename T>
 void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* ids, int64_t dim, uint32_t threshold, const uint64_t blk_size,
-                      uint32_t& blk_num, IOWriter& data_writer, IOWriter& centroids_writer, IOWriter& centroids_id_writer,
+                      uint32_t& blk_num, IOWriter& data_writer, IOWriter& centroids_writer, IOWriter& centroids_id_writer, std::mutex& mutex,
                       bool kmpp = false, float avg_len = 0.0, int64_t niter = 10, int64_t seed = 1234) {
 
     float weight = 0;
@@ -106,19 +104,24 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
     }
     delete [] data_blk_buf;
 
-#pragma omp parallel for
-    for(int64_t i = 1; i < k2; ++i) {
+    std::vector<int64_t> ssk_todos;
+    for(int64_t i = 0; i < k2; ++i) {
         if (threshold < bucket_size[i] <= SAME_SIZE_THRESHOLD) {
-            recursive_kmeans(k1_id, (uint32_t)bucket_size[i], data + bucket_offest[i] * dim, ids + bucket_offest[i], dim, threshold, blk_size,
-                             blk_num, data_writer, centroids_writer, centroids_id_writer, kmpp, avg_len, niter, seed);
+            ssk_todos.push_back(i);
         }
+    }
+#pragma omp parallel for
+    for (int64_t t = 0; t < ssk_todos.size(); ++t) {
+        int64_t i = ssk_todos[t];
+        recursive_kmeans(k1_id, (uint32_t)bucket_size[i], data + bucket_offest[i] * dim, ids + bucket_offest[i], dim, threshold, blk_size,
+                         blk_num, data_writer, centroids_writer, centroids_id_writer, mutex, kmpp, avg_len, niter, seed);
     }
 
     for(int64_t i = 0; i < k2; ++i) {
         // std::cout<<"after kmeans : centroids i"<<i<<" has vectors "<<(int)bucket_size<<std::endl;
         if (bucket_size[i] > SAME_SIZE_THRESHOLD) {
             recursive_kmeans(k1_id, (uint32_t)bucket_size[i], data + bucket_offest[i] * dim, ids + bucket_offest[i], dim, threshold, blk_size,
-                             blk_num, data_writer, centroids_writer, centroids_id_writer, kmpp, avg_len, niter, seed);
+                             blk_num, data_writer, centroids_writer, centroids_id_writer, mutex, kmpp, avg_len, niter, seed);
         }
     }
 
