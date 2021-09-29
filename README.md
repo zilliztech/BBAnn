@@ -32,17 +32,35 @@ $ make -j
 
 ### Current Approach: Block-based index
 
-Build: 
+**Please Build With the Script**: 
 ```
 $ cp scripts/bbann_script/build.sh release/
+$ cp scripts/bbann_script/analyze_stat.py release/
 $ chmod +x release/build.sh
-$ # You have to modify build necessary parameters
+$ # !!!You have to modify build necessary parameters!!!
 $ sudo screen ./release/build.sh
 ```
 
-TODO(jigao): recheck search's script
+**Please Search With the Script**:
+```
+$ cp scripts/bbann_script/search.sh release/
+$ cp scripts/bbann_script/analyze_stat.py release/
+$ chmod +x release/search.sh
+$ # !!!You have to modify search necessary parameters!!!
+$ # !!!You have to make sure the log & answer folder are there!!!
+$ sudo ./release/search.sh
+```
 
-### Build Index
+```
+$ cp scripts/bbann_script/search_full.sh release/
+$ cp scripts/bbann_script/analyze_stat.py release/
+$ chmod +x release/search_full.sh
+$ # !!!You have to modify search necessary parameters!!!
+$ # !!!You have to make sure the log & answer folder are there!!!
+$ sudo ./release/search_full.sh
+```
+
+### Build Index without script
 
 To build, under the `release` directory, run `build_bbann` with the following arguments
 
@@ -62,7 +80,7 @@ $ mkdir -p index_path
 $ ./build_bbann [uint8|int8|float] [data_path] [index_path] [HNSW_M] [HNSW_efConstruction] [IP|L2] [K1] [page_per_block]
 ```
 
-### Search Index
+### Search Index without script
 
 To search, under the `release` directory, run `search_bbann` with the following arguments
 args:
