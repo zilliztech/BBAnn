@@ -1,6 +1,8 @@
 import time
 import argparse
 import bbannpy
+import faulthandler
+faulthandler.enable()
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--type', type=str, default=float,

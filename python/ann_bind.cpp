@@ -18,26 +18,48 @@ PYBIND11_MAKE_OPAQUE(std::vector<uint8_t>);
 
 namespace py = pybind11;
 
-struct BBAnnParameters {
-  std::string dataFilePath;
-  std::string indexPrefixPath;
-  std::string queryPath;
-  std::string groundTruthFilePath;
-  MetricType metric;
-  int K = 20; // top k.
-  int hnswM = 32;
-  int hnswefC = 500;
-  int K1 = 20;
-  int blockSize = 1;
-  int nProbe = 2;
+template <class TClass, typename paraT> class BuildIndexFactory {
+public:
+  static void BuildIndex(const paraT para) { TClass::BuildIndexImpl(para); }
 };
 
+// Interface for Ann index which the base data type of the vector space is
+// dataT, and the index should be accessed via parameters/settings packed in
+// paraT.
+//    dataT should be one of [uint8_t, int8_t, float(32-bit)].
+//    see BBAnnParameters for example paraT.
+template <typename dataT, typename paraT> class AnnIndexInterface {
+public:
+  virtual ~AnnIndexInterface() = default;
+
+  // Load the in-mem part of the index into memory.
+  // Returns true if load success.
+  virtual bool LoadIndex(std::string &indexPathPrefix) = 0;
+
+  // To construct a index with parameters and settings given in *para*,
+  // users shall call <>.BuildIndex().
+  // The class that implements the interface must contain this method:
+  // static void BuildIndexImpl(const paraT para);
+
+  // Conduct a top-k Ann search for items in *query*, which is a numpy array of
+  // dim*numQuery items converted to dataT type.
+  virtual std::pair<py::array_t<unsigned>, py::array_t<float>> /* do batch */
+  BatchSearch(
+      py::array_t<dataT, py::array::c_style | py::array::forcecast> &query,
+      uint64_t dim, uint64_t numQuery, uint64_t knn, const paraT para) = 0;
+};
 template <typename T> struct TypeWrapper;
 template <> struct TypeWrapper<float> { using distanceT = float; };
 template <> struct TypeWrapper<uint8_t> { using distanceT = uint32_t; };
 template <> struct TypeWrapper<int8_t> { using distanceT = int32_t; };
 
-template <typename dataT> struct BBAnnIndex {
+template <typename dataT, typename paraT>
+struct BBAnnIndex : public BuildIndexFactory<BBAnnIndex<dataT, paraT>, paraT>,
+                    public AnnIndexInterface<dataT, paraT> {
+public:
+  using parameterType = paraT;
+  using dataType = dataT;
+
   BBAnnIndex(MetricType metric) : metric_(metric) {
     std::cout << "BBAnnIndex constructor" << std::endl;
   }
@@ -66,15 +88,15 @@ template <typename dataT> struct BBAnnIndex {
     return true;
   }
 
-  auto BatchSearch(
+  std::pair<py::array_t<unsigned>, py::array_t<float>> /* do batch */
+  BatchSearch(
       py::array_t<dataT, py::array::c_style | py::array::forcecast> &query,
       uint64_t dim, uint64_t numQuery, uint64_t knn,
-      const BBAnnParameters para) {
+      const paraT para) override {
 
     std::cout << "Query: ";
 
     using distanceT = typename TypeWrapper<dataT>::distanceT;
-    using constDataT = typename TypeWrapper<dataT>::constDataT;
     py::array_t<unsigned> ids({numQuery, knn});
     py::array_t<float> dists({numQuery, knn});
     const dataT *pquery = query.data();
@@ -109,7 +131,7 @@ template <typename dataT> struct BBAnnIndex {
   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw_;
   std::string indexPrefix_;
 
-  static void BuildIndex(const BBAnnParameters para) {
+  static void BuildIndexImpl(const paraT para) {
     std::cout << "Build start " << std::endl;
     using distanceT = typename TypeWrapper<dataT>::distanceT;
     switch (para.metric) {
@@ -134,9 +156,25 @@ template <typename dataT> struct BBAnnIndex {
   }
 };
 
-template <typename dataT, typename indexT, class StringWrapper>
+struct BBAnnParameters {
+  std::string dataFilePath;
+  std::string indexPrefixPath;
+  std::string queryPath;
+  std::string groundTruthFilePath;
+  MetricType metric;
+  int K = 20; // top k.
+  int hnswM = 32;
+  int hnswefC = 500;
+  int K1 = 20;
+  int blockSize = 1;
+  int nProbe = 2;
+};
+
+template <class indexT, class TypeNameWrapper>
 void IndexBindWrapper(py::module_ &m) {
-  py::class_<indexT>(m, StringWrapper::Get())
+  using paraT = typename indexT::parameterType;
+  using dataT = typename indexT::dataType;
+  py::class_<indexT>(m, TypeNameWrapper::Get())
       .def(py::init([](MetricType metric) {
         return std::unique_ptr<indexT>(new indexT(metric));
       }))
@@ -145,12 +183,10 @@ void IndexBindWrapper(py::module_ &m) {
            py::arg("dim"), py::arg("num_query"), py::arg("knn"),
            py::arg("para"))
       .def("build",
-           [](indexT &self, BBAnnParameters para) {
-             return indexT::BuildIndex(para);
-           },
+           [](indexT &self, paraT para) { return indexT::BuildIndex(para); },
            py::arg("para"));
 
-  m.def(StringWrapper::ReaderName(),
+  m.def(TypeNameWrapper::ReaderName(),
         [](const std::string &path, std::vector<dataT> &data) {
           size_t num, dim, aligned_dims;
           // TODO(!!!!!!)  check disann implementaion, what is rounded dims?
@@ -220,7 +256,7 @@ PYBIND11_MODULE(bbannpy, m) {
     static const char *ReaderName() { return "read_bin_int8"; }
   };
 
-  IndexBindWrapper<float, BBAnnIndex<float>, FloatWrapper>(m);
-  IndexBindWrapper<uint8_t, BBAnnIndex<uint8_t>, UInt8Wrapper>(m);
-  IndexBindWrapper<int8_t, BBAnnIndex<int8_t>, Int8Wrapper>(m);
+  IndexBindWrapper<BBAnnIndex<float, BBAnnParameters>, FloatWrapper>(m);
+  IndexBindWrapper<BBAnnIndex<uint8_t, BBAnnParameters>, UInt8Wrapper>(m);
+  IndexBindWrapper<BBAnnIndex<int8_t, BBAnnParameters>,Int8Wrapper>(m);
 }
