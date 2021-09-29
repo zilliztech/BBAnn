@@ -16,7 +16,7 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
     if ( weight!=0 && cluster_size > SAME_SIZE_THRESHOLD) {
         k2 = int64_t(sqrt(cluster_size/threshold)) + 1;
     } else {
-        k2 = int64_t(cluster_size/threshold) + 1;
+        k2 = std::max((cluster_size + threshold - 1) / threshold, 1L);
     }
 
     k2 = k2 < MAX_CLUSTER_K2 ? k2 : MAX_CLUSTER_K2;
@@ -28,6 +28,7 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
 
     if(cluster_size <= SAME_SIZE_THRESHOLD) {
         //use same size kmeans or graph partition 
+        k2 = std::max((cluster_size + threshold - 1) / threshold, 1L);
         same_size_kmeans<T>(cluster_size, data, dim, k2, k2_centroids, cluster_id.data(), kmpp, avg_len, niter, seed);
     } else {
 
