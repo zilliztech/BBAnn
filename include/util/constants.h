@@ -23,7 +23,8 @@ constexpr static int SPLIT_THRESHOLD = 500;
 constexpr static int MAX_CLUSTER_K2 = 500;
 
 constexpr static int KMEANS_THRESHOLD = 2000;
-
+// if cluster size smaller than SAME_SIZE_THRESHOLD , use same size kmeans or graph partition
+constexpr static int SAME_SIZE_THRESHOLD = 5000;
 
 
 // file prefix strings and suffix strings
