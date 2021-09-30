@@ -68,7 +68,8 @@ ext_modules = [
                       pybind11.get_include(True)],
         libraries=['aio'],
         language='c++',
-        extra_objects=['../build/src/libBBAnn_static.a'],
+        extra_objects=['../build/src/libBBAnn_static.a',
+        '../build/src/lib/libBBAnnLib_s.a'],
     )
 ]
 

@@ -7,8 +7,9 @@
 #include <pybind11/stl_bind.h>
 #include <string>
 
+#include "ann_interface.h"
 #include "bbann.h"
-
+#include "lib/bbannlib.h"
 namespace py = pybind11;
 
 PYBIND11_MAKE_OPAQUE(std::vector<unsigned>);
@@ -16,107 +17,23 @@ PYBIND11_MAKE_OPAQUE(std::vector<float>);
 PYBIND11_MAKE_OPAQUE(std::vector<int8_t>);
 PYBIND11_MAKE_OPAQUE(std::vector<uint8_t>);
 
-namespace py = pybind11;
-
-template <class TClass, typename paraT> class BuildIndexFactory {
-public:
-  static void BuildIndex(const paraT para) { TClass::BuildIndexImpl(para); }
-};
-
-// Interface for Ann index which the base data type of the vector space is
-// dataT, and the index should be accessed via parameters/settings packed in
-// paraT.
-//    dataT should be one of [uint8_t, int8_t, float(32-bit)].
-//    see BBAnnParameters for example paraT.
-template <typename dataT, typename paraT> class AnnIndexInterface {
-public:
-  virtual ~AnnIndexInterface() = default;
-
-  // Load the in-mem part of the index into memory.
-  // Returns true if load success.
-  virtual bool LoadIndex(std::string &indexPathPrefix) = 0;
-
-  // To construct a index with parameters and settings given in *para*,
-  // users shall call <>.BuildIndex().
-  // The class that implements the interface must contain this method:
-  // static void BuildIndexImpl(const paraT para);
-
-  // Conduct a top-k Ann search for items in *query*, which is a numpy array of
-  // dim*numQuery items converted to dataT type.
-  virtual std::pair<py::array_t<unsigned>, py::array_t<float>> /* do batch */
-  BatchSearch(
-      py::array_t<dataT, py::array::c_style | py::array::forcecast> &query,
-      uint64_t dim, uint64_t numQuery, uint64_t knn, const paraT para) = 0;
-};
-template <typename T> struct TypeWrapper;
-template <> struct TypeWrapper<float> { using distanceT = float; };
-template <> struct TypeWrapper<uint8_t> { using distanceT = uint32_t; };
-template <> struct TypeWrapper<int8_t> { using distanceT = int32_t; };
-
 template <typename dataT, typename paraT>
-struct BBAnnIndex : public BuildIndexFactory<BBAnnIndex<dataT, paraT>, paraT>,
-                    public AnnIndexInterface<dataT, paraT> {
-public:
-  using parameterType = paraT;
-  using dataType = dataT;
-
-  BBAnnIndex(MetricType metric) : metric_(metric) {
-    std::cout << "BBAnnIndex constructor" << std::endl;
-  }
-  MetricType metric_;
-
-  bool LoadIndex(std::string &indexPathPrefix) {
-    std::cout << "Loading: " << indexPathPrefix;
-
-    std::string hnsw_index_file = indexPathPrefix + HNSW + INDEX + BIN;
-    std::string bucket_centroids_file =
-        indexPathPrefix + BUCKET + CENTROIDS + BIN;
-
-    uint32_t bucket_num, dim;
-    get_bin_metadata(bucket_centroids_file, bucket_num, dim);
-
-    hnswlib::SpaceInterface<float> *space = nullptr;
-    if (MetricType::L2 == metric_) {
-      space = new hnswlib::L2Space(dim);
-    } else if (MetricType::IP == metric_) {
-      space = new hnswlib::InnerProductSpace(dim);
-    }
-    // load hnsw
-    index_hnsw_ = std::make_shared<hnswlib::HierarchicalNSW<float>>(
-        space, hnsw_index_file);
-    indexPrefix_ = indexPathPrefix;
-    return true;
-  }
-
-  std::pair<py::array_t<unsigned>, py::array_t<float>> /* do batch */
-  BatchSearch(
+struct BBAnnIndexPy : public BBAnnIndex<dataT, paraT> {
+  BBAnnIndexPy(MetricType &metric) : BBAnnIndex<dataT, paraT>(metric){};
+  /* do batch with numpy interface */
+  std::pair<py::array_t<unsigned>, py::array_t<float>> BatchSearch(
       py::array_t<dataT, py::array::c_style | py::array::forcecast> &query,
-      uint64_t dim, uint64_t numQuery, uint64_t knn,
-      const paraT para) override {
-
-    std::cout << "Query: ";
-
+      uint64_t dim, uint64_t numQuery, uint64_t knn, const paraT para) {
     using distanceT = typename TypeWrapper<dataT>::distanceT;
+
     py::array_t<unsigned> ids({numQuery, knn});
     py::array_t<float> dists({numQuery, knn});
     const dataT *pquery = query.data();
-
     distanceT *answer_dists = new distanceT[(int64_t)numQuery * knn];
     uint32_t *answer_ids = new uint32_t[(int64_t)numQuery * knn];
 
-    switch (para.metric) {
-    case MetricType::L2: {
-      Computer<dataT, dataT, distanceT> dis_computer =
-          L2sqr<const dataT, const dataT, distanceT>;
-      search_bbann_queryonly<dataT, distanceT, CMax<distanceT, uint32_t>>(
-          indexPrefix_, para.nProbe, para.hnswefC, knn, index_hnsw_, para.K1,
-          para.blockSize, dis_computer, pquery, answer_ids, answer_dists,
-          numQuery, dim);
-      break;
-    }
-    default:
-      std::cerr << "not supported" << std::endl;
-    }
+    BBAnnIndex<dataT, paraT>::BatchSearchCpp(pquery, dim, numQuery, knn, para,
+                                             answer_ids, answer_dists);
 
     auto r = ids.mutable_unchecked();
     auto d = dists.mutable_unchecked();
@@ -125,57 +42,17 @@ public:
         r(i, j) = (unsigned)answer_ids[i * knn + j];
         d(i, j) = (float)answer_dists[i * knn + j];
       }
-
     return std::make_pair(ids, dists);
   }
-  std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw_;
-  std::string indexPrefix_;
-
-  static void BuildIndexImpl(const paraT para) {
-    std::cout << "Build start " << std::endl;
-    using distanceT = typename TypeWrapper<dataT>::distanceT;
-    switch (para.metric) {
-    case MetricType::L2: {
-      std::cout << "Build With L2" << std::endl;
-      std::cout << "dataT" << typeid(dataT).name() << std::endl;
-      std::cout << "distanceT" << typeid(distanceT).name() << std::endl;
-      build_bbann<dataT, distanceT, CMax<distanceT, uint32_t>>(
-          para.dataFilePath, para.indexPrefixPath, para.hnswM, para.hnswefC,
-          para.metric, para.K1, para.blockSize);
-      return;
-    }
-    case MetricType::IP: {
-      build_bbann<dataT, distanceT, CMin<distanceT, uint32_t>>(
-          para.dataFilePath, para.indexPrefixPath, para.hnswM, para.hnswefC,
-          para.metric, para.K1, para.blockSize);
-      return;
-    }
-    default:
-      std::cerr << "not supported" << std::endl;
-    }
-  }
 };
-
-struct BBAnnParameters {
-  std::string dataFilePath;
-  std::string indexPrefixPath;
-  std::string queryPath;
-  std::string groundTruthFilePath;
-  MetricType metric;
-  int K = 20; // top k.
-  int hnswM = 32;
-  int hnswefC = 500;
-  int K1 = 20;
-  int blockSize = 1;
-  int nProbe = 2;
-};
-
 template <class indexT, class TypeNameWrapper>
 void IndexBindWrapper(py::module_ &m) {
   using paraT = typename indexT::parameterType;
   using dataT = typename indexT::dataType;
   py::class_<indexT>(m, TypeNameWrapper::Get())
       .def(py::init([](MetricType metric) {
+        TestLib ann;
+        std::cout << ann.Get();
         return std::unique_ptr<indexT>(new indexT(metric));
       }))
       .def("LoadIndex", &indexT::LoadIndex, py::arg("index_path_prefix"))
@@ -256,7 +133,7 @@ PYBIND11_MODULE(bbannpy, m) {
     static const char *ReaderName() { return "read_bin_int8"; }
   };
 
-  IndexBindWrapper<BBAnnIndex<float, BBAnnParameters>, FloatWrapper>(m);
-  IndexBindWrapper<BBAnnIndex<uint8_t, BBAnnParameters>, UInt8Wrapper>(m);
-  IndexBindWrapper<BBAnnIndex<int8_t, BBAnnParameters>,Int8Wrapper>(m);
+  IndexBindWrapper<BBAnnIndexPy<float, BBAnnParameters>, FloatWrapper>(m);
+  IndexBindWrapper<BBAnnIndexPy<uint8_t, BBAnnParameters>, UInt8Wrapper>(m);
+  IndexBindWrapper<BBAnnIndexPy<int8_t, BBAnnParameters>, Int8Wrapper>(m);
 }
