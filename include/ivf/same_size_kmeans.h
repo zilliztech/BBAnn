@@ -274,4 +274,5 @@ void same_size_kmeans(int64_t nx, const T *x_in, int64_t dim, int64_t k,
 
   delete[] dis_tab;
   delete[] hassign;
+  std::cout<<"end of same size "<<std::endl;
 }

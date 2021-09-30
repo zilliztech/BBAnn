@@ -21,25 +21,17 @@ void find_nearest_large_bucket (
         if (hassign[assign[i]] > small_bucket_max_limit) {
             new_assign[i] = transform_table[assign[i]];
         } else {
-            while (min_id < assign.size()) {
-                if (hassign[min_id] < large_bucket_min_limit) min_id++;
-                else break;
-            }
-            assert (min_id < assign.size());
-            std::cout <<"first min_id: "<< min_id<<std::endl;
             min_dist = L2sqr<const T, const float ,float >(x_i, centroids + transform_table[min_id] * dim, dim);
 
-            for (int j = min_id; j < assign.size(); j++) {
-                if(hassign[assign[j]] >= large_bucket_min_limit) {
-                    std::cout << "selecting j:" << j <<" to "<< transform_table[j]<<std::endl;
-                    dist = L2sqr<const T, const float, float>(x_i, centroids + transform_table[j] *dim , dim);
-                    if(dist < min_dist) {
-                        min_dist = dist;
-                        min_id = j;
-                    }
+            for (int j = min_id; j < k; j++) {
+
+                dist = L2sqr<const T, const float, float>(x_i, centroids + transform_table[j] *dim , dim);
+                if(dist < min_dist) {
+                    min_dist = dist;
+                    min_id = j;
                 }
             }
-            new_assign[i] = transform_table[min_id];
+            new_assign[i] = min_id;
         }
     }
     assign.assign(new_assign.begin(), new_assign.end());
@@ -54,9 +46,7 @@ void merge_clusters(LevelType level, int64_t dim, int64_t nx, int64_t& k, const 
     for (int i = 0; i < nx; i++) {
         hassign[assign[i]]++;
     }
-    for (int i = 0 ; i < k; i++) {
-        std::cout << hassign[i]<<std::endl;
-    }
+
     int64_t large_bucket_min_limit;
     int64_t small_bucket_max_limit;
 
@@ -80,45 +70,40 @@ void merge_clusters(LevelType level, int64_t dim, int64_t nx, int64_t& k, const 
     int64_t new_k = 0;
     int64_t large_bucket_num = 0;
     int64_t * transform_table = new int64_t [k];
-
-    for (int i = 0; i < k; i++) {
-        if (hassign[i] >= small_bucket_max_limit) {
-            transform_table[i] = new_k;
-            new_k++;
-
-            if(hassign[i] >= large_bucket_min_limit) {
-                large_bucket_num++;
-            }
+    for (int i=0; i < k; i++ ) {
+        if(hassign[i] >= large_bucket_min_limit) {
+            transform_table[i] = large_bucket_num;
+            large_bucket_num++;
         } else {
             transform_table[i] = -1;
         }
     }
-    std::cout <<"transform table"<<std::endl;
-    for (int i=0; i<k; i++)  std::cout<<transform_table[i]<<" ";
-    std::cout<<std::endl;
-    new_k = large_bucket_num ? new_k : new_k + 1; // add a bucket for all small bucket
-    std::cout<< "find the new k "<<new_k<<std::endl;
+    new_k += large_bucket_num;
+    for (int i = 0; i < k; i++) {
+        if (hassign[i] >= small_bucket_max_limit && transform_table[i] == -1) {
+            transform_table[i] = new_k;
+            new_k++;
+        }
+    }
     if(new_k == k) {
-     //   delete [] transform_table;
+      //  delete [] transform_table;
         return ;
     }
-    std::cout<< "transform table "<<std::endl;
-    for (int i=0;i<k ;i++ ) std::cout<<transform_table[i]<<" ";
+    new_k = large_bucket_num ? new_k : new_k + 1; // add a bucket for all small bucket
 
     int64_t * new_hassign = new int64_t [new_k];
     float * new_centroids = new float[dim * new_k];
-    std::cout <<"update assign"<<std::endl;
     for (int i = 0; i < k; i++) {
         if(transform_table[i] != -1) {
             memcpy(new_centroids + transform_table[i] * dim, centroids.data() + i * dim, dim);
         }
     }
     if (large_bucket_num) {
-        std::cout <<"find nearest large bucket"<<std::endl;
-        find_nearest_large_bucket<T>(x, new_centroids, nx, new_k, dim, hassign, transform_table,
+
+        find_nearest_large_bucket<T>(x, new_centroids, nx, large_bucket_num, dim, hassign, transform_table,
                 large_bucket_min_limit, small_bucket_max_limit, assign);
-        std::cout <<"find neiacxarest large bucket down"<<std::endl;
-        compute_centroids<T>(dim, k, nx, x, assign.data(), new_hassign, new_centroids, avg_len);
+
+        compute_centroids<T>(dim, new_k, nx, x, assign.data(), new_hassign, new_centroids, avg_len);
 
     } else {
 
@@ -150,24 +135,16 @@ void merge_clusters(LevelType level, int64_t dim, int64_t nx, int64_t& k, const 
             }
         }
     }
-    std::cout<<"update meta "<<std::endl;
+
     //update meta :
     k = new_k;
-    centroids.resize(dim * k);
-    memcpy(centroids.data(), new_centroids, sizeof(float) * dim *k);
-   // centroids.assign(new_centroids, new_centroids + k * dim);
-
-    //centroids = new float [dim * k];
-  //  memcpy (centroids, new_centroids, dim * k * sizeof(float));
-
-
-
+    centroids.assign(new_centroids, new_centroids + k * dim);
 
     delete [] new_centroids;
     delete [] new_hassign;
     delete [] transform_table;
     delete [] hassign;
-    std::cout<<"end of merge_clustering "<<std::endl;
+
 
     return ;
 }
@@ -201,31 +178,32 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
     //float* k2_centroids = new float[k2 * dim];
     std::vector<float> k2_centroids(k2 * dim, 0.0);
     std::vector<int64_t> cluster_id(cluster_size, -1);
-    std::vector<float> dists(cluster_size, -1);
+
 
 
     if(do_same_size_kmeans) {
-        //use same size kmeans or graph partition 
+        //use same size kmeans or graph partition
+
         same_size_kmeans<T>(cluster_size, data, dim, k2, k2_centroids.data(), cluster_id.data(), kmpp, avg_len, niter, seed);
+
     } else {
         kmeans<T>(cluster_size, data, dim, k2, k2_centroids.data(), kmpp, avg_len, niter, seed);
         // Dynamic balance constraint K-means:
         // balanced_kmeans<T>(cluster_size, data, dim, k2, k2_centroids, weight, kmpp, avg_len, niter, seed);
-
+        std::vector<float> dists(cluster_size, -1);
         if( weight!=0 && cluster_size <= KMEANS_THRESHOLD ) {
             dynamic_assign<T, float, float>(data, k2_centroids.data(), dim, cluster_size, k2, weight, cluster_id.data(), dists.data());
         } else {
             elkan_L2_assign<T, float, float>(data, k2_centroids.data(), dim, cluster_size, k2, cluster_id.data(), dists.data());
         }
-        std::cout<<"before k "<<k2<<std::endl;
+
+        //dists is useless, so delete first
+        std::vector<float>().swap(dists);
+
         merge_clusters<T>((LevelType)level, dim, cluster_size, k2, data, cluster_id, k2_centroids, avg_len);
-        std::cout<<"after k "<<k2<<std::endl;
+
         //split_clusters_half(dim, k2, cluster_size, data, nullptr, cluster_id.data(), k2_centroids, avg_len);
     }
-
-
-    //dists is useless, so delete first
-    std::vector<float>().swap(dists);
 
     std::vector<float> bucket_pre_size(k2 + 1, 0);
 
@@ -288,6 +266,4 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
         }
     }
     delete [] data_blk_buf;
-    //delete [] k2_centroids;
-
 }
