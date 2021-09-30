@@ -245,6 +245,7 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
         // std::cout<<"after kmeans : centroids i"<<i<<" has vectors "<<(int)bucket_size<<std::endl;
         if (bucket_size <= threshold) {
             //write a blk to file
+            std::cout << bucket_size<<std::endl;
             memset(data_blk_buf, 0, blk_size);
             *reinterpret_cast<uint32_t*>(data_blk_buf) = bucket_size;
             char* beg_address = data_blk_buf + sizeof(uint32_t);
