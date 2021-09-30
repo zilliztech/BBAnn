@@ -1,6 +1,6 @@
 #include "flat/flat.h"
 #include "ivf/ivf_flat.h"
-#include "ivf/same_size_kmeans.h"
+#include "ivf/clustering.h"
 #include "util/merge.h"
 #include "util/read_file.h"
 #include "util/utils.h"
@@ -75,31 +75,48 @@ void Flat(int batch_from, int batch_num) {
   // batch_from);
 }
 
-uint32_t nlist = 10;
-uint32_t nprobe = 10;
+uint32_t nlist = 100;
+uint32_t nprobe = 20;
 float *centroids = nullptr;
 std::vector<std::vector<CODE_T>> codes;
 std::vector<std::vector<uint32_t>> ids;
 
-void IVF_Train(int batch_num) {
+void IVF_Train(int nx) {
   centroids = new float[nlist * dim];
+  int64_t *assign = new int64_t[nx];
 
   gettimeofday(&t1, 0);
 
   // kmeans(batch_num, xb, dim, nlist, centroids);
-  same_size_kmeans(batch_num, xb, dim, nlist, centroids);
+  same_size_kmeans(nx, xb, dim, nlist, centroids, assign);
 
   gettimeofday(&t2, 0);
   printf("kmeans cost %ld ms\n", getTime(t2, t1));
-}
 
-void IVF_Insert(int batch_num) {
-  gettimeofday(&t1, 0);
+    codes.resize(nlist);
+    ids.resize(nlist);
 
-  ivf_flat_insert(batch_num, xb, dim, nlist, centroids, codes, ids);
+#pragma omp parallel
+    {
+        int64_t nt = omp_get_num_threads();
+        int64_t rank = omp_get_thread_num();
 
-  gettimeofday(&t2, 0);
-  printf("insert cost %ld ms\n", getTime(t2, t1));
+        // this thread is taking care of centroids c0:c1
+        int64_t c0 = (nlist * rank) / nt;
+        int64_t c1 = (nlist * (rank + 1)) / nt;
+
+        for (int64_t i = 0; i < nx; i++) {
+            int64_t ci = assign[i];
+            if (ci >= c0 && ci < c1) {
+                codes[ci].resize(codes[ci].size() + dim);
+                memcpy(codes[ci].data() + ids[ci].size() * dim,
+                       xb + i * dim, dim * sizeof(CODE_T));
+                ids[ci].push_back(i);
+            }
+        }
+    }
+
+  delete[] assign;
 }
 
 void IVF_Search(int batch_num, int iter = 1) {
@@ -169,10 +186,9 @@ int main() {
     answer_writer.write((char*)tmp_gt_dis, tot * sizeof(float));
     answer_writer.close();
 #else
-  IVF_Train(nb);
   codes.clear();
   ids.clear();
-  IVF_Insert(nb);
+  IVF_Train(nb);
   IVF_Search(nb);
 
   save_answer("ivf_answer.bin", global_dis, global_lab);
