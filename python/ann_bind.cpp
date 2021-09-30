@@ -45,7 +45,6 @@ struct BBAnnIndexPy : public BBAnnIndex<dataT, paraT> {
     return std::make_pair(ids, dists);
   }
 };
-
 template <class indexT, class TypeNameWrapper>
 void IndexBindWrapper(py::module_ &m) {
   using paraT = typename indexT::parameterType;
