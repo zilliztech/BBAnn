@@ -1,3 +1,5 @@
+add_subdirectory(lib)
+
 set(BigAnn_SRCS diskann2.cpp TimeRecorder.cpp random.cpp)
 set(BBAnn_SRCS bbann.cpp TimeRecorder.cpp random.cpp)
 
