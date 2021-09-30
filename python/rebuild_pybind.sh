@@ -16,4 +16,4 @@ python3 tests/bbann_build_test.py \
 python3 tests/bbann_query_test.py \
    --type float --index_path_prefix /tmp/dat/ \
    --query_path /data/random-xs/random10000/queries_1000_20
-
+echo Succ!

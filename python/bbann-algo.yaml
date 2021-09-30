@@ -1,0 +1,10 @@
+random-xs:
+    bbann:
+      docker-tag: billion-scale-benchmark
+      module: benchmark.algorithms.bbann
+      constructor: Bbann
+      base-args: ["@metric"]
+      run-groups:
+        base:
+          args: [{"M": 32, "efC": 200, "K1": 20, "blockSize": 4096}]
+          query-args: [{}]
