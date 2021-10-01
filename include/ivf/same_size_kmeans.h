@@ -267,12 +267,13 @@ void same_size_kmeans(int64_t nx, const T *x_in, int64_t dim, int64_t k,
     compute_centroids(dim, k, nx, x_in, assign, hassign, centroids, avg_len);
   }
 
+#ifdef SSK_LOG
   ssk_print_cluster_size_stats(k, hassign);
+#endif
 
   delete[] xs;
   delete[] ks;
 
   delete[] dis_tab;
   delete[] hassign;
-  std::cout<<"end of same size "<<std::endl;
 }

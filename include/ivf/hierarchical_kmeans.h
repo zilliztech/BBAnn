@@ -6,10 +6,9 @@
 
 template<typename T>
 void find_nearest_large_bucket (
-        const T *  x,
-        const float * centroids,
-        int64_t nx, int64_t k, int64_t dim, int64_t * hassign, int64_t * transform_table,
-        int64_t large_bucket_min_limit, int64_t small_bucket_max_limit, std::vector<int64_t>& assign)
+        const T *  x, const float * centroids,
+        int64_t nx, int64_t k, int64_t dim, int64_t * hassign,
+        int64_t * transform_table, std::vector<int64_t>& assign)
 {
     std::vector<int64_t> new_assign(nx, -1);
 #pragma omp parallel for
@@ -18,7 +17,7 @@ void find_nearest_large_bucket (
         int min_id = 0;
         float min_dist ;
         float dist ;
-        if (hassign[assign[i]] > small_bucket_max_limit) {
+        if (transform_table[assign[i]] != -1) {
             new_assign[i] = transform_table[assign[i]];
         } else {
             min_dist = L2sqr<const T, const float ,float >(x_i, centroids + transform_table[min_id] * dim, dim);
@@ -49,27 +48,24 @@ void merge_clusters(LevelType level, int64_t dim, int64_t nx, int64_t& k, const 
 
     int64_t large_bucket_min_limit;
     int64_t small_bucket_max_limit;
-
-    if(level == LevelType::FIRST_LEVEL || level == LevelType::SECOND_LEVEL) {
+    // strategies should be changed according to different scenarios
+    if(level == LevelType::FIRST_LEVEL) {
 
         large_bucket_min_limit = MAX_SAME_SIZE_THRESHOLD;
         small_bucket_max_limit = MAX_SAME_SIZE_THRESHOLD;
 
-    } else if (level == LevelType::THIRTH_LEVEL || level == LevelType::BALANCE_LEVEL) {
+    } else {
 
         large_bucket_min_limit = MAX_SAME_SIZE_THRESHOLD;
         small_bucket_max_limit = MIN_SAME_SIZE_THRESHOLD;
-
-    } else {
-        //error
-        assert(level < LevelType::FINAL_LEVEL);
 
     }
 
     //find the new k2 and centroids:
     int64_t new_k = 0;
     int64_t large_bucket_num = 0;
-    int64_t * transform_table = new int64_t [k];
+    int64_t middle_bucket_num = 0;
+    int64_t * transform_table = new int64_t [k]; // old k to new k
     for (int i=0; i < k; i++ ) {
         if(hassign[i] >= large_bucket_min_limit) {
             transform_table[i] = large_bucket_num;
@@ -83,36 +79,40 @@ void merge_clusters(LevelType level, int64_t dim, int64_t nx, int64_t& k, const 
         if (hassign[i] >= small_bucket_max_limit && transform_table[i] == -1) {
             transform_table[i] = new_k;
             new_k++;
+            middle_bucket_num ++;
         }
     }
     if(new_k == k) {
-      //  delete [] transform_table;
+
         return ;
     }
-    new_k = large_bucket_num ? new_k : new_k + 1; // add a bucket for all small bucket
+    new_k = new_k != 0 ? new_k : 1; // add a bucket for all small bucket
 
     int64_t * new_hassign = new int64_t [new_k];
     float * new_centroids = new float[dim * new_k];
     for (int i = 0; i < k; i++) {
         if(transform_table[i] != -1) {
-            memcpy(new_centroids + transform_table[i] * dim, centroids.data() + i * dim, dim);
+            memcpy(new_centroids + transform_table[i] * dim, centroids.data() + i * dim, dim * sizeof(float));
         }
     }
     if (large_bucket_num) {
 
-        find_nearest_large_bucket<T>(x, new_centroids, nx, large_bucket_num, dim, hassign, transform_table,
-                large_bucket_min_limit, small_bucket_max_limit, assign);
+        find_nearest_large_bucket<T>(x, new_centroids, nx, large_bucket_num, dim, hassign, transform_table, assign);
 
         compute_centroids<T>(dim, new_k, nx, x, assign.data(), new_hassign, new_centroids, avg_len);
 
+    } else if (middle_bucket_num) {
+        find_nearest_large_bucket<T>(x, new_centroids, nx, middle_bucket_num, dim, hassign, transform_table, assign);
+
+        compute_centroids<T>(dim, new_k, nx, x, assign.data(), new_hassign, new_centroids, avg_len);
     } else {
 
-        float * __restrict merge_centroid = new_centroids + (new_k - 1) * dim;
-        int64_t merge_centroid_id = new_k -1;
+        float * __restrict merge_centroid = new_centroids;
+        int64_t merge_centroid_id = 0;
         memset(merge_centroid, 0, sizeof(float) * dim);
 #pragma omp parallel for
         for (int i = 0; i < nx; i++) {
-            auto * __restrict x_in = x + i *dim;
+            auto * __restrict x_in = x + i * dim;
             if(transform_table[assign[i]] == -1) {
                 for (int d = 0; d < dim; d++) {
                     merge_centroid[d] += x_in[d];
@@ -129,7 +129,7 @@ void merge_clusters(LevelType level, int64_t dim, int64_t nx, int64_t& k, const 
                 merge_centroid[j] *= len;
             }
         } else {
-            float norm = 1.0 / hassign[merge_centroid_id];
+            float norm = 1.0 / nx;
             for (int64_t j = 0; j < dim; j++) {
                 merge_centroid[j] *= norm;
             }
@@ -154,36 +154,28 @@ template <typename T>
 void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* ids, int64_t dim, uint32_t threshold, const uint64_t blk_size,
                       uint32_t& blk_num, IOWriter& data_writer, IOWriter& centroids_writer, IOWriter& centroids_id_writer, int level,
                       bool kmpp = false, float avg_len = 0.0, int64_t niter = 10, int64_t seed = 1234) {
-    std::cout<< "level" <<level<<" cluster_size"<<cluster_size<<std::endl;
+    //std::cout<< "level" <<level<<" cluster_size"<<cluster_size<<std::endl;
 
     float weight = 0;
     int vector_size = sizeof(T) * dim;
     int id_size = sizeof(uint32_t);
     int64_t k2;
-    bool do_same_size_kmeans = (LevelType (level) == LevelType ::FINAL_LEVEL) ||
-            (LevelType (level) == LevelType ::SECOND_LEVEL && cluster_size >= MIN_SAME_SIZE_THRESHOLD && cluster_size <= MAX_SAME_SIZE_THRESHOLD);
-    if(do_same_size_kmeans) {
-        k2 = int64_t(cluster_size/threshold) + 1;
+    bool do_same_size_kmeans = (LevelType (level) >= LevelType ::BALANCE_LEVEL) ||
+            (LevelType (level) == LevelType ::THIRTH_LEVEL && cluster_size >= MIN_SAME_SIZE_THRESHOLD && cluster_size <= MAX_SAME_SIZE_THRESHOLD);
+    if (do_same_size_kmeans) {
+        k2 = std::max((cluster_size + threshold - 1) / threshold, 1L);
     } else {
         k2 = int64_t(sqrt(cluster_size/threshold)) + 1;
+        k2 = k2 < MAX_CLUSTER_K2 ? k2 : MAX_CLUSTER_K2;
     }
-    /*
-    if ( weight!=0 && cluster_size > SAME_SIZE_THRESHOLD) {
-        k2 = int64_t(sqrt(cluster_size/threshold)) + 1;
-    } else {
-        k2 = int64_t(cluster_size/threshold) + 1;
-    }*/
 
-    k2 = k2 < MAX_CLUSTER_K2 ? k2 : MAX_CLUSTER_K2;
     //float* k2_centroids = new float[k2 * dim];
     std::vector<float> k2_centroids(k2 * dim, 0.0);
     std::vector<int64_t> cluster_id(cluster_size, -1);
 
-
-
     if(do_same_size_kmeans) {
         //use same size kmeans or graph partition
-
+        k2 = std::max((cluster_size + threshold - 1) / threshold, 1L);
         same_size_kmeans<T>(cluster_size, data, dim, k2, k2_centroids.data(), cluster_id.data(), kmpp, avg_len, niter, seed);
 
     } else {
@@ -245,7 +237,7 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
         // std::cout<<"after kmeans : centroids i"<<i<<" has vectors "<<(int)bucket_size<<std::endl;
         if (bucket_size <= threshold) {
             //write a blk to file
-            std::cout << bucket_size<<std::endl;
+            //std::cout << bucket_size<<std::endl;
             memset(data_blk_buf, 0, blk_size);
             *reinterpret_cast<uint32_t*>(data_blk_buf) = bucket_size;
             char* beg_address = data_blk_buf + sizeof(uint32_t);
