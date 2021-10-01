@@ -80,7 +80,7 @@ void  hierarchical_clusters() {
         threshold = blk_size / entry_size;
         cout<<"threshold"<<threshold<<endl;
 
-        recursive_kmeans<uint8_t>(i, 10000000, datai, idi, cluster_dim, threshold, blk_size, blk_num, data_writer, centroids_writer, centroids_id_writer, false);
+        recursive_kmeans<uint8_t>(i, 1000000, datai, idi, cluster_dim, threshold, blk_size, blk_num, data_writer, centroids_writer, centroids_id_writer, 0, false);
 
         global_centroids_number += blk_num;
 
@@ -136,11 +136,25 @@ void test_split_clusters_half() {
 }
 
 
+void test_split_10m() {
+    uint32_t cluster_size, cluster_dim, ids_size, ids_dim;
+    int32_t threshold;
+    uint32_t entry_num;
+
+    std::string data_file = "/home/cqy/dataset/learn.100M.u8bin";
+    IOReader data_reader("/home/cqy/dataset/learn.100M.u8bin");
+    //IOReader ids_reader(ids_file);
+
+    data_reader.read((char*)&cluster_size, sizeof(uint32_t));
+    data_reader.read((char*)&cluster_dim, sizeof(uint32_t));
+    uint8_t* buf = new uint8_t [cluster_size * cluster_dim];
+    data_reader.read((char*)buf, sizeof(uint8_t) * cluster_dim * cluster_size);
+}
 
 int main() {
   //  int32_t blk_num = test_recursive_kmeans();
    // test_hierarchical_clusters(blk_num);
-   // hierarchical_clusters();
-   test_split_clusters_half();
+    hierarchical_clusters();
+   //test_split_clusters_half();
     return 0;
 }

@@ -189,7 +189,7 @@ void hierarchical_clusters(const std::string &output_path, const int K1,
       IOWriter data_writer(data_file, MEGABYTE * 100);
       recursive_kmeans<DATAT>(i, cluster_size, datai, idi, cluster_dim,
                               entry_num, blk_size, blk_num, data_writer,
-                              centroids_writer, centroids_id_writer, false,
+                              centroids_writer, centroids_id_writer, 0, false,
                               avg_len);
 
       global_centroids_number += blk_num;

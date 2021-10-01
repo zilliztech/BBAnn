@@ -22,3 +22,11 @@ enum class QuantizerType {
     PQ = 1,
     PQRES = 2,
 };
+
+enum class LevelType {
+    FIRST_LEVEL = 0,
+    SECOND_LEVEL = 1,
+    THIRTH_LEVEL = 2,
+    BALANCE_LEVEL = 3,
+    FINAL_LEVEL =4,
+};
