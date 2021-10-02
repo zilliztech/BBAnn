@@ -22,10 +22,10 @@ add_executable(test_distance test_distance.cpp)
 target_link_libraries(test_distance BigAnn)
 
 add_executable(test_recursive_kmeans recursive_kmeans_test.cpp)
-target_link_libraries(test_recursive_kmeans BigAnn)
+target_link_libraries(test_recursive_kmeans BigAnn ${CMAKE_CURRENT_LIST_DIR}/../cmake/thirdparty/KaHIP/deploy/libkahip.a)
 
 add_executable(test_same_size_kmeans test_same_size_kmeans.cpp)
-target_link_libraries(test_same_size_kmeans BigAnn)
+target_link_libraries(test_same_size_kmeans BigAnn ${CMAKE_CURRENT_LIST_DIR}/../cmake/thirdparty/KaHIP/deploy/libkahip.a)
 
 ## Google Test
 set(TEST_SOURCES

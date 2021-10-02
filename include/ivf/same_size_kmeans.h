@@ -11,6 +11,8 @@
 #include <memory>
 #include <string.h>
 #include <unistd.h>
+#include "hnswlib/hnswlib.h"
+#include "interface/kaHIP_interface.h"
 
 // #define SSK_LOG
 
@@ -104,174 +106,106 @@ void same_size_kmeans(int64_t nx, const T *x_in, int64_t dim, int64_t k,
                       float *centroids, int64_t *assign, bool kmpp = false,
                       float avg_len = 0.0, int64_t niter = 10,
                       int64_t seed = 1234) {
-  assert(x_in != nullptr);
-  assert(centroids != nullptr);
-  assert(assign != nullptr);
+      assert(x_in != nullptr);
+    assert(centroids != nullptr);
+    assert(assign != nullptr);
 
-  assert(nx > 0);
-  assert(k > 0);
+    assert(nx > 0);
+    assert(k > 0);
+    std::cout<<"input cluster size="<<nx<<std::endl;
+    uint64_t max_target_size = (nx + k - 1) / k;
+    uint64_t min_target_size = nx / k;
 
-  uint64_t max_target_size = (nx + k - 1) / k;
-  uint64_t min_target_size = nx / k;
+    // the nubmer of vectors in the cluster
+    int64_t *hassign = new int64_t[k];
 
-  // the nubmer of vectors in the cluster
-  int64_t *hassign = new int64_t[k];
-
-  memset(hassign, 0, sizeof(int64_t) * k);
-
-  if (kmpp) {
-    kmeanspp<T>(x_in, nx, dim, k, centroids);
-  } else {
-    rand_perm(assign, nx, k, seed);
-    for (int64_t i = 0; i < k; i++) {
-      const T *x = x_in + assign[i] * dim;
-      float *c = centroids + i * dim;
-
-      for (int64_t d = 0; d < dim; d++) {
-        c[d] = x[d];
-      }
-    }
-  }
-
-  float *dis_tab = new float[nx * k];
-  assert(dis_tab != nullptr);
-
-  ssk_compute_dist_tab(nx, x_in, dim, k, centroids, dis_tab);
-
-#ifdef SSK_LOG
-  std::cout << "init compute dis_tab done" << std::endl;
-#endif
-
-  ssk_init_assign(nx, k, max_target_size, dis_tab, hassign, assign);
-
-#ifdef SSK_LOG
-  std::cout << "Initialization done" << std::endl;
-#endif
-
-  int64_t *xs = new int64_t[nx];
-  for (int64_t i = 0; i < nx; ++i) {
-    xs[i] = i;
-  }
-
-  int64_t *ks = new int64_t[k];
-  for (int64_t i = 0; i < k; ++i) {
-    ks[i] = i;
-  }
-
-  auto delta_cur_best = [&](const auto &x) {
-    float min_dis = std::numeric_limits<float>::max();
-    for (int64_t i = 0; i < k; ++i) {
-      min_dis = std::min(min_dis, dis_tab[x * k + i]);
-    }
-    return dis_tab[x * k + assign[x]] - min_dis;
-  };
-
-  auto gain = [&](const auto &x, int64_t i) {
-    return dis_tab[x * k + assign[x]] - dis_tab[x * k + i];
-  };
-
-  compute_centroids(dim, k, nx, x_in, assign, hassign, centroids, avg_len);
-
-  std::vector<std::deque<int64_t>> transfer_lists(k);
-  float err = std::numeric_limits<float>::max();
-
-  for (int64_t iter = 0; iter < niter; ++iter) {
-#ifdef SSK_LOG
-    std::cout << "Start " << iter << "th iteration" << std::endl;
-#endif
-
-    int64_t transfer_cnt = 0;
-    ssk_compute_dist_tab(nx, x_in, dim, k, centroids, dis_tab);
-
-    std::sort(xs, xs + nx, [&](const auto &x, const auto &y) {
-      return delta_cur_best(x) > delta_cur_best(y);
-    });
-
-    for (int64_t i = 0; i < nx; ++i) {
-      const auto x = xs[i];
-      int64_t x_cluster = assign[x];
-      std::sort(ks, ks + k, [&](const auto &a, const auto &b) {
-        return gain(x, a) > gain(x, b);
-      });
-
-      for (int64_t j = 0; j < k; ++j) {
-        if (j == assign[x])
-          continue;
-
-        float x_gain = gain(x, j);
-
-        for (int64_t v = 0; v < transfer_lists[j].size(); ++v) {
-          const int64_t candidate = transfer_lists[j][v];
-
-          if (x_gain + gain(candidate, x_cluster) > 0) {
-            std::swap(assign[x], assign[candidate]);
-            x_cluster = assign[x];
-            transfer_lists[j].erase(transfer_lists[j].begin() + v);
-            transfer_cnt += 2;
-
-            x_gain = 0;
-            break;
-          }
+    memset(hassign, 0, sizeof(int64_t) * k);
+    int* xadj=new int[nx+1];
+    xadj[0]=0;
+    std::vector<int> neighborhood;
+    int npts = (int) nx;
+    int kint = (int) k;
+//    printf("reaching same_size_kmenas\n");
+    {
+        std::vector<std::vector<int>> neighbors(nx, std::vector<int>());
+        {
+            hnswlib::SpaceInterface<float> *space;
+            space = new hnswlib::L2Space(dim);
+            auto index_hnsw = std::make_shared<hnswlib::HierarchicalNSW<float>>(
+                    space, nx, 16, 100);
+//	printf("start to build hnsw\n");
+#pragma omp parallel for
+            for (int64_t i = 0; i < nx; i++) {
+                index_hnsw->addPoint(x_in + i * dim, i);
+            }
+//	printf("finish building hnsw for gp\n");
+            for (int i = 0; i < nx; i++) {
+                std::priority_queue<std::pair<float, long unsigned int>> pq=index_hnsw->searchKnn(x_in+i*dim,10);
+                while (!pq.empty()){
+                    int neighbor_id=(int)pq.top().second;
+                    if (neighbor_id!=i) {
+                        neighbors[i].push_back(neighbor_id);
+                    }
+                    pq.pop();
+                }
+            }
+            //std::cout<<"finish initializing neighbors"<<std::endl;
         }
-
-        if (x_gain > 0 && (hassign[x_cluster] > min_target_size &&
-                           hassign[j] < max_target_size)) {
-          --hassign[x_cluster];
-          ++hassign[j];
-          assign[x] = j;
-          x_cluster = j;
-          ++transfer_cnt;
+        for (int i=0;i<nx;i++){
+            for (int j:neighbors[i]){
+                auto iter=std::find(neighbors[j].begin(),neighbors[j].end(),i);
+                if (iter==neighbors[j].end()){
+                    neighbors[j].push_back(i);
+                }
+            }
         }
-      }
-
-      if (assign[x] != ks[0] &&
-          dis_tab[x * k + assign[x]] > dis_tab[x * k + ks[0]]) {
-        transfer_lists[assign[x]].push_back(x);
-      }
+        //std::cout<<"finish transform to undirect"<<std::endl;
+        for (int i=0;i<nx;i++){
+            xadj[i+1]=xadj[i]+neighbors[i].size();
+            for (int j:neighbors[i]){
+                neighborhood.push_back(j);
+            }
+        }
+        //std::cout<<"finish initialize graph"<<std::endl;
     }
-
-    int64_t skip_cnt = 0;
-    for (auto &l : transfer_lists) {
-      skip_cnt += l.size();
-      l.clear();
+//    for (int j=0;j<nx;j++){
+//	    int n_n=xadj[j+1]-xadj[j];
+//    printf("neighbor size of node %d is %d, the ids of neighbors are ",j,n_n);
+//    for (int i=xadj[j];i<xadj[j+1];i++){
+//	    printf("%d ",neighborhood[i]);
+//    }
+//    printf("\n");
+//    }
+    double imbalance = 0.025;
+    int edge_cut     = 0;
+    int* vwgt        = NULL;
+    int* adjcwgt     = NULL;
+    int* int_assign=new int[nx];
+    kaffpa(&npts, vwgt, xadj, adjcwgt, neighborhood.data(), &kint, &imbalance, false, 0, ECO, & edge_cut,
+           int_assign);
+//    printf("finish partitioning graph\n");
+    int max_id=0;
+    for (int i=0;i<nx;i++){
+	    assign[i]=(int64_t)(int_assign[i]);
+	    if (max_id<assign[i]) max_id=assign[i];
     }
-
-    float cur_err = 0.0;
-    for (auto i = 0; i < nx; ++i) {
-      cur_err += dis_tab[i * k + assign[i]];
+    int* counting=new int[max_id+1];
+    for (int i=0;i<=max_id;i++){
+	    counting[i]=0;
     }
-#ifdef SSK_LOG
-    std::cout << "Transfered " << transfer_cnt << ", skipped " << skip_cnt
-              << " points." << std::endl;
-    std::cout << "Current Error: " << cur_err << std::endl;
-#endif
-
-    if (fabs(cur_err - err) < err * 0.01) {
-#ifdef SSK_LOG
-      std::cout << "exit kmeans iteration after the " << iter
-                << "th iteration, err = " << err << ", cur_err = " << cur_err
-                << std::endl;
-#endif
-      break;
+    for (int i=0;i<nx;i++){
+	    counting[assign[i]]++;
     }
-    err = cur_err;
-
-    if (transfer_cnt == 0) {
-#ifdef SSK_LOG
-      std::cout << "No tranfer occurs in the last iteration. Terminate."
-                << std::endl;
-#endif
-      break;
+    for (int i=0;i<=max_id;i++){
+	    printf("%d ",counting[i]);
     }
-
-    compute_centroids(dim, k, nx, x_in, assign, hassign, centroids, avg_len);
-  }
-
-  ssk_print_cluster_size_stats(k, hassign);
-
-  delete[] xs;
-  delete[] ks;
-
-  delete[] dis_tab;
-  delete[] hassign;
+    printf("\n");
+//    printf("start to compute centroids\n");
+    compute_centroids(dim,k,nx,x_in,assign,hassign,centroids,avg_len);
+//    for (int i=0;i<dim;i++){
+//        printf("%f ",centroids[i]);
+//    }
+//    printf("\n");
+    delete[] hassign;
+    delete[] int_assign;
 }

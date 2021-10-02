@@ -6,8 +6,8 @@
 DATA_TYPE=uint8
 #DATA_TYPE=int8
 #DATA_TYPE=float
-DATA_FILE=/data/diskann-T2-baseline-indices/bigann-1B/base.1B.u8bin
-INDEX_PATH=/data/BBANN-BIGANN
+DATA_FILE=/home/bianzheng/LuoJiaRui/Dataset/BigANN10M/base.10M.u8bin
+INDEX_PATH=/home/bianzheng/LuoJiaRui/data/indices/BigANN10M_gp_version
 HNSW_M=32
 HNSW_EF=500
 METRIC_TYPE=L2
@@ -61,7 +61,7 @@ else
   LOG_FILE=${LOG_PREFIX}.log
   echo "Log File: " $LOG_FILE
 
-  sudo ./build_bbann $DATA_TYPE $DATA_FILE $INDEX_PATH $HNSW_M $HNSW_EF $METRIC_TYPE $K1 $PAGE_PER_BLOCK 2>&1 | sudo tee $LOG_FILE &
+  sudo /home/bianzheng/LuoJiaRui/BigANNGP/release/build_bbann $DATA_TYPE $DATA_FILE $INDEX_PATH $HNSW_M $HNSW_EF $METRIC_TYPE $K1 $PAGE_PER_BLOCK 2>&1 | sudo tee $LOG_FILE &
   pid=$!
   echo "PID: " $pid
   pidstat -rud -h -t -p $pid 5 > ${LOG_PREFIX}.stat

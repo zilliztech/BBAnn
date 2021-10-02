@@ -6,10 +6,10 @@
 DATA_TYPE=uint8
 #DATA_TYPE=int8
 #DATA_TYPE=float
-INDEX_PATH=/data/GRIP_Indexes/BIGANN-32-500-32-8-128-500-PQR/
-QUERY_FILE=/data/diskann-T2-baseline-indices/bigann-1B/query.public.10K.u8bin
-RESULT_OUTPUT=/data/answers/a.answer
-TRUTH_SET_FILE=/data/diskann-T2-baseline-indices/bigann-1B/bigann-1B-gt
+INDEX_PATH=/home/bianzheng/LuoJiaRui/data/indices/BigANN10M_gp_version-32-500-128-3/
+QUERY_FILE=/home/bianzheng/LuoJiaRui/Dataset/BigANN10M/query.public.10K.u8bin
+RESULT_OUTPUT=/home/bianzheng/LuoJiaRui/data/answers/BigANN10M_gp/10021927_result_top10
+TRUTH_SET_FILE=/home/bianzheng/LuoJiaRui/Dataset/BigANN10M/bigann-10M-gt
 NPROBE=50
 REFINE_NPROBE=250
 # K
@@ -50,7 +50,7 @@ echo "LOG_FILE: " $LOG_FILE
 
 sync; echo 3 | sudo tee /proc/sys/vm/drop_caches
 pkill -f "search_bbann"
-time ./search_bbann $DATA_TYPE $INDEX_PATH $QUERY_FILE $RESULT_OUTPUT $TRUTH_SET_FILE $NPROBE $REFINE_NPROBE $K $K1 $METRIC_TYPE $PAGE_PER_BLOCK | sudo tee $LOG_FILE &
+time /home/bianzheng/LuoJiaRui/BigANNGP/release/search_bbann $DATA_TYPE $INDEX_PATH $QUERY_FILE $RESULT_OUTPUT $TRUTH_SET_FILE $NPROBE $REFINE_NPROBE $K $K1 $METRIC_TYPE $PAGE_PER_BLOCK | sudo tee $LOG_FILE &
 pid=$!
 pidstat -rud -h -t -p $pid 1 > $LOG_FILE.stat
 wait $pid
