@@ -32,6 +32,8 @@ $ make -j
 
 ### Current Approach: Block-based index
 
+#### Build Scripts
+
 **Please Build With the Script**: 
 ```
 $ cp scripts/bbann_script/build.sh release/
@@ -40,6 +42,22 @@ $ chmod +x release/build.sh
 $ # !!!You have to modify build necessary parameters!!!
 $ sudo screen ./release/build.sh
 ```
+
+[Basic Build Script: build.sh](scripts/bbann_script/build.sh)
+
+#### Build Log Reader Scripts
+
+[Build Log Reader Script: build_log_extract.sh](scripts/bbann_script/build_log_extract.sh)
+
+```
+$ cp scripts/bbann_script/build_log_extract.sh [/index_path/log/]
+$ cd [/index_path/log/]
+$ chmod +x build_log_extract.sh
+$ sudo ./build_log_extract.sh
+$ cat result.csv
+```
+
+#### Search Scripts
 
 **Please Search With the Script**:
 ```
@@ -60,7 +78,28 @@ $ # !!!You have to make sure the log & answer folder are there!!!
 $ sudo ./release/search_full.sh
 ```
 
-### Build Index without script
+[Basic Search Script with one-nprobe-searching: search.sh](scripts/bbann_script/search.sh)
+
+[Full Search Script with multiple-nprobe-searching: search_full.sh](scripts/bbann_script/search_full.sh)
+
+[Full Search Script for Dataset BIGANN: bigann_search_full.sh](scripts/bbann_script/bigann_search_full.sh)
+
+[Full Search Script for Dataset BIGANN: msspacev_search_full.sh](scripts/bbann_script/msspacev_search_full.sh)
+
+#### Search Log Reader Scripts
+
+[Search Log Reader Script: search_log_extract.sh](scripts/bbann_script/search_log_extract.sh)
+
+```
+$ cp scripts/bbann_script/search_log_extract.sh [/answer/index-answer-path/]
+$ cp scripts/bbann_script/rewrite.py [/answer/index-answer-path/]
+$ cd [/answer/index-answer-path/]
+$ chmod +x search_log_extract.sh
+$ sudo ./search_log_extract.sh
+$ cat result.csv
+```
+
+#### Build Index without script
 
 To build, under the `release` directory, run `build_bbann` with the following arguments
 
@@ -80,7 +119,7 @@ $ mkdir -p index_path
 $ ./build_bbann [uint8|int8|float] [data_path] [index_path] [HNSW_M] [HNSW_efConstruction] [IP|L2] [K1] [page_per_block]
 ```
 
-### Search Index without script
+#### Search Index without script
 
 To search, under the `release` directory, run `search_bbann` with the following arguments
 args:
