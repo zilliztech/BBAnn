@@ -84,7 +84,7 @@ $ sudo ./release/search_full.sh
 
 [Full Search Script for Dataset BIGANN: bigann_search_full.sh](scripts/bbann_script/bigann_search_full.sh)
 
-[Full Search Script for Dataset BIGANN: msspacev_search_full.sh](scripts/bbann_script/msspacev_search_full.sh)
+[Full Search Script for Dataset MSSPACEV: msspacev_search_full.sh](scripts/bbann_script/msspacev_search_full.sh)
 
 #### Search Log Reader Scripts
 
