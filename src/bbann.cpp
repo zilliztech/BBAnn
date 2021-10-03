@@ -412,6 +412,7 @@ void save_answers(const std::string &answer_bin_file, const int topk,
   rc.ElapseFromBegin("save answers done.");
 }
 
+// TODO: reuse this one
 template <typename DATAT>
 void search_flat(const std::string &index_path, const DATAT *pquery,
                  const uint32_t nq, const uint32_t dq, const int nprobe,
