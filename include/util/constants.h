@@ -26,7 +26,7 @@ constexpr static int KMEANS_THRESHOLD = 2000;
 // if cluster size smaller than SAME_SIZE_THRESHOLD , use same size kmeans or graph partition
 constexpr static int SAME_SIZE_THRESHOLD = 5000;
 
-constexpr static int MIN_SAME_SIZE_THRESHOLD = 100;
+constexpr static int MIN_SAME_SIZE_THRESHOLD = 500;
 constexpr static int MAX_SAME_SIZE_THRESHOLD = 1500;
 
 
