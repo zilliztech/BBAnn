@@ -179,7 +179,20 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
         same_size_kmeans<T>(cluster_size, data, dim, k2, k2_centroids.data(), cluster_id.data(), kmpp, avg_len, niter, seed);
 
     } else {
-        kmeans<T>(cluster_size, data, dim, k2, k2_centroids.data(), kmpp, avg_len, niter, seed);
+        int64_t train_size = cluster_size;
+        T* train_data = nullptr;
+        if (cluster_size > k2 * K2_MAX_POINTS_PER_CENTROID) {
+            train_size = k2 * K2_MAX_POINTS_PER_CENTROID;
+            train_data = new T [train_size * dim];
+            random_sampling_k2(data, cluster_size, dim, train_size, train_data, seed);
+        } else {
+            train_data = data;
+        }
+        kmeans<T>(train_size, train_data, dim, k2, k2_centroids.data(), kmpp, avg_len, niter, seed);
+        if(cluster_size > k2 * K2_MAX_POINTS_PER_CENTROID) {
+            delete [] train_data;
+        }
+
         // Dynamic balance constraint K-means:
         // balanced_kmeans<T>(cluster_size, data, dim, k2, k2_centroids, weight, kmpp, avg_len, niter, seed);
         std::vector<float> dists(cluster_size, -1);
