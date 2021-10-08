@@ -179,7 +179,7 @@ void hierarchical_clusters(const std::string &output_path, const int K1,
       assert(ids_dim == 1);
       assert(entry_num > 0);
 
-      DATAT *datai = new DATAT[cluster_size * cluster_dim];
+      DATAT *datai = new DATAT[(uint64_t)cluster_size * cluster_dim * 1ULL];
       uint32_t *idi = new uint32_t[ids_size * ids_dim];
       uint32_t blk_num = 0;
       data_reader.read((char *)datai,
@@ -355,7 +355,7 @@ template <typename DATAT>
 void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
                   const int nq, const int dq, const int nprobe,
                   const int refine_nprobe, const DATAT *pquery,
-                  uint32_t *buckets_label) {
+                  uint32_t *buckets_label, float *centroids_dist = nullptr) {
 
   TimeRecorder rc("search graph");
   std::cout << "search graph parameters:" << std::endl;
@@ -365,17 +365,23 @@ void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
             << " buckets_label: " << static_cast<void *>(buckets_label)
             << std::endl;
   index_hnsw->setEf(refine_nprobe);
+  bool set_distance = centroids_dist!= nullptr;
 #pragma omp parallel for
   for (int64_t i = 0; i < nq; i++) {
     // auto queryi = pquery + i * dq;
     // todo: hnsw need to support query data is not float
     float *queryi = new float[dq];
+    float *queryi_dist = set_distance ? centroids_dist + i * nprobe : nullptr;
+
     for (int j = 0; j < dq; j++)
       queryi[j] = (float)(*(pquery + i * dq + j));
     auto reti = index_hnsw->searchKnn(queryi, nprobe);
     auto p_labeli = buckets_label + i * nprobe;
     while (!reti.empty()) {
       *p_labeli++ = reti.top().second;
+      if(set_distance) {
+          *queryi_dist++ = reti.top().first;
+      }
       reti.pop();
     }
     delete[] queryi;
@@ -550,7 +556,7 @@ void search_bbann(
       mp;
 
   search_graph<DATAT>(index_hnsw, nq, dq, nprobe, hnsw_ef, pquery,
-                      bucket_labels);
+                      bucket_labels, nullptr);
   // search_flat<DATAT>(index_path, pquery, nq, dq, nprobe, bucket_labels);
   rc.RecordSection("search buckets done.");
 
@@ -671,6 +677,141 @@ void search_bbann(
 
   delete[] buf;
   delete[] bucket_labels;
+  delete[] pquery;
+  delete[] answer_ids;
+  delete[] answer_dists;
+
+  rc.ElapseFromBegin("search bigann totally done");
+}
+
+template <typename DATAT, typename DISTT, typename HEAPT>
+void dynamic_search_bbann(
+        const std::string &index_path, const std::string &query_bin_file,
+        const std::string &answer_bin_file, const int nprobe, const int hnsw_ef,
+        const int topk, std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+        const int K1, const uint64_t block_size,
+        Computer<DATAT, DATAT, DISTT> &dis_computer) {
+  TimeRecorder rc("dynamic search bigann");
+
+  std::cout << "search bigann parameters:" << std::endl;
+  std::cout << " index_path: " << index_path
+            << " query_bin_file: " << query_bin_file
+            << " answer_bin_file: " << answer_bin_file << " nprobe: " << nprobe
+            << " hnsw_ef: " << hnsw_ef << " topk: " << topk << " K1: " << K1
+            << std::endl;
+
+  DATAT *pquery = nullptr;
+  float *centroids = nullptr;
+  float *centroids_dists = nullptr;
+  DISTT *answer_dists = nullptr;
+  uint32_t *answer_ids = nullptr;
+  uint32_t *bucket_labels = nullptr;
+
+  uint32_t nq, dq;
+  uint32_t nc, dc;
+
+  read_bin_file<DATAT>(query_bin_file, pquery, nq, dq);
+  rc.RecordSection("load query done.");
+  //load centroids ：
+  std::string bucket_centroids_file = index_path + BUCKET + CENTROIDS + BIN;
+  read_bin_file<float>(bucket_centroids_file, centroids, nc, dc);
+  rc.RecordSection("load centroids done.");
+
+  std::cout << "query numbers: " << nq << " query dims: " << dq << std::endl;
+
+  answer_dists = new DISTT[(int64_t)nq * topk];
+  answer_ids = new uint32_t[(int64_t)nq * topk];
+
+  const int graph_search_topk = 200;
+  bucket_labels = new uint32_t[(int64_t)nq * graph_search_topk];
+
+  // cid -> [bid -> [qid]]
+  std::unordered_map<uint32_t,
+          std::unordered_map<uint32_t, std::unordered_set<uint32_t>>>
+                                       mp;
+
+  centroids_dists = new float[(int64_t)nq*graph_search_topk*1ULL];
+
+  search_graph<DATAT>(index_hnsw, nq, dq, graph_search_topk, graph_search_topk * 5, pquery,
+                      bucket_labels, centroids_dists);
+
+  // search_flat<DATAT>(index_path, pquery, nq, dq, nprobe, bucket_labels);
+  rc.RecordSection("search buckets done.");
+
+  uint32_t cid, bid;
+  uint32_t dim = dq, gid;
+  const uint32_t vec_size = sizeof(DATAT) * dim;
+  const uint32_t entry_size = vec_size + sizeof(uint32_t);
+  DATAT *vec;
+
+  // init answer heap
+#pragma omp parallel for schedule(static, 128)
+  for (int i = 0; i < nq; i++) {
+    auto ans_disi = answer_dists + topk * i;
+    auto ans_idsi = answer_ids + topk * i;
+    heap_heapify<HEAPT>(topk, ans_disi, ans_idsi);
+  }
+  rc.RecordSection("heapify answers heaps");
+
+  char *buf = new char[block_size];
+  int64_t total_vector =  0;
+  /* flat */
+  for (int64_t i = 0; i < nq; ++i) {
+    const auto ii = i * graph_search_topk;
+    const DATAT *q_idx = pquery + i * dq;
+    const float *c_dist = centroids_dists + i * graph_search_topk;
+    float search_threshold = c_dist[0];
+    for (int64_t j = 0; j < graph_search_topk; ++j) {
+      search_threshold = search_threshold < c_dist[j] ? search_threshold : c_dist[j];
+    }
+    search_threshold *= (1 + SEARCH_PRUNING_RATE);
+    // std::cout<<i<<" search_threshold "<<search_threshold<<std::endl;
+    for (int64_t j = 0; j < graph_search_topk; ++j) {
+      //    std::cout<<"j"<<" ";
+      //  std::cout<<c_dist[j]<<std::endl;
+      if(c_dist[j] <= search_threshold) {
+
+        parse_global_block_id(bucket_labels[ii + j], cid, bid);
+        std::string cluster_file_path =
+                index_path + CLUSTER + std::to_string(cid) + "-" + RAWDATA + BIN;
+        auto fh = std::ifstream(cluster_file_path, std::ios::binary);
+        assert(!fh.fail());
+
+        fh.seekg(bid * block_size);
+        fh.read(buf, block_size);
+
+        const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
+        char *buf_begin = buf + sizeof(uint32_t);
+        total_vector += entry_num;
+        for (uint32_t k = 0; k < entry_num; ++k) {
+          char *entry_begin = buf_begin + entry_size * k;
+          vec = reinterpret_cast<DATAT *>(entry_begin);
+          auto dis = dis_computer(vec, q_idx, dim);
+          if (HEAPT::cmp(answer_dists[topk * i], dis)) {
+            heap_swap_top<HEAPT>(
+                    topk, answer_dists + topk * i, answer_ids + topk * i, dis,
+                    *reinterpret_cast<uint32_t *>(entry_begin + vec_size));
+          }
+        }
+        // std::cout<<"search block"<<std::endl;
+      }
+    }
+  }
+  std::cout<<"total access vector :"<<total_vector<<std::endl;
+  rc.RecordSection("scan blocks done");
+
+  // write answers
+  save_answers<DISTT, HEAPT>(answer_bin_file, topk, nq, answer_dists,
+                             answer_ids);
+  rc.RecordSection("write answers done");
+
+  gather_vec_searched_per_query(index_path, pquery, nq, graph_search_topk, dq, block_size,
+                                buf, bucket_labels);
+  rc.RecordSection("gather statistics done");
+
+  delete[] buf;
+  delete[] bucket_labels;
+  delete[] centroids_dists;
   delete[] pquery;
   delete[] answer_ids;
   delete[] answer_dists;
