@@ -210,7 +210,7 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
         //split_clusters_half(dim, k2, cluster_size, data, nullptr, cluster_id.data(), k2_centroids, avg_len);
     }
 
-    std::vector<float> bucket_pre_size(k2 + 1, 0);
+    std::vector<int64_t> bucket_pre_size(k2 + 1, 0);
 
     for (int i=0; i<cluster_size; i++) {
         bucket_pre_size[cluster_id[i]+1]++;
@@ -267,7 +267,7 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
             blk_num++;
 
         } else {
-            recursive_kmeans(k1_id, (uint32_t)bucket_size, data + bucket_offest * dim, ids + bucket_offest, dim, threshold, blk_size,
+            recursive_kmeans(k1_id, bucket_size, data + bucket_offest * dim, ids + bucket_offest, dim, threshold, blk_size,
                              blk_num, data_writer, centroids_writer, centroids_id_writer, level + 1, kmpp, avg_len, niter, seed);
         }
     }
