@@ -179,9 +179,11 @@ void hierarchical_clusters(const std::string &output_path, const int K1,
       assert(ids_dim == 1);
       assert(entry_num > 0);
 
+
       int64_t data_size = static_cast<int64_t>(cluster_size);
 
       DATAT *datai = new DATAT[data_size * cluster_dim * 1ULL];
+
       uint32_t *idi = new uint32_t[ids_size * ids_dim];
       uint32_t blk_num = 0;
       data_reader.read((char *)datai,
