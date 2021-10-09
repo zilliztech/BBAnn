@@ -48,8 +48,18 @@ void BBAnnIndex<dataT, paraT>::BatchSearchCpp(const dataT *pquery, uint64_t dim,
         numQuery, dim);
     break;
   }
+  case MetricType::IP {
+    Computer<dataT, dataT, distanceT> dis_computer =
+        L2sqr<const dataT, const dataT, distanceT>;
+    search_bbann_queryonly<dataT, distanceT, CMin<distanceT, uint32_t>>(
+        indexPrefix_, para.nProbe, para.hnswefC, knn, index_hnsw_, para.K1,
+        para.blockSize, dis_computer, pquery, answer_ids, answer_dists,
+        numQuery, dim);
+    break;
+
+  }
   default:
-    std::cerr << "not supported" << std::endl;
+    std::cerr << "not supported metric type"  << (int) para.metric << std::endl;
   }
 }
 

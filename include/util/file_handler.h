@@ -67,6 +67,7 @@ class IOWriter {
     IOWriter(const std::string& file_name, const uint64_t cache_size = GIGABYTE)
     : cache_size_(cache_size), cur_off_(0) {
         writer_.open(file_name, std::ios::binary);
+        std::cout << "writing file" << file_name << std::endl;
         assert(writer_.is_open() == true);
         assert(cache_size_ > 0);
         cache_buf_ = (char*) malloc(cache_size_);
