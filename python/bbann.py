@@ -92,7 +92,7 @@ class BbANN(BaseANN):
         """Carry out a batch query for k-NN of query set X."""
         nq, dim = (np.shape(X))
         self.res, self.query_dists = self.index.batch_search(X, dim, nq, k)
-        print(self.res)
+        print(dim(self.res))
 
     def range_query(self, X, radius):
         """

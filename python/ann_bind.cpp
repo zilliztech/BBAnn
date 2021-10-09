@@ -27,7 +27,8 @@ void IndexBindWrapper(py::module_ &m) {
       }))
       .def("LoadIndex", &indexT::LoadIndex, py::arg("index_path_prefix"))
       .def("batch_search",
-           [](indexT &self,py::array_t<dataT, py::array::c_style | py::array::forcecast>
+           [](indexT &self,
+              py::array_t<dataT, py::array::c_style | py::array::forcecast>
                   &query,
               uint64_t dim, uint64_t numQuery, uint64_t knn, const paraT para)
                -> std::pair<py::array_t<unsigned>, py::array_t<float>> {
@@ -37,8 +38,8 @@ void IndexBindWrapper(py::module_ &m) {
              const dataT *pquery = query.data();
              distanceT *answer_dists = new distanceT[(int64_t)numQuery * knn];
              uint32_t *answer_ids = new uint32_t[(int64_t)numQuery * knn];
-             self.BatchSearchCpp(pquery, dim, numQuery, knn, para,
-                                    answer_ids, answer_dists);
+             self.BatchSearchCpp(pquery, dim, numQuery, knn, para, answer_ids,
+                                 answer_dists);
              auto r = ids.mutable_unchecked();
              auto d = dists.mutable_unchecked();
              for (uint64_t i = 0; i < numQuery; ++i)
@@ -53,8 +54,11 @@ void IndexBindWrapper(py::module_ &m) {
       .def("build",
            [](indexT &self, paraT para) { return indexT::BuildIndex(para); },
            py::arg("para"));
+}
 
-  m.def(TypeNameWrapper::ReaderName(),
+template <class dataT>
+void DataReaderBindWrapper(py::module_ &m, const char * readerName) {
+  m.def(readerName,
         [](const std::string &path, std::vector<dataT> &data) {
           size_t num, dim, aligned_dims;
           // TODO(!!!!!!)  check disann implementaion, what is rounded dims?
@@ -106,25 +110,20 @@ PYBIND11_MODULE(bbannpy, m) {
       .def_readwrite("K", &BBAnnParameters::K)
       .def_readwrite("nProbe", &BBAnnParameters::nProbe)
       .def_readwrite("blockSize", &BBAnnParameters::blockSize);
-
-  class FloatWrapper {
-  public:
-    static const char *Get() { return "FloatIndex"; }
-    static const char *ReaderName() { return "read_bin_float"; }
-  };
-  class UInt8Wrapper {
-  public:
-    static const char *Get() { return "Uint8Index"; }
-    static const char *ReaderName() { return "read_bin_uint8"; }
-  };
-
-  class Int8Wrapper {
-  public:
-    static const char *Get() { return "Int8Index"; }
-    static const char *ReaderName() { return "read_bin_int8"; }
-  };
+#define CLASSWRAPPER_DECL(className, index)                                    \
+  class className {                                                            \
+  public:                                                                      \
+    static const char *Get() { return index; }                                 \
+  }
+  CLASSWRAPPER_DECL(FloatWrapper, "FloatIndex");
+  CLASSWRAPPER_DECL(UInt8Wrapper, "Uint8Index");
+  CLASSWRAPPER_DECL(Int8Wrapper, "Int8Index");
+#undef CLASSWRAPPER_DECL
 
   IndexBindWrapper<BBAnnIndex<float, BBAnnParameters>, FloatWrapper>(m);
   IndexBindWrapper<BBAnnIndex<uint8_t, BBAnnParameters>, UInt8Wrapper>(m);
   IndexBindWrapper<BBAnnIndex<int8_t, BBAnnParameters>, Int8Wrapper>(m);
+  DataReaderBindWrapper<float>(m, "read_bin_float");
+  DataReaderBindWrapper<int8_t>(m, "read_bin_int8");
+  DataReaderBindWrapper<uint8_t>(m, "read_bin_uint8");
 }
