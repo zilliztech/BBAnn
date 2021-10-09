@@ -179,15 +179,17 @@ void hierarchical_clusters(const std::string &output_path, const int K1,
       assert(ids_dim == 1);
       assert(entry_num > 0);
 
-      DATAT *datai = new DATAT[(uint64_t)cluster_size * cluster_dim * 1ULL];
+      int64_t data_size = static_cast<int64_t>(cluster_size);
+
+      DATAT *datai = new DATAT[data_size * cluster_dim * 1ULL];
       uint32_t *idi = new uint32_t[ids_size * ids_dim];
       uint32_t blk_num = 0;
       data_reader.read((char *)datai,
-                       cluster_size * cluster_dim * sizeof(DATAT));
+                       data_size * cluster_dim * sizeof(DATAT));
       ids_reader.read((char *)idi, ids_size * ids_dim * sizeof(uint32_t));
 
       IOWriter data_writer(data_file, MEGABYTE * 100);
-      recursive_kmeans<DATAT>(i, cluster_size, datai, idi, cluster_dim,
+      recursive_kmeans<DATAT>(i, data_size, datai, idi, cluster_dim,
                               entry_num, blk_size, blk_num, data_writer,
                               centroids_writer, centroids_id_writer, 0, false,
                               avg_len);
