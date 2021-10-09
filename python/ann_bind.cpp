@@ -52,8 +52,6 @@ void IndexBindWrapper(py::module_ &m) {
   using dataT = typename indexT::dataType;
   py::class_<indexT>(m, TypeNameWrapper::Get())
       .def(py::init([](MetricType metric) {
-        TestLib ann;
-        std::cout << ann.Get();
         return std::unique_ptr<indexT>(new indexT(metric));
       }))
       .def("LoadIndex", &indexT::LoadIndex, py::arg("index_path_prefix"))

@@ -1,12 +1,11 @@
-#include "lib/bbannlib.h"
+#include "lib/bbannlib2.h"
 #include "ann_interface.h"
-#include "util/constants.h"
-#include "util/defines.h"
 #include <stdint.h>
 #include <string>
 
+namespace bbann {
 template <typename dataT, typename paraT>
-bool BBAnnIndex<dataT, paraT>::LoadIndex(std::string &indexPathPrefix) {
+bool BBAnnIndex2<dataT, paraT>::LoadIndex(std::string &indexPathPrefix) {
   std::cout << "Loading: " << indexPathPrefix;
 
   std::string hnsw_index_file = indexPathPrefix + HNSW + INDEX + BIN;
@@ -30,7 +29,7 @@ bool BBAnnIndex<dataT, paraT>::LoadIndex(std::string &indexPathPrefix) {
 }
 
 template <typename dataT, typename paraT>
-void BBAnnIndex<dataT, paraT>::BatchSearchCpp(const dataT *pquery, uint64_t dim,
+void BBAnnIndex2<dataT, paraT>::BatchSearchCpp(const dataT *pquery, uint64_t dim,
                                               uint64_t numQuery, uint64_t knn,
                                               const paraT para,
                                               uint32_t *answer_ids,
@@ -54,15 +53,14 @@ void BBAnnIndex<dataT, paraT>::BatchSearchCpp(const dataT *pquery, uint64_t dim,
         para.blockSize, dis_computer, pquery, answer_ids, answer_dists,
         numQuery, dim);
     break;
-
   }
   default:
-    std::cerr << "not supported metric type"  << (int) para.metric << std::endl;
+    std::cerr << "not supported metric type" << (int)para.metric << std::endl;
   }
 }
 
 template <typename dataT, typename paraT>
-void BBAnnIndex<dataT, paraT>::BuildIndexImpl(const paraT para) {
+void BBAnnIndex2<dataT, paraT>::BuildIndexImpl(const paraT para) {
   std::cout << "Build start " << std::endl;
   using distanceT = typename TypeWrapper<dataT>::distanceT;
   switch (para.metric) {
@@ -87,15 +85,17 @@ void BBAnnIndex<dataT, paraT>::BuildIndexImpl(const paraT para) {
 }
 
 #define BBANNLIB_DECL(dataT, paraT)                                            \
-  template bool BBAnnIndex<dataT, paraT>::LoadIndex(                           \
+  template bool BBAnnIndex2<dataT, paraT>::LoadIndex(                           \
       std::string &indexPathPrefix);                                           \
-  template void BBAnnIndex<dataT, paraT>::BatchSearchCpp(                      \
+  template void BBAnnIndex2<dataT, paraT>::BatchSearchCpp(                      \
       const dataT *pquery, uint64_t dim, uint64_t numQuery, uint64_t knn,      \
       const paraT para, uint32_t *answer_ids, distanceT *answer_dists);        \
-  template void BBAnnIndex<dataT, paraT>::BuildIndexImpl(const paraT para);
+  template void BBAnnIndex2<dataT, paraT>::BuildIndexImpl(const paraT para);
 
 BBANNLIB_DECL(float, BBAnnParameters);
 BBANNLIB_DECL(uint8_t, BBAnnParameters);
 BBANNLIB_DECL(int8_t, BBAnnParameters);
 
 #undef BBANNLIB_DECL
+
+}
