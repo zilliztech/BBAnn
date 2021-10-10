@@ -14,7 +14,7 @@ class BbANN(BaseANN):
         self.index_params = index_params
         self.identifier = index_params.get("identifier")
         self.para =  bbannpy.BBAnnParameters()
-        print("init BbAnn")
+        print("init BbAnn with the following parameters")
         for key in index_params:
             print(key, index_params[key])
             if hasattr(self.para, key):
@@ -22,6 +22,11 @@ class BbANN(BaseANN):
 
 
     def set_query_arguments(self, query_args):
+        print("query BbAnn with the following parameters")
+        for key in query_args:
+            print(key, query_args[key])
+            if hasattr(self.para, key):
+              setattr(self.para, key, query_args[key])
         pass
 
     def done(self):
