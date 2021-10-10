@@ -62,7 +62,7 @@ void BBAnnIndex<dataT, paraT>::BatchSearchCpp(const dataT *pquery, uint64_t dim,
 
 template <typename dataT, typename paraT>
 void BBAnnIndex<dataT, paraT>::BuildIndexImpl(const paraT para) {
-  std::cout << "Build start " << std::endl;
+  std::cout << __func__ << "Build start " << std::endl;
   using distanceT = typename TypeWrapper<dataT>::distanceT;
   switch (para.metric) {
   case MetricType::L2: {

@@ -62,7 +62,7 @@ print("Here4")
 index = bbannpy.FloatIndex(bbannpy.L2)
 print("Here5")
 
-if not index.LoadIndex(para.indexPrefixPath):
+if not index.load_index(para.indexPrefixPath):
     print("error loading index")
 print("Load succ")
 ids, dists = index.batch_search(query_data_numpy, query_aligned_dims,

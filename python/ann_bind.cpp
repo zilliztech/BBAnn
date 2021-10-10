@@ -10,7 +10,7 @@
 #include "ann_interface.h"
 #include "bbann.h"
 #include "lib/bbannlib.h"
-#include "lib/bbannlib2.h"
+// #include "lib/bbannlib2.h"
 namespace py = pybind11;
 
 PYBIND11_MAKE_OPAQUE(std::vector<unsigned>);
@@ -26,7 +26,7 @@ void IndexBindWrapper(py::module_ &m) {
       .def(py::init([](MetricType metric) {
         return std::unique_ptr<indexT>(new indexT(metric));
       }))
-      .def("LoadIndex", &indexT::LoadIndex, py::arg("index_path_prefix"))
+      .def("load_index", &indexT::LoadIndex, py::arg("index_path_prefix"))
       .def("batch_search",
            [](indexT &self,
               py::array_t<dataT, py::array::c_style | py::array::forcecast>

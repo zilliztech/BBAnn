@@ -12,7 +12,17 @@ class BbANN(BaseANN):
     def __init__(self, metric, index_params):
         self.metric = metric
         self.index_params = index_params
-        self.R = index_params.get("R")
+        self.identifier = index_params.get("identifier")
+        self.para =  bbannpy.BBAnnParameters()
+        print("init BbAnn")
+        for key in index_params:
+            print(key, index_params[key])
+            if hasattr(self.para, key):
+              setattr(self.para, key, index_params[key])
+
+
+    def set_query_arguments(self, query_args):
+        pass
 
     def done(self):
         pass
@@ -21,7 +31,8 @@ class BbANN(BaseANN):
         """
         File name for the index.
         """
-        return f"R{self._R}"
+        
+        return f"bbann_{self.identifier}"
 
     def create_index_dir(self, dataset):
         """
@@ -32,20 +43,20 @@ class BbANN(BaseANN):
 
     def set_index_type(self, ds_distance, ds_dtype):
         if ds_distance == "euclidean":
-            metric = bbannpy.L2
+            self.para.metric = bbannpy.L2
         elif ds_distance == "ip":
-            metric = bbannpy.INNER_PRODUCT
+            self.para.metric = bbannpy.INNER_PRODUCT
         else:
             print("Unsuported distance function.")
             return False
 
         if not hasattr(self, 'index'):
             if ds_dtype == "float32":
-                self.index = bbannpy.FloatIndex(metric)
+                self.index = bbannpy.FloatIndex(self.para.metric)
             elif ds_dtype == "int8":
-                self.index = bbannpy.Int8Index(metric)
+                self.index = bbannpy.Int8Index(self.para.metric)
             elif ds_dtype == "uint8":
-                self.index = bbannpy.UInt8Index(metric)
+                self.index = bbannpy.UInt8Index(self.para.metric)
             else:
                 print("Unsupported data type.")
                 return False
@@ -59,18 +70,18 @@ class BbANN(BaseANN):
         ds = DATASETS[dataset]()
         d = ds.d
         index_dir = self.create_index_dir(ds)
-        self.index_path = os.path.join(index_dir, self.index_name())
         if not self.set_index_type(ds.distance(), ds.dtype):
             return False
+        
+        self.para.dataFilePath = ds.get_dataset_fn()
+        self.para.indexPrefixPath = os.path.join(index_dir, self.index_name())
 
         start = time.time()
-        self.index.build(
-            ds.get_dataset_fn(),
-            index_path=self.index_path)
+        self.index.build(self.para)
         end = time.time()
         print("bbAnn index built in %.3f s" % (end - start))
-        print(f"Loading index from {self.index_path}")
-        self.index.load_index(self.index_path)
+        print(f"Loading index from {self.para.indexPrefixPath}")
+        self.index.load_index(self.para.indexPrefixPath)
 
     def load_index(self, dataset):
         """
@@ -91,8 +102,8 @@ class BbANN(BaseANN):
     def query(self, X, k):
         """Carry out a batch query for k-NN of query set X."""
         nq, dim = (np.shape(X))
-        self.res, self.query_dists = self.index.batch_search(X, dim, nq, k)
-        print(dim(self.res))
+        self.res, self.query_dists = self.index.batch_search(X, dim, nq, k, self.para)
+        print(self.res)
 
     def range_query(self, X, radius):
         """
