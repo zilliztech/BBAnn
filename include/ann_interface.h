@@ -41,3 +41,10 @@ public:
                               uint32_t *answer_ids,
                               distanceT *answer_dists) = 0;
 };
+namespace bbann{
+enum class MetricType {
+    None = 0,
+    L2 = 1,
+    IP = 2,
+};
+}

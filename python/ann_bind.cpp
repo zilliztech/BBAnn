@@ -7,10 +7,19 @@
 #include <pybind11/stl_bind.h>
 #include <string>
 
+#define ANN_LIB_2
+#ifdef ANN_LIB
 #include "ann_interface.h"
 #include "bbann.h"
 #include "lib/bbannlib.h"
-// #include "lib/bbannlib2.h"
+#endif
+#ifdef ANN_LIB_2
+#include "lib/bbannlib2.h"
+using bbann::BBAnnIndex2;
+using bbann::BBAnnParameters;
+using bbann::MetricType;
+#endif
+
 namespace py = pybind11;
 
 PYBIND11_MAKE_OPAQUE(std::vector<unsigned>);
@@ -27,6 +36,12 @@ void IndexBindWrapper(py::module_ &m) {
         return std::unique_ptr<indexT>(new indexT(metric));
       }))
       .def("load_index", &indexT::LoadIndex, py::arg("index_path_prefix"))
+      .def("build",
+           [](indexT &self, paraT para) {
+             std::cout << "Build" << TypeNameWrapper::Get() << std::endl;
+             return indexT::BuildIndex(para);
+           },
+           py::arg("para"))
       .def("batch_search",
            [](indexT &self,
               py::array_t<dataT, py::array::c_style | py::array::forcecast>
@@ -51,14 +66,11 @@ void IndexBindWrapper(py::module_ &m) {
              return std::make_pair(ids, dists);
            },
            py::arg("query"), py::arg("dim"), py::arg("num_query"),
-           py::arg("knn"), py::arg("para"))
-      .def("build",
-           [](indexT &self, paraT para) { return indexT::BuildIndex(para); },
-           py::arg("para"));
+           py::arg("knn"), py::arg("para"));
 }
 
 template <class dataT>
-void DataReaderBindWrapper(py::module_ &m, const char * readerName) {
+void DataReaderBindWrapper(py::module_ &m, const char *readerName) {
   m.def(readerName,
         [](const std::string &path, std::vector<dataT> &data) {
           size_t num, dim, aligned_dims;
@@ -117,13 +129,21 @@ PYBIND11_MODULE(bbannpy, m) {
     static const char *Get() { return index; }                                 \
   }
   CLASSWRAPPER_DECL(FloatWrapper, "FloatIndex");
-  CLASSWRAPPER_DECL(UInt8Wrapper, "Uint8Index");
+  CLASSWRAPPER_DECL(UInt8Wrapper, "UInt8Index");
   CLASSWRAPPER_DECL(Int8Wrapper, "Int8Index");
 #undef CLASSWRAPPER_DECL
-
+#ifdef ANN_LIB
   IndexBindWrapper<BBAnnIndex<float, BBAnnParameters>, FloatWrapper>(m);
   IndexBindWrapper<BBAnnIndex<uint8_t, BBAnnParameters>, UInt8Wrapper>(m);
   IndexBindWrapper<BBAnnIndex<int8_t, BBAnnParameters>, Int8Wrapper>(m);
+#endif
+
+#ifdef ANN_LIB_2
+  IndexBindWrapper<BBAnnIndex2<float>, FloatWrapper>(m);
+  IndexBindWrapper<BBAnnIndex2<uint8_t>, UInt8Wrapper>(m);
+  IndexBindWrapper<BBAnnIndex2<int8_t>, Int8Wrapper>(m);
+
+#endif
   DataReaderBindWrapper<float>(m, "read_bin_float");
   DataReaderBindWrapper<int8_t>(m, "read_bin_int8");
   DataReaderBindWrapper<uint8_t>(m, "read_bin_uint8");
