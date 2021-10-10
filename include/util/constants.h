@@ -6,6 +6,7 @@
 
 constexpr static int PAGESIZE = 4096;
 
+constexpr static int MAXIMUM_BUCKET_SEARCH_MORE_THAN_NPROBE=2;
 // units
 constexpr static uint64_t KILOBYTE = 1024;
 constexpr static uint64_t MEGABYTE = 1024 * 1024;

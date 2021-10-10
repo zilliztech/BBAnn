@@ -542,6 +542,8 @@ void search_bbann(
   DISTT *answer_dists = nullptr;
   uint32_t *answer_ids = nullptr;
   uint32_t *bucket_labels = nullptr;
+  uint32_t *answer_bucket_1= nullptr;
+  uint32_t *answer_bucket_2= nullptr;
 
   uint32_t nq, dq;
 
@@ -553,11 +555,14 @@ void search_bbann(
   answer_dists = new DISTT[(int64_t)nq * topk];
   answer_ids = new uint32_t[(int64_t)nq * topk];
   bucket_labels = new uint32_t[(int64_t)nq * nprobe]; // 400K * nprobe
+  answer_bucket_1=new uint32_t [nq*nprobe];
+  answer_bucket_2=new uint32_t[nq*nprobe];
 
   // cid -> [bid -> [qid]]
   std::unordered_map<uint32_t,
                      std::unordered_map<uint32_t, std::unordered_set<uint32_t>>>
       mp;
+  std::unordered_map<uint32_t,int32_t> bucket_map;
 
   search_graph<DATAT>(index_hnsw, nq, dq, nprobe, hnsw_ef, pquery,
                       bucket_labels, nullptr);
@@ -567,7 +572,8 @@ void search_bbann(
   uint32_t cid, bid;
   uint32_t dim = dq, gid;
   const uint32_t vec_size = sizeof(DATAT) * dim;
-  const uint32_t entry_size = vec_size + sizeof(uint32_t);
+  //const uint32_t entry_size = vec_size + sizeof(uint32_t);
+    const uint32_t entry_size = vec_size + 3*sizeof(uint32_t);
   DATAT *vec;
 
   // init answer heap
@@ -575,7 +581,7 @@ void search_bbann(
   for (int i = 0; i < nq; i++) {
     auto ans_disi = answer_dists + topk * i;
     auto ans_idsi = answer_ids + topk * i;
-    heap_heapify<HEAPT>(topk, ans_disi, ans_idsi);
+    heap_heapify<HEAPT>(topk, ans_disi, ans_idsi,answer_bucket_1+topk*i,answer_bucket_2+topk*i);
   }
   rc.RecordSection("heapify answers heaps");
 
@@ -587,6 +593,7 @@ void search_bbann(
     const DATAT *q_idx = pquery + i * dq;
 
     for (int64_t j = 0; j < nprobe; ++j) {
+      bucket_map[bucket_labels[ii+j]]=-1;
       parse_global_block_id(bucket_labels[ii + j], cid, bid);
       std::string cluster_file_path =
           index_path + CLUSTER + std::to_string(cid) + "-" + RAWDATA + BIN;
@@ -605,11 +612,101 @@ void search_bbann(
         auto dis = dis_computer(vec, q_idx, dim);
         if (HEAPT::cmp(answer_dists[topk * i], dis)) {
           heap_swap_top<HEAPT>(
-              topk, answer_dists + topk * i, answer_ids + topk * i, dis,
-              *reinterpret_cast<uint32_t *>(entry_begin + vec_size));
+              topk, answer_dists + topk * i, answer_ids + topk * i,answer_bucket_1+topk*i,
+              answer_bucket_2+topk*i,dis,
+              *reinterpret_cast<uint32_t *>(entry_begin + vec_size),
+              *reinterpret_cast<uint32_t*>(entry_begin+vec_size+1),
+              *reinterpret_cast<uint32_t*>(entry_begin+vec_size+2));
         }
       }
     }
+
+    int maximum_nprobe=MAXIMUM_BUCKET_SEARCH_MORE_THAN_NPROBE*nprobe-nprobe;
+    auto b1_p=answer_bucket_1+topk*i;
+    auto b2_p=answer_bucket_2+topk*i;
+    int siz=0;
+    for (int ind=0;ind<topk;ind++){
+        if (bucket_map.count(b1_p[ind])==0){
+            bucket_map[b1_p[ind]]=1;
+            siz++;
+        }
+        else if (bucket_map[b1_p[ind]]!=-1){
+            bucket_map[b1_p[ind]]=bucket_map[b1_p[ind]]+1;
+        }
+        if (bucket_map.count(b2_p[ind])==0){
+            bucket_map[b2_p[ind]]=1;
+            siz++;
+        }
+        else if (bucket_map[b2_p[ind]]!=-1){
+            bucket_map[b2_p[ind]]=bucket_map[b2_p[ind]]+1;
+        }
+    }
+    int32_t * vote_count=new int32_t [siz];
+    uint32_t * vote_id=new uint32_t [siz];
+    if (maximum_nprobe<siz) {
+        heap_heapify<CMin<int32_t, uint32_t>>(maximum_nprobe, vote_count, vote_id);
+        for (auto it = bucket_map.begin(); it != bucket_map.end(); ++it) {
+            heap_swap_top<CMin<int32_t,uint32_t>>(maximum_nprobe,vote_count,vote_id,it->second,it->first);
+        }
+        heap_reorder<CMin<int32_t,uint32_t>>(maximum_nprobe,vote_count,vote_id);
+        for (int ind=0;ind<maximum_nprobe;ind++){
+            parse_global_block_id(vote_id[ind], cid, bid);
+            std::string cluster_file_path =
+                    index_path + CLUSTER + std::to_string(cid) + "-" + RAWDATA + BIN;
+            auto fh = std::ifstream(cluster_file_path, std::ios::binary);
+            assert(!fh.fail());
+
+            fh.seekg(bid * block_size);
+            fh.read(buf, block_size);
+
+            const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
+            char *buf_begin = buf + sizeof(uint32_t);
+
+            for (uint32_t k = 0; k < entry_num; ++k) {
+                char *entry_begin = buf_begin + entry_size * k;
+                vec = reinterpret_cast<DATAT *>(entry_begin);
+                auto dis = dis_computer(vec, q_idx, dim);
+                if (HEAPT::cmp(answer_dists[topk * i], dis)) {
+                    heap_swap_top<HEAPT>(
+                            topk, answer_dists + topk * i, answer_ids + topk * i,dis,
+                            *reinterpret_cast<uint32_t *>(entry_begin + vec_size));
+                }
+            }
+        }
+    }
+    else{
+        int ind=0;
+        for (auto it=bucket_map.begin();it!=bucket_map.end();++it){
+            vote_id[ind]=it->first;
+            vote_count[ind]=it->second;
+            ind++;
+        }
+        for (int ind=0;ind<siz;++ind){
+            parse_global_block_id(vote_id[ind], cid, bid);
+            std::string cluster_file_path =
+                    index_path + CLUSTER + std::to_string(cid) + "-" + RAWDATA + BIN;
+            auto fh = std::ifstream(cluster_file_path, std::ios::binary);
+            assert(!fh.fail());
+
+            fh.seekg(bid * block_size);
+            fh.read(buf, block_size);
+
+            const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
+            char *buf_begin = buf + sizeof(uint32_t);
+
+            for (uint32_t k = 0; k < entry_num; ++k) {
+                char *entry_begin = buf_begin + entry_size * k;
+                vec = reinterpret_cast<DATAT *>(entry_begin);
+                auto dis = dis_computer(vec, q_idx, dim);
+                if (HEAPT::cmp(answer_dists[topk * i], dis)) {
+                    heap_swap_top<HEAPT>(
+                            topk, answer_dists + topk * i, answer_ids + topk * i,dis,
+                            *reinterpret_cast<uint32_t *>(entry_begin + vec_size));
+                }
+            }
+        }
+    }
+
   }
 
   /* remove duplications + parallel on queries when searching block */

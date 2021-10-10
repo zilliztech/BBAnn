@@ -51,6 +51,22 @@ void heap_heapify (
 }
 
 template <class C> inline
+void heap_heapify (
+        size_t k,
+        typename C::T *  bh_val,
+        typename C::TI *  bh_ids,
+        typename C::TI * bucket_1,
+        typename C::TI * bucket_2)
+{
+    for (size_t i = 0; i < k; i++) {
+        bh_val[i] = C::neutral();
+        bh_ids[i] = -1;
+        bucket_1[i]=-1;
+        bucket_2[i]=-1;
+    }
+}
+
+template <class C> inline
 void heap_swap_top (size_t k,
                      typename C::T* bh_val, typename C::TI* bh_ids,
                      typename C::T val, typename C::TI ids)
@@ -80,6 +96,47 @@ void heap_swap_top (size_t k,
     }
     bh_val[i] = val;
     bh_ids[i] = ids;
+}
+
+template <class C> inline
+void heap_swap_top (size_t k,
+                    typename C::T* bh_val, typename C::TI* bh_ids, typename C::TI* bucket_id_1,
+                    typename C::TI* bucket_id_2,
+                    typename C::T val, typename C::TI ids,typename C::TI bucket_1,typename C::TI bucket_2)
+{
+    bh_val--; /* Use 1-based indexing for easier node->child translation */
+    bh_ids--;
+    bucket_id_1--;
+    bucket_id_2--;
+    size_t i = 1, i1, i2;
+    while (1) {
+        i1 = i << 1;
+        i2 = i1 + 1;
+        if (i1 > k)
+            break;
+        if (i2 == k + 1 || C::cmp(bh_val[i1], bh_val[i2])) {
+            if (C::cmp(val, bh_val[i1]))
+                break;
+            bh_val[i] = bh_val[i1];
+            bh_ids[i] = bh_ids[i1];
+            bucket_id_1[i]=bucket_id_1[i1];
+            bucket_id_2[i]=bucket_id_2[i1];
+            i = i1;
+        }
+        else {
+            if (C::cmp(val, bh_val[i2]))
+                break;
+            bh_val[i] = bh_val[i2];
+            bh_ids[i] = bh_ids[i2];
+            bucket_id_1[i]=bucket_id_1[i2];
+            bucket_id_2[i]=bucket_id_2[i2];
+            i = i2;
+        }
+    }
+    bh_val[i] = val;
+    bh_ids[i] = ids;
+    bucket_id_1[i]=bucket_1;
+    bucket_id_2[i]=bucket_2;
 }
 
 template <class C> inline
