@@ -10,6 +10,7 @@
 #include "ann_interface.h"
 #include "bbann.h"
 #include "lib/bbannlib.h"
+#include "lib/bbannlib2.h"
 namespace py = pybind11;
 
 PYBIND11_MAKE_OPAQUE(std::vector<unsigned>);
