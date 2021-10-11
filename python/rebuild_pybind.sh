@@ -4,6 +4,7 @@ set -e
 pushd ../build
 cmake ..
 cd src
+make clean
 make -j
 popd
 
