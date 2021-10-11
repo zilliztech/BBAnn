@@ -3,6 +3,7 @@
 set -e
 pushd ../build
 cmake ..
+make clean
 make -j
 popd
 
