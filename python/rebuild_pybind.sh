@@ -1,6 +1,7 @@
 #!/bin/bash
 # To build the pybind11 integration, run the following:
 set -e
+mkdir -p ../build
 pushd ../build
 cmake ..
 make clean

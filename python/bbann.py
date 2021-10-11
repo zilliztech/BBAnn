@@ -36,14 +36,22 @@ class BbANN(BaseANN):
         """
         File name for the index.
         """
-        
-        return f"bbann_{self.identifier}"
+        return f"{self.identifier}"
 
     def create_index_dir(self, dataset):
         """
         Return a folder name, in which we would store the index.
         """
-        index_dir = os.path.join(os.getcwd(), "bbann_index")
+        index_dir = os.path.join(os.getcwd(), "data", "indices")
+        os.makedirs(index_dir, mode=0o777, exist_ok=True)
+        index_dir = os.path.join(index_dir, "T2")
+        os.makedirs(index_dir, mode=0o777, exist_ok=True)
+        index_dir = os.path.join(index_dir, self.__str__())
+        os.makedirs(index_dir, mode=0o777, exist_ok=True)
+        index_dir = os.path.join(index_dir, dataset.short_name())
+        os.makedirs(index_dir, mode=0o777, exist_ok=True)
+        index_dir = os.path.join(index_dir, self.index_name())
+        os.makedirs(index_dir, mode=0o777, exist_ok=True)
         return index_dir
 
     def set_index_type(self, ds_distance, ds_dtype):
@@ -79,7 +87,7 @@ class BbANN(BaseANN):
             return False
         
         self.para.dataFilePath = ds.get_dataset_fn()
-        self.para.indexPrefixPath = os.path.join(index_dir, self.index_name())
+        self.para.indexPrefixPath = index_dir+"/"
 
         start = time.time()
         self.index.build(self.para)
@@ -100,7 +108,7 @@ class BbANN(BaseANN):
         index_dir = self.create_index_dir(ds)
         if not (os.path.exists(index_dir)) and 'url' not in self._index_params:
             return False
-        index_path = os.path.join(index_dir, self.index_name())
+        index_path = index_dir + "/"
         print(f"Loading index from {self.index_path}")
         self.index.load_index(self.index_path)
 

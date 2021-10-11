@@ -117,7 +117,7 @@ PYBIND11_MODULE(bbannpy, m) {
     static const char *Get() { return index; }                                 \
   }
   CLASSWRAPPER_DECL(FloatWrapper, "FloatIndex");
-  CLASSWRAPPER_DECL(UInt8Wrapper, "Uint8Index");
+  CLASSWRAPPER_DECL(UInt8Wrapper, "UInt8Index");
   CLASSWRAPPER_DECL(Int8Wrapper, "Int8Index");
 #undef CLASSWRAPPER_DECL
 
