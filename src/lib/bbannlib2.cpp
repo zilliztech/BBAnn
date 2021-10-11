@@ -910,18 +910,6 @@ bool BBAnnIndex2<dataT>::LoadIndex(std::string &indexPathPrefix) {
   return true;
 }
 
-/*()
-search_bbann_queryonly<dataT, distanceT, CMin<distanceT, uint32_t>>(
-        indexPrefix_, para.nProbe, para.hnswefC, knn, index_hnsw_, para.K1,
-        para.blockSize, dis_computer, pquery, answer_ids, answer_dists,
-        numQuery, dim);
-        void search_bbann_queryonly(
-    const std::string &index_path, const int nprobe, const int hnsw_ef,
-    const int topk, std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
-    const int K1, const uint64_t block_size,
-    Computer<DATAT, DATAT, DISTT> &dis_computer,
-    ....
-*/
 template <typename DATAT, typename DISTT>
 void search_bbann_queryonly(
     std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
