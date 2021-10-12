@@ -1,17 +1,16 @@
 #pragma once
 
-// #include <omp.h>
-
-#include <algorithm>
-#include <bitset>
-#include <deque>
+#include <omp.h>
 
 #include "util/distance.h"
-#include <assert.h>
-#include <unistd.h>
-// #include "util/utils.h"
-#include "ivf/clustering.h"
 #include "util/random.h"
+#include "util/utils.h"
+#include <algorithm>
+#include <assert.h>
+#include <deque>
+#include <memory>
+#include <string.h>
+#include <unistd.h>
 
 // #define SSK_LOG
 
@@ -102,10 +101,13 @@ void ssk_print_cluster_size_stats(int64_t k, const int64_t *hassign) {
 
 template <typename T>
 void same_size_kmeans(int64_t nx, const T *x_in, int64_t dim, int64_t k,
-                      float *centroids, bool kmpp = false, int64_t niter = 10,
+                      float *centroids, int64_t *assign, bool kmpp = false,
+                      float avg_len = 0.0, int64_t niter = 10,
                       int64_t seed = 1234) {
   assert(x_in != nullptr);
   assert(centroids != nullptr);
+  assert(assign != nullptr);
+
   assert(nx > 0);
   assert(k > 0);
 
@@ -114,8 +116,6 @@ void same_size_kmeans(int64_t nx, const T *x_in, int64_t dim, int64_t k,
 
   // the nubmer of vectors in the cluster
   int64_t *hassign = new int64_t[k];
-  // a vector is belong to which centroid
-  int64_t *assign = new int64_t[nx];
 
   memset(hassign, 0, sizeof(int64_t) * k);
 
@@ -170,7 +170,7 @@ void same_size_kmeans(int64_t nx, const T *x_in, int64_t dim, int64_t k,
     return dis_tab[x * k + assign[x]] - dis_tab[x * k + i];
   };
 
-  compute_centroids(dim, k, nx, x_in, assign, hassign, centroids);
+  compute_centroids(dim, k, nx, x_in, assign, hassign, centroids, avg_len);
 
   std::vector<std::deque<int64_t>> transfer_lists(k);
   float err = std::numeric_limits<float>::max();
@@ -264,15 +264,16 @@ void same_size_kmeans(int64_t nx, const T *x_in, int64_t dim, int64_t k,
       break;
     }
 
-    compute_centroids(dim, k, nx, x_in, assign, hassign, centroids);
+    compute_centroids(dim, k, nx, x_in, assign, hassign, centroids, avg_len);
   }
 
+#ifdef SSK_LOG
   ssk_print_cluster_size_stats(k, hassign);
+#endif
 
   delete[] xs;
   delete[] ks;
 
   delete[] dis_tab;
   delete[] hassign;
-  delete[] assign;
 }

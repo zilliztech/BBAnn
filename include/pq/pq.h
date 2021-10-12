@@ -17,7 +17,7 @@
 #include <limits>
 #include <functional>
 #include "util/utils.h"
-#include "ivf/clustering.h"
+#include "ivf/kmeans.h"
 
 template<typename T>
 using PQ_Computer = std::function<float(const T*, const float*, int n)>;
