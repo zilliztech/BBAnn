@@ -108,9 +108,12 @@ class BbANN(BaseANN):
         index_dir = self.create_index_dir(ds)
         if not (os.path.exists(index_dir)) and 'url' not in self._index_params:
             return False
-        index_path = index_dir + "/"
+        if not self.set_index_type(ds.distance(), ds.dtype):
+            return False
+        self.index_path = index_dir + "/"
         print(f"Loading index from {self.index_path}")
         self.index.load_index(self.index_path)
+        return True
 
     def query(self, X, k):
         """Carry out a batch query for k-NN of query set X."""
