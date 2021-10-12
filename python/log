@@ -1,0 +1,668 @@
+~/BigAnn/benchmark ~/BigAnn/python
+Preparing datasets with 10000 random points and 1000 queries.
+Computing groundtruth
+2021-10-11 13:47:36,728 - annb - INFO - running only bbann
+2021-10-11 13:47:36,728 - annb - INFO - Order: [Definition(algorithm='bbann', constructor='BbANN', module='benchmark.algorithms.bbann', docker_tag='billion-scale-benchmark', arguments=['euclidean', {'hnswM': 32, 'hnswefC': 200, 'K1': 20, 'blockSize': 4096, 'identifier': 'abc'}], query_argument_groups=[[{}]], disabled=False)]
+BBAnnIndex constructor
+BuildIndexImplBuild start 
+Build With L2
+dataTf
+distanceTf
+build bigann parameters:
+ raw_data_bin_file: data/random10000/data_10000_20 output_path: /home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/ hnsw.M: 32 hnsw.efConstruction: 200 K1: 20
+train_cluster parameters:
+ raw_data_bin_file: data/random10000/data_10000_20 output path: /home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/ K1: 20 centroids: 0
+get meta from data/random10000/data_10000_20, nrows = 10000, ncols = 20
+nb = 10000, dim = 20, sample_num 4 K1: 100
+train cluster: reservoir sample with sample rate: 0.010000 done (0.001411 second [1.410839 ms])
+train cluster: calculate 100 vectors from sample_data done (0.003401 second [3.401396 ms])
+max len: 31.7459, min len: 19.275, average len: 26.1877
+new nx = 100
+Too little trained points need 780 given 100
+exit kmeans iteration after the 4th iteration, err = 46032.1, cur_err = 46032.1
+after the kmeans with nx = 100, k = 20, has 0 empty clusters, max cluster: 7 min cluster: 1
+train cluster: kmeans done (0.001171 second [1.170733 ms])
+train cluster: train cluster done. (0.005994 second [5.994068 ms])
+build bigann: train cluster to get 20 centroids done. (0.006024 second [6.024170 ms])
+divide_raw_data parameters:
+ raw_data_bin_file: data/random10000/data_10000_20 output_path: /home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/ centroids: 0x27d4000 K1: 20
+split the 0th batch, start position = 0, end position = 10000
+batch-0: read batch data done (0.000411 second [0.411112 ms])
+batch-0: select file done (0.013745 second [13.744686 ms])
+batch-0: write done (0.002628 second [2.628374 ms])
+batch-0: split batch 0 done (0.016802 second [16.802373 ms])
+divide raw data: split done (0.028678 second [28.678406 ms])
+split_raw_data done in ... seconds, show statistics:
+cluster-0 has 577 points.
+cluster-1 has 407 points.
+cluster-2 has 437 points.
+cluster-3 has 540 points.
+cluster-4 has 485 points.
+cluster-5 has 482 points.
+cluster-6 has 478 points.
+cluster-7 has 514 points.
+cluster-8 has 485 points.
+cluster-9 has 574 points.
+cluster-10 has 465 points.
+cluster-11 has 511 points.
+cluster-12 has 531 points.
+cluster-13 has 565 points.
+cluster-14 has 456 points.
+cluster-15 has 443 points.
+cluster-16 has 534 points.
+cluster-17 has 466 points.
+cluster-18 has 500 points.
+cluster-19 has 550 points.
+divide raw data: rewrite header done (0.001445 second [1.444640 ms])
+total points num: 10000
+divide raw data: split_raw_data totally done (0.030401 second [30.401154 ms])
+build bigann: divide raw data into 20 clusters done (0.030769 second [30.769064 ms])
+hierarchical clusters parameters:
+ output_path: /home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/ vector avg length: 26.1877 block size: 4096
+writing file/home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/bucket-centroids.bin
+writing file/home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/cluster-combine_ids.bin
+writing file/home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/cluster-0-raw_data.bin
+new nx = 577
+exit kmeans iteration after the 5th iteration, err = 229954, cur_err = 228779
+after the kmeans with nx = 577, k = 13, has 0 empty clusters, max cluster: 85 min cluster: 22
+new nx = 50
+Too little trained points need 78 given 50
+exit kmeans iteration after the 2th iteration, err = 12116.3, cur_err = 12116.3
+after the kmeans with nx = 50, k = 2, has 0 empty clusters, max cluster: 39 min cluster: 11
+new nx = 54
+Too little trained points need 78 given 54
+exit kmeans iteration after the 3th iteration, err = 18873.7, cur_err = 18809.3
+after the kmeans with nx = 54, k = 2, has 0 empty clusters, max cluster: 36 min cluster: 18
+new nx = 85
+exit kmeans iteration after the 3th iteration, err = 27714.9, cur_err = 27632.2
+after the kmeans with nx = 85, k = 2, has 0 empty clusters, max cluster: 49 min cluster: 36
+new nx = 49
+Too little trained points need 78 given 49
+exit kmeans iteration after the 2th iteration, err = 12373.2, cur_err = 12373.2
+after the kmeans with nx = 49, k = 2, has 0 empty clusters, max cluster: 42 min cluster: 7
+new nx = 49
+Too little trained points need 78 given 49
+exit kmeans iteration after the 2th iteration, err = 15296.5, cur_err = 15296.5
+after the kmeans with nx = 49, k = 2, has 0 empty clusters, max cluster: 28 min cluster: 21
+new nx = 62
+Too little trained points need 78 given 62
+exit kmeans iteration after the 2th iteration, err = 21565.7, cur_err = 21440.3
+after the kmeans with nx = 62, k = 2, has 0 empty clusters, max cluster: 40 min cluster: 22
+new nx = 59
+Too little trained points need 78 given 59
+exit kmeans iteration after the 5th iteration, err = 17611, cur_err = 17579.3
+after the kmeans with nx = 59, k = 2, has 0 empty clusters, max cluster: 31 min cluster: 28
+writing file/home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/cluster-1-raw_data.bin
+new nx = 407
+exit kmeans iteration after the 4th iteration, err = 176006, cur_err = 175747
+after the kmeans with nx = 407, k = 9, has 0 empty clusters, max cluster: 87 min cluster: 26
+new nx = 86
+exit kmeans iteration after the 3th iteration, err = 35196.6, cur_err = 35163.9
+after the kmeans with nx = 86, k = 2, has 0 empty clusters, max cluster: 61 min cluster: 25
+new nx = 61
+Too little trained points need 78 given 61
+exit kmeans iteration after the 3th iteration, err = 22898.8, cur_err = 22840.9
+after the kmeans with nx = 61, k = 2, has 0 empty clusters, max cluster: 33 min cluster: 28
+new nx = 50
+Too little trained points need 78 given 50
+exit kmeans iteration after the 2th iteration, err = 15029.5, cur_err = 14980.1
+after the kmeans with nx = 50, k = 2, has 0 empty clusters, max cluster: 28 min cluster: 22
+new nx = 50
+Too little trained points need 78 given 50
+exit kmeans iteration after the 2th iteration, err = 14529.7, cur_err = 14529.7
+after the kmeans with nx = 50, k = 2, has 0 empty clusters, max cluster: 40 min cluster: 10
+writing file/home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/cluster-2-raw_data.bin
+new nx = 437
+exit kmeans iteration after the 4th iteration, err = 174540, cur_err = 172960
+after the kmeans with nx = 437, k = 10, has 0 empty clusters, max cluster: 67 min cluster: 21
+new nx = 55
+Too little trained points need 78 given 55
+exit kmeans iteration after the 2th iteration, err = 15170.1, cur_err = 15170.1
+after the kmeans with nx = 55, k = 2, has 0 empty clusters, max cluster: 46 min cluster: 9
+new nx = 58
+Too little trained points need 78 given 58
+exit kmeans iteration after the 3th iteration, err = 19089.1, cur_err = 19089.1
+after the kmeans with nx = 58, k = 2, has 0 empty clusters, max cluster: 31 min cluster: 27
+new nx = 67
+Too little trained points need 78 given 67
+exit kmeans iteration after the 2th iteration, err = 22115.6, cur_err = 22093.9
+after the kmeans with nx = 67, k = 2, has 0 empty clusters, max cluster: 50 min cluster: 17
+new nx = 50
+Too little trained points need 78 given 50
+exit kmeans iteration after the 2th iteration, err = 13779.5, cur_err = 13708.6
+after the kmeans with nx = 50, k = 2, has 0 empty clusters, max cluster: 35 min cluster: 15
+new nx = 50
+Too little trained points need 78 given 50
+exit kmeans iteration after the 2th iteration, err = 17935.7, cur_err = 17935.7
+after the kmeans with nx = 50, k = 2, has 0 empty clusters, max cluster: 43 min cluster: 7
+writing file/home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/cluster-3-raw_data.bin
+new nx = 540
+exit kmeans iteration after the 5th iteration, err = 227429, cur_err = 226919
+after the kmeans with nx = 540, k = 12, has 0 empty clusters, max cluster: 90 min cluster: 14
+new nx = 54
+Too little trained points need 78 given 54
+exit kmeans iteration after the 2th iteration, err = 17788.2, cur_err = 17788.2
+after the kmeans with nx = 54, k = 2, has 0 empty clusters, max cluster: 38 min cluster: 16
+new nx = 49
+Too little trained points need 78 given 49
+exit kmeans iteration after the 3th iteration, err = 14815.2, cur_err = 14815.2
+after the kmeans with nx = 49, k = 2, has 0 empty clusters, max cluster: 36 min cluster: 13
+new nx = 68
+Too little trained points need 78 given 68
+exit kmeans iteration after the 2th iteration, err = 22243.2, cur_err = 22243.2
+after the kmeans with nx = 68, k = 2, has 0 empty clusters, max cluster: 59 min cluster: 9
+new nx = 59
+Too little trained points need 78 given 59
+exit kmeans iteration after the 3th iteration, err = 17514.8, cur_err = 17472.8
+after the kmeans with nx = 59, k = 2, has 0 empty clusters, max cluster: 40 min cluster: 19
+new nx = 90
+exit kmeans iteration after the 3th iteration, err = 30949.7, cur_err = 30949.7
+after the kmeans with nx = 90, k = 2, has 0 empty clusters, max cluster: 59 min cluster: 31
+new nx = 59
+Too little trained points need 78 given 59
+exit kmeans iteration after the 2th iteration, err = 16821.7, cur_err = 16821.7
+after the kmeans with nx = 59, k = 2, has 0 empty clusters, max cluster: 45 min cluster: 14
+new nx = 59
+Too little trained points need 78 given 59
+exit kmeans iteration after the 2th iteration, err = 26402, cur_err = 26402
+after the kmeans with nx = 59, k = 2, has 0 empty clusters, max cluster: 47 min cluster: 12
+new nx = 68
+Too little trained points need 78 given 68
+exit kmeans iteration after the 2th iteration, err = 24454.5, cur_err = 24413.2
+after the kmeans with nx = 68, k = 2, has 0 empty clusters, max cluster: 51 min cluster: 17
+new nx = 51
+Too little trained points need 78 given 51
+exit kmeans iteration after the 3th iteration, err = 18197.2, cur_err = 18197.2
+after the kmeans with nx = 51, k = 2, has 0 empty clusters, max cluster: 49 min cluster: 2
+new nx = 49
+Too little trained points need 78 given 49
+exit kmeans iteration after the 2th iteration, err = 14077.5, cur_err = 14077.5
+after the kmeans with nx = 49, k = 2, has 0 empty clusters, max cluster: 43 min cluster: 6
+writing file/home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/cluster-4-raw_data.bin
+new nx = 485
+exit kmeans iteration after the 4th iteration, err = 194265, cur_err = 194061
+after the kmeans with nx = 485, k = 11, has 0 empty clusters, max cluster: 74 min cluster: 19
+new nx = 66
+Too little trained points need 78 given 66
+exit kmeans iteration after the 4th iteration, err = 24729.1, cur_err = 24729.1
+after the kmeans with nx = 66, k = 2, has 0 empty clusters, max cluster: 42 min cluster: 24
+new nx = 74
+Too little trained points need 78 given 74
+exit kmeans iteration after the 3th iteration, err = 27198.3, cur_err = 27198.3
+after the kmeans with nx = 74, k = 2, has 0 empty clusters, max cluster: 55 min cluster: 19
+new nx = 55
+Too little trained points need 78 given 55
+exit kmeans iteration after the 4th iteration, err = 14694.2, cur_err = 14694.2
+after the kmeans with nx = 55, k = 2, has 0 empty clusters, max cluster: 32 min cluster: 23
+writing file/home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/cluster-5-raw_data.bin
+new nx = 482
+exit kmeans iteration after the 4th iteration, err = 183534, cur_err = 182483
+after the kmeans with nx = 482, k = 11, has 0 empty clusters, max cluster: 87 min cluster: 24
+new nx = 50
+Too little trained points need 78 given 50
+exit kmeans iteration after the 2th iteration, err = 13655.7, cur_err = 13655.7
+after the kmeans with nx = 50, k = 2, has 0 empty clusters, max cluster: 35 min cluster: 15
+new nx = 86
+exit kmeans iteration after the 3th iteration, err = 29759.4, cur_err = 29759.4
+after the kmeans with nx = 86, k = 2, has 0 empty clusters, max cluster: 53 min cluster: 33
+new nx = 53
+Too little trained points need 78 given 53
+exit kmeans iteration after the 3th iteration, err = 15320.8, cur_err = 15320.8
+after the kmeans with nx = 53, k = 2, has 0 empty clusters, max cluster: 45 min cluster: 8
+new nx = 52
+Too little trained points need 78 given 52
+exit kmeans iteration after the 3th iteration, err = 18061, cur_err = 18022
+after the kmeans with nx = 52, k = 2, has 0 empty clusters, max cluster: 35 min cluster: 17
+writing file/home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/cluster-6-raw_data.bin
+new nx = 478
+exit kmeans iteration after the 4th iteration, err = 192784, cur_err = 191473
+after the kmeans with nx = 478, k = 10, has 0 empty clusters, max cluster: 82 min cluster: 21
+new nx = 69
+Too little trained points need 78 given 69
+exit kmeans iteration after the 5th iteration, err = 22841.1, cur_err = 22811.3
+after the kmeans with nx = 69, k = 2, has 0 empty clusters, max cluster: 39 min cluster: 30
+new nx = 53
+Too little trained points need 78 given 53
+exit kmeans iteration after the 2th iteration, err = 12800.2, cur_err = 12800.2
+after the kmeans with nx = 53, k = 2, has 0 empty clusters, max cluster: 32 min cluster: 21
+new nx = 82
+exit kmeans iteration after the 3th iteration, err = 28163.8, cur_err = 28133.9
+after the kmeans with nx = 82, k = 2, has 0 empty clusters, max cluster: 68 min cluster: 14
+new nx = 68
+Too little trained points need 78 given 68
+exit kmeans iteration after the 3th iteration, err = 17797.2, cur_err = 17797.2
+after the kmeans with nx = 68, k = 2, has 0 empty clusters, max cluster: 44 min cluster: 24
+writing file/home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/cluster-7-raw_data.bin
+new nx = 514
+exit kmeans iteration after the 4th iteration, err = 203379, cur_err = 201550
+after the kmeans with nx = 514, k = 11, has 0 empty clusters, max cluster: 82 min cluster: 16
+new nx = 73
+Too little trained points need 78 given 73
+exit kmeans iteration after the 3th iteration, err = 22269.3, cur_err = 22269.3
+after the kmeans with nx = 73, k = 2, has 0 empty clusters, max cluster: 50 min cluster: 23
+new nx = 50
+Too little trained points need 78 given 50
+exit kmeans iteration after the 2th iteration, err = 14748.1, cur_err = 14748.1
+after the kmeans with nx = 50, k = 2, has 0 empty clusters, max cluster: 48 min cluster: 2
+new nx = 51
+Too little trained points need 78 given 51
+exit kmeans iteration after the 2th iteration, err = 15663.8, cur_err = 15627.7
+after the kmeans with nx = 51, k = 2, has 0 empty clusters, max cluster: 37 min cluster: 14
+new nx = 53
+Too little trained points need 78 given 53
+exit kmeans iteration after the 2th iteration, err = 19426.7, cur_err = 19284
+after the kmeans with nx = 53, k = 2, has 0 empty clusters, max cluster: 39 min cluster: 14
+new nx = 82
+exit kmeans iteration after the 3th iteration, err = 26074.3, cur_err = 26038.1
+after the kmeans with nx = 82, k = 2, has 0 empty clusters, max cluster: 42 min cluster: 40
+new nx = 80
+exit kmeans iteration after the 3th iteration, err = 30131.5, cur_err = 30131.5
+after the kmeans with nx = 80, k = 2, has 0 empty clusters, max cluster: 58 min cluster: 22
+new nx = 58
+Too little trained points need 78 given 58
+exit kmeans iteration after the 2th iteration, err = 18406.2, cur_err = 18254.1
+after the kmeans with nx = 58, k = 2, has 0 empty clusters, max cluster: 35 min cluster: 23
+writing file/home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/cluster-8-raw_data.bin
+new nx = 485
+exit kmeans iteration after the 6th iteration, err = 193221, cur_err = 193212
+after the kmeans with nx = 485, k = 11, has 0 empty clusters, max cluster: 90 min cluster: 13
+new nx = 54
+Too little trained points need 78 given 54
+exit kmeans iteration after the 3th iteration, err = 16410.1, cur_err = 16410.1
+after the kmeans with nx = 54, k = 2, has 0 empty clusters, max cluster: 45 min cluster: 9
+new nx = 90
+exit kmeans iteration after the 3th iteration, err = 31061, cur_err = 31061
+after the kmeans with nx = 90, k = 2, has 0 empty clusters, max cluster: 48 min cluster: 42
+new nx = 56
+Too little trained points need 78 given 56
+exit kmeans iteration after the 4th iteration, err = 20060, cur_err = 20060
+after the kmeans with nx = 56, k = 2, has 0 empty clusters, max cluster: 36 min cluster: 20
+writing file/home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/cluster-9-raw_data.bin
+new nx = 574
+exit kmeans iteration after the 4th iteration, err = 237425, cur_err = 236820
+after the kmeans with nx = 574, k = 12, has 0 empty clusters, max cluster: 95 min cluster: 3
+new nx = 84
+exit kmeans iteration after the 4th iteration, err = 26196.6, cur_err = 26196.6
+after the kmeans with nx = 84, k = 2, has 0 empty clusters, max cluster: 44 min cluster: 40
+new nx = 101
+Too little trained points need 117 given 101
+exit kmeans iteration after the 3th iteration, err = 31923.2, cur_err = 31722.6
+after the kmeans with nx = 101, k = 3, has 0 empty clusters, max cluster: 38 min cluster: 29
+new nx = 53
+Too little trained points need 78 given 53
+exit kmeans iteration after the 3th iteration, err = 16511.8, cur_err = 16511.8
+after the kmeans with nx = 53, k = 2, has 0 empty clusters, max cluster: 28 min cluster: 25
+new nx = 64
+Too little trained points need 78 given 64
+exit kmeans iteration after the 3th iteration, err = 24176.5, cur_err = 24143.2
+after the kmeans with nx = 64, k = 2, has 0 empty clusters, max cluster: 40 min cluster: 24
+new nx = 51
+Too little trained points need 78 given 51
+exit kmeans iteration after the 2th iteration, err = 13191.4, cur_err = 13096.8
+after the kmeans with nx = 51, k = 2, has 0 empty clusters, max cluster: 42 min cluster: 9
+writing file/home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/cluster-10-raw_data.bin
+new nx = 465
+exit kmeans iteration after the 4th iteration, err = 188594, cur_err = 188471
+after the kmeans with nx = 465, k = 10, has 0 empty clusters, max cluster: 76 min cluster: 25
+new nx = 76
+Too little trained points need 78 given 76
+exit kmeans iteration after the 3th iteration, err = 25846.8, cur_err = 25806.3
+after the kmeans with nx = 76, k = 2, has 0 empty clusters, max cluster: 48 min cluster: 28
+new nx = 59
+Too little trained points need 78 given 59
+exit kmeans iteration after the 2th iteration, err = 20147.1, cur_err = 20147.1
+after the kmeans with nx = 59, k = 2, has 0 empty clusters, max cluster: 42 min cluster: 17
+new nx = 51
+Too little trained points need 78 given 51
+exit kmeans iteration after the 2th iteration, err = 17791.9, cur_err = 17682.2
+after the kmeans with nx = 51, k = 2, has 0 empty clusters, max cluster: 47 min cluster: 4
+new nx = 49
+Too little trained points need 78 given 49
+exit kmeans iteration after the 2th iteration, err = 12574.8, cur_err = 12574.8
+after the kmeans with nx = 49, k = 2, has 0 empty clusters, max cluster: 26 min cluster: 23
+new nx = 52
+Too little trained points need 78 given 52
+exit kmeans iteration after the 3th iteration, err = 18043.1, cur_err = 17902.7
+after the kmeans with nx = 52, k = 2, has 0 empty clusters, max cluster: 38 min cluster: 14
+writing file/home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/cluster-11-raw_data.bin
+new nx = 511
+exit kmeans iteration after the 5th iteration, err = 210605, cur_err = 208878
+after the kmeans with nx = 511, k = 11, has 0 empty clusters, max cluster: 104 min cluster: 18
+new nx = 103
+Too little trained points need 117 given 103
+exit kmeans iteration after the 2th iteration, err = 30904.4, cur_err = 30623.5
+after the kmeans with nx = 103, k = 3, has 0 empty clusters, max cluster: 60 min cluster: 10
+new nx = 58
+Too little trained points need 78 given 58
+exit kmeans iteration after the 2th iteration, err = 14266, cur_err = 14194.5
+after the kmeans with nx = 58, k = 2, has 0 empty clusters, max cluster: 31 min cluster: 27
+new nx = 71
+Too little trained points need 78 given 71
+exit kmeans iteration after the 3th iteration, err = 25807.9, cur_err = 25759.2
+after the kmeans with nx = 71, k = 2, has 0 empty clusters, max cluster: 48 min cluster: 23
+new nx = 66
+Too little trained points need 78 given 66
+exit kmeans iteration after the 3th iteration, err = 24066.9, cur_err = 23946.7
+after the kmeans with nx = 66, k = 2, has 0 empty clusters, max cluster: 45 min cluster: 21
+writing file/home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/cluster-12-raw_data.bin
+new nx = 531
+exit kmeans iteration after the 4th iteration, err = 206960, cur_err = 205692
+after the kmeans with nx = 531, k = 12, has 0 empty clusters, max cluster: 69 min cluster: 16
+new nx = 56
+Too little trained points need 78 given 56
+exit kmeans iteration after the 2th iteration, err = 15735.9, cur_err = 15735.9
+after the kmeans with nx = 56, k = 2, has 0 empty clusters, max cluster: 31 min cluster: 25
+new nx = 59
+Too little trained points need 78 given 59
+exit kmeans iteration after the 2th iteration, err = 18979.4, cur_err = 18867.9
+after the kmeans with nx = 59, k = 2, has 0 empty clusters, max cluster: 39 min cluster: 20
+new nx = 67
+Too little trained points need 78 given 67
+exit kmeans iteration after the 4th iteration, err = 19583.3, cur_err = 19583.3
+after the kmeans with nx = 67, k = 2, has 0 empty clusters, max cluster: 36 min cluster: 31
+new nx = 70
+Too little trained points need 78 given 70
+exit kmeans iteration after the 2th iteration, err = 23994.9, cur_err = 23964.9
+after the kmeans with nx = 70, k = 2, has 0 empty clusters, max cluster: 43 min cluster: 27
+new nx = 61
+Too little trained points need 78 given 61
+exit kmeans iteration after the 2th iteration, err = 22372.8, cur_err = 22338.6
+after the kmeans with nx = 61, k = 2, has 0 empty clusters, max cluster: 36 min cluster: 25
+writing file/home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/cluster-13-raw_data.bin
+new nx = 565
+exit kmeans iteration after the 5th iteration, err = 220232, cur_err = 219837
+after the kmeans with nx = 565, k = 12, has 0 empty clusters, max cluster: 66 min cluster: 29
+new nx = 49
+Too little trained points need 78 given 49
+exit kmeans iteration after the 3th iteration, err = 16073, cur_err = 16044.3
+after the kmeans with nx = 49, k = 2, has 0 empty clusters, max cluster: 27 min cluster: 22
+new nx = 51
+Too little trained points need 78 given 51
+exit kmeans iteration after the 3th iteration, err = 14573.3, cur_err = 14573.3
+after the kmeans with nx = 51, k = 2, has 0 empty clusters, max cluster: 36 min cluster: 15
+new nx = 51
+Too little trained points need 78 given 51
+exit kmeans iteration after the 2th iteration, err = 17158.2, cur_err = 17017.2
+after the kmeans with nx = 51, k = 2, has 0 empty clusters, max cluster: 38 min cluster: 13
+new nx = 67
+Too little trained points need 78 given 67
+exit kmeans iteration after the 3th iteration, err = 20320.3, cur_err = 20320.3
+after the kmeans with nx = 67, k = 2, has 0 empty clusters, max cluster: 35 min cluster: 32
+new nx = 66
+Too little trained points need 78 given 66
+exit kmeans iteration after the 2th iteration, err = 24242.7, cur_err = 24242.7
+after the kmeans with nx = 66, k = 2, has 0 empty clusters, max cluster: 36 min cluster: 30
+new nx = 62
+Too little trained points need 78 given 62
+exit kmeans iteration after the 2th iteration, err = 22780.5, cur_err = 22712.8
+after the kmeans with nx = 62, k = 2, has 0 empty clusters, max cluster: 51 min cluster: 11
+new nx = 51
+Too little trained points need 78 given 51
+exit kmeans iteration after the 2th iteration, err = 14928.5, cur_err = 14881.1
+after the kmeans with nx = 51, k = 2, has 0 empty clusters, max cluster: 41 min cluster: 10
+writing file/home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/cluster-14-raw_data.bin
+new nx = 456
+exit kmeans iteration after the 5th iteration, err = 175780, cur_err = 175422
+after the kmeans with nx = 456, k = 10, has 0 empty clusters, max cluster: 71 min cluster: 28
+new nx = 54
+Too little trained points need 78 given 54
+exit kmeans iteration after the 2th iteration, err = 13465.3, cur_err = 13444.6
+after the kmeans with nx = 54, k = 2, has 0 empty clusters, max cluster: 30 min cluster: 24
+new nx = 59
+Too little trained points need 78 given 59
+exit kmeans iteration after the 2th iteration, err = 17696.1, cur_err = 17696.1
+after the kmeans with nx = 59, k = 2, has 0 empty clusters, max cluster: 34 min cluster: 25
+new nx = 71
+Too little trained points need 78 given 71
+exit kmeans iteration after the 3th iteration, err = 26179, cur_err = 25933
+after the kmeans with nx = 71, k = 2, has 0 empty clusters, max cluster: 47 min cluster: 24
+new nx = 54
+Too little trained points need 78 given 54
+exit kmeans iteration after the 2th iteration, err = 15183.9, cur_err = 15183.9
+after the kmeans with nx = 54, k = 2, has 0 empty clusters, max cluster: 43 min cluster: 11
+writing file/home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/cluster-15-raw_data.bin
+new nx = 443
+exit kmeans iteration after the 4th iteration, err = 185728, cur_err = 183878
+after the kmeans with nx = 443, k = 10, has 0 empty clusters, max cluster: 64 min cluster: 22
+new nx = 63
+Too little trained points need 78 given 63
+exit kmeans iteration after the 2th iteration, err = 23816.2, cur_err = 23643.8
+after the kmeans with nx = 63, k = 2, has 0 empty clusters, max cluster: 43 min cluster: 20
+new nx = 53
+Too little trained points need 78 given 53
+exit kmeans iteration after the 5th iteration, err = 14062.5, cur_err = 14031.9
+after the kmeans with nx = 53, k = 2, has 0 empty clusters, max cluster: 29 min cluster: 24
+new nx = 54
+Too little trained points need 78 given 54
+exit kmeans iteration after the 3th iteration, err = 20853.9, cur_err = 20750.4
+after the kmeans with nx = 54, k = 2, has 0 empty clusters, max cluster: 39 min cluster: 15
+new nx = 66
+Too little trained points need 78 given 66
+exit kmeans iteration after the 2th iteration, err = 20063, cur_err = 19982.4
+after the kmeans with nx = 66, k = 2, has 0 empty clusters, max cluster: 33 min cluster: 33
+writing file/home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/cluster-16-raw_data.bin
+new nx = 534
+exit kmeans iteration after the 4th iteration, err = 226288, cur_err = 224312
+after the kmeans with nx = 534, k = 12, has 0 empty clusters, max cluster: 85 min cluster: 17
+new nx = 52
+Too little trained points need 78 given 52
+exit kmeans iteration after the 3th iteration, err = 21934.4, cur_err = 21725.5
+after the kmeans with nx = 52, k = 2, has 0 empty clusters, max cluster: 30 min cluster: 22
+new nx = 77
+Too little trained points need 78 given 77
+exit kmeans iteration after the 3th iteration, err = 29021, cur_err = 29021
+after the kmeans with nx = 77, k = 2, has 0 empty clusters, max cluster: 61 min cluster: 16
+new nx = 61
+Too little trained points need 78 given 61
+exit kmeans iteration after the 2th iteration, err = 18199.3, cur_err = 18199.3
+after the kmeans with nx = 61, k = 2, has 0 empty clusters, max cluster: 37 min cluster: 24
+new nx = 68
+Too little trained points need 78 given 68
+exit kmeans iteration after the 2th iteration, err = 20215.8, cur_err = 20188.2
+after the kmeans with nx = 68, k = 2, has 0 empty clusters, max cluster: 42 min cluster: 26
+writing file/home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/cluster-17-raw_data.bin
+new nx = 466
+exit kmeans iteration after the 4th iteration, err = 198149, cur_err = 197487
+after the kmeans with nx = 466, k = 10, has 0 empty clusters, max cluster: 81 min cluster: 22
+new nx = 54
+Too little trained points need 78 given 54
+exit kmeans iteration after the 2th iteration, err = 17532.6, cur_err = 17532.6
+after the kmeans with nx = 54, k = 2, has 0 empty clusters, max cluster: 42 min cluster: 12
+new nx = 81
+exit kmeans iteration after the 2th iteration, err = 27494.8, cur_err = 27427.8
+after the kmeans with nx = 81, k = 2, has 0 empty clusters, max cluster: 68 min cluster: 13
+new nx = 60
+Too little trained points need 78 given 60
+exit kmeans iteration after the 2th iteration, err = 18345.4, cur_err = 18165.9
+after the kmeans with nx = 60, k = 2, has 0 empty clusters, max cluster: 54 min cluster: 6
+new nx = 54
+Too little trained points need 78 given 54
+exit kmeans iteration after the 3th iteration, err = 12852.9, cur_err = 12852.9
+after the kmeans with nx = 54, k = 2, has 0 empty clusters, max cluster: 33 min cluster: 21
+new nx = 73
+Too little trained points need 78 given 73
+exit kmeans iteration after the 4th iteration, err = 27163.3, cur_err = 27129.7
+after the kmeans with nx = 73, k = 2, has 0 empty clusters, max cluster: 58 min cluster: 15
+new nx = 58
+Too little trained points need 78 given 58
+exit kmeans iteration after the 3th iteration, err = 16981.7, cur_err = 16981.7
+after the kmeans with nx = 58, k = 2, has 0 empty clusters, max cluster: 49 min cluster: 9
+new nx = 49
+Too little trained points need 78 given 49
+exit kmeans iteration after the 2th iteration, err = 11355.8, cur_err = 11304.3
+after the kmeans with nx = 49, k = 2, has 0 empty clusters, max cluster: 39 min cluster: 10
+new nx = 56
+Too little trained points need 78 given 56
+exit kmeans iteration after the 2th iteration, err = 17929.7, cur_err = 17900.7
+after the kmeans with nx = 56, k = 2, has 0 empty clusters, max cluster: 31 min cluster: 25
+writing file/home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/cluster-18-raw_data.bin
+new nx = 500
+exit kmeans iteration after the 7th iteration, err = 189088, cur_err = 188236
+after the kmeans with nx = 500, k = 11, has 0 empty clusters, max cluster: 83 min cluster: 28
+new nx = 52
+Too little trained points need 78 given 52
+exit kmeans iteration after the 2th iteration, err = 16203.8, cur_err = 16075.4
+after the kmeans with nx = 52, k = 2, has 0 empty clusters, max cluster: 39 min cluster: 13
+new nx = 80
+exit kmeans iteration after the 4th iteration, err = 24893.2, cur_err = 24866.2
+after the kmeans with nx = 80, k = 2, has 0 empty clusters, max cluster: 52 min cluster: 28
+new nx = 52
+Too little trained points need 78 given 52
+exit kmeans iteration after the 2th iteration, err = 12474.5, cur_err = 12427
+after the kmeans with nx = 52, k = 2, has 0 empty clusters, max cluster: 33 min cluster: 19
+new nx = 52
+Too little trained points need 78 given 52
+exit kmeans iteration after the 3th iteration, err = 14494, cur_err = 14494
+after the kmeans with nx = 52, k = 2, has 0 empty clusters, max cluster: 35 min cluster: 17
+new nx = 60
+Too little trained points need 78 given 60
+exit kmeans iteration after the 2th iteration, err = 17606.2, cur_err = 17556.1
+after the kmeans with nx = 60, k = 2, has 0 empty clusters, max cluster: 42 min cluster: 18
+new nx = 54
+Too little trained points need 78 given 54
+exit kmeans iteration after the 2th iteration, err = 14896.4, cur_err = 14795.6
+after the kmeans with nx = 54, k = 2, has 0 empty clusters, max cluster: 36 min cluster: 18
+writing file/home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/cluster-19-raw_data.bin
+new nx = 550
+exit kmeans iteration after the 5th iteration, err = 224644, cur_err = 223907
+after the kmeans with nx = 550, k = 12, has 0 empty clusters, max cluster: 72 min cluster: 8
+new nx = 62
+Too little trained points need 78 given 62
+exit kmeans iteration after the 2th iteration, err = 20693.6, cur_err = 20569.2
+after the kmeans with nx = 62, k = 2, has 0 empty clusters, max cluster: 40 min cluster: 22
+new nx = 53
+Too little trained points need 78 given 53
+exit kmeans iteration after the 3th iteration, err = 13231.7, cur_err = 13168.6
+after the kmeans with nx = 53, k = 2, has 0 empty clusters, max cluster: 43 min cluster: 10
+new nx = 72
+Too little trained points need 78 given 72
+exit kmeans iteration after the 3th iteration, err = 28234.5, cur_err = 28104.5
+after the kmeans with nx = 72, k = 2, has 0 empty clusters, max cluster: 50 min cluster: 22
+new nx = 50
+Too little trained points need 78 given 50
+exit kmeans iteration after the 3th iteration, err = 15932.5, cur_err = 15907.2
+after the kmeans with nx = 50, k = 2, has 0 empty clusters, max cluster: 31 min cluster: 19
+new nx = 69
+Too little trained points need 78 given 69
+exit kmeans iteration after the 2th iteration, err = 29690.4, cur_err = 29566.4
+after the kmeans with nx = 69, k = 2, has 0 empty clusters, max cluster: 42 min cluster: 27
+new nx = 54
+Too little trained points need 78 given 54
+exit kmeans iteration after the 2th iteration, err = 14823.6, cur_err = 14823.6
+after the kmeans with nx = 54, k = 2, has 0 empty clusters, max cluster: 43 min cluster: 11
+hierarchical_clusters generate 327 centroids
+build bigann: conquer each cluster into buckets done (0.059668 second [59.667777 ms])
+build hnsw parameters:
+ index_path: /home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/ hnsw.M: 32 hnsw.efConstruction: 200 metric_type: 1
+read binary file from /home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/bucket-centroids.bin done in ... seconds, n = 327, dim = 20
+create_graph_index: load centroids of buckets done (0.000043 second [0.043001 ms])
+there are 327 of dimension 20 points of hnsw
+read binary file from /home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/cluster-combine_ids.bin done in ... seconds, n = 327, dim = 1
+create_graph_index: load combine ids of buckets done (0.000038 second [0.038101 ms])
+there are 327 of dimension 1 combine ids of hnsw
+hnsw totally add 327 points
+create_graph_index: create index hnsw done (0.031003 second [31.003272 ms])
+create_graph_index: hnsw save index done (0.000275 second [0.274707 ms])
+create_graph_index: create index hnsw totally done (0.031373 second [31.372782 ms])
+build bigann: build hnsw done. (0.031736 second [31.736292 ms])
+get meta from /home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/bucket-centroids.bin, nrows = 327, ncols = 20
+Total number of buckets: 327
+#vectors in bucket avg: 30.581 max: 48 min: 2
+build bigann: gather statistics done (0.001161 second [1.160533 ms])
+build bigann: build bigann totally done. (0.129367 second [129.367136 ms])
+Loading: /home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/get meta from /home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/bucket-centroids.bin, nrows = 327, ncols = 20
+Query: 
+query numbers: 1000 query dims: 20
+search graph parameters:
+ index_hnsw: 0x27963d0 nq: 1000 dq: 20 nprobe: 2 refine_nprobe: 200 pquery: 0x7f460d8b0008 buckets_label: 0x2816000
+search graph: search graph done. (0.106247 second [106.246986 ms])
+search bigann: search buckets done. (0.106277 second [106.276687 ms])
+search bigann: heapify answers heaps (0.000028 second [0.028401 ms])
+Query: 
+query numbers: 1000 query dims: 20
+search graph parameters:
+ index_hnsw: 0x27963d0 nq: 1000 dq: 20 nprobe: 2 refine_nprobe: 200 pquery: 0x7f460d8b0008 buckets_label: 0x2816000
+search graph: search graph done. (0.106654 second [106.654297 ms])
+search bigann: search buckets done. (0.106683 second [106.683199 ms])
+search bigann: heapify answers heaps (0.000029 second [0.028800 ms])
+Query: 
+query numbers: 1000 query dims: 20
+search graph parameters:
+ index_hnsw: 0x27963d0 nq: 1000 dq: 20 nprobe: 2 refine_nprobe: 200 pquery: 0x7f460d8b0008 buckets_label: 0x2816000
+search graph: search graph done. (0.106327 second [106.326688 ms])
+search bigann: search buckets done. (0.106353 second [106.352589 ms])
+search bigann: heapify answers heaps (0.000028 second [0.027501 ms])
+Query: 
+query numbers: 1000 query dims: 20
+search graph parameters:
+ index_hnsw: 0x27963d0 nq: 1000 dq: 20 nprobe: 2 refine_nprobe: 200 pquery: 0x7f460d8b0008 buckets_label: 0x2816000
+search graph: search graph done. (0.106287 second [106.287287 ms])
+search bigann: search buckets done. (0.106313 second [106.313488 ms])
+search bigann: heapify answers heaps (0.000028 second [0.028400 ms])
+Query: 
+query numbers: 1000 query dims: 20
+search graph parameters:
+ index_hnsw: 0x27963d0 nq: 1000 dq: 20 nprobe: 2 refine_nprobe: 200 pquery: 0x7f460d8b0008 buckets_label: 0x2816000
+search graph: search graph done. (0.106278 second [106.278287 ms])
+search bigann: search buckets done. (0.106305 second [106.305188 ms])
+search bigann: heapify answers heaps (0.000028 second [0.027501 ms])
+['euclidean', {'hnswM': 32, 'hnswefC': 200, 'K1': 20, 'blockSize': 4096, 'identifier': 'abc'}]
+Trying to instantiate benchmark.algorithms.bbann.BbANN(['euclidean', {'hnswM': 32, 'hnswefC': 200, 'K1': 20, 'blockSize': 4096, 'identifier': 'abc'}])
+init BbAnn with the following parameters
+hnswM 32
+hnswefC 200
+K1 20
+blockSize 4096
+identifier abc
+Running bbann on random-xs
+Got 1000 queries
+bbAnn index built in 0.129 s
+Loading index from /home/catcat/BigAnn/benchmark/data/indices/T2/BBANN/RandomDS-10000/abc/
+Built index in 0.1320345401763916
+Index size:  17132.0
+Running query argument group 1 of 1...
+query BbAnn with the following parameters
+Run 1/5...
+[[6430 9834 6893 ... 2769 3481 3467]
+ [3127 1754 5976 ...  655 7071 5726]
+ [6504 8635 3345 ... 7251 8401  794]
+ ...
+ [3207 6281  274 ...   24 8603 6332]
+ [8919 3069 9795 ... 5937 6525  534]
+ [1876 8723 4109 ... 9476 2479 3289]]
+Run 2/5...
+[[6430 9834 6893 ... 2769 3481 3467]
+ [3127 1754 5976 ...  655 7071 5726]
+ [6504 8635 3345 ... 7251 8401  794]
+ ...
+ [3207 6281  274 ...   24 8603 6332]
+ [8919 3069 9795 ... 5937 6525  534]
+ [1876 8723 4109 ... 9476 2479 3289]]
+Run 3/5...
+[[6430 9834 6893 ... 2769 3481 3467]
+ [3127 1754 5976 ...  655 7071 5726]
+ [6504 8635 3345 ... 7251 8401  794]
+ ...
+ [3207 6281  274 ...   24 8603 6332]
+ [8919 3069 9795 ... 5937 6525  534]
+ [1876 8723 4109 ... 9476 2479 3289]]
+Run 4/5...
+[[6430 9834 6893 ... 2769 3481 3467]
+ [3127 1754 5976 ...  655 7071 5726]
+ [6504 8635 3345 ... 7251 8401  794]
+ ...
+ [3207 6281  274 ...   24 8603 6332]
+ [8919 3069 9795 ... 5937 6525  534]
+ [1876 8723 4109 ... 9476 2479 3289]]
+Run 5/5...
+[[6430 9834 6893 ... 2769 3481 3467]
+ [3127 1754 5976 ...  655 7071 5726]
+ [6504 8635 3345 ... 7251 8401  794]
+ ...
+ [3207 6281  274 ...   24 8603 6332]
+ [8919 3069 9795 ... 5937 6525  534]
+ [1876 8723 4109 ... 9476 2479 3289]]
+writing output to results/random-xs.png
+Computing knn metrics
+  0:                                                                            BBANN        0.836     7187.061
+~/BigAnn/python
