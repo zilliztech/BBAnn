@@ -12,8 +12,7 @@ random-xs:
           [{"nProbe":2, "efSearch":100, "K1":20, "blockSize":4096, "identifier": "abc"},
           {"nProbe":10, "efSearch":100, "K1":20, "blockSize":4096, "identifier": "abc"},
           {"nProbe":22, "efSearch":100, "K1":20, "blockSize":4096, "identifier": "abc"},
-          {"nProbe":30, "efSearch":250, "K1":20, "blockSize":4096, "identifier": "abc"}
-          ]
+          {"nProbe":30, "efSearch":250, "K1":20, "blockSize":4096, "identifier": "abc"}]
 random-range-xs:
   bbann:
     docker-tag: billion-scale-benchmark-bbann
@@ -23,8 +22,7 @@ random-range-xs:
     run-groups:
       base:
         args: |
-          [{"hnswM":32, "hnswefC":500, "K1":128, "blockSize":4096,},]
+          [{"hnswM":32, "hnswefC":200, "K1":20, "blockSize":4096, "identifier": "range"}]
         query-args: |
-          [{"nProbe":50, "efSearch":250, "K1":128, "blockSize":4096,},
-          {"nProbe":100, "efSearch":500, "K1":128, "blockSize":4096,},
-          {"nProbe":200, "efSearch":1000, "K1":128, "blockSize":4096,}]
+          [{"nProbe":2, "efSearch":100, "K1":20, "blockSize":4096, "identifier": "range"}]
+        

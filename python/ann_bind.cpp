@@ -77,7 +77,7 @@ void IndexBindWrapper(py::module_ &m) {
               std::vector<std::vector<uint32_t>> ids(numQuery);
               std::vector<std::vector<float>> dists(numQuery);
               std::vector<uint64_t> lims(numQuery+1);
-
+              // returns a 
               self.RangeSearchCpp(pquery, dim, numQuery, radius, para, ids, dists, lims);
 
               uint64_t total = lims.back();
@@ -92,7 +92,8 @@ void IndexBindWrapper(py::module_ &m) {
               for (uint64_t i = 0; i < numQuery; ++i) {
                 for (uint64_t j = 0; j < ids[i].size(); ++j) {
                   res_ids_mutable(pos) = (unsigned)ids[i][j];
-                  res_dists_mutable(pos++) = dists[i][j];
+                  res_dists_mutable(pos) = dists[i][j];
+                  pos++;
                 }
                 res_lims_mutable(i) = lims[i];
               }

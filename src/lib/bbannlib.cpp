@@ -86,9 +86,9 @@ void BBAnnIndex<dataT, paraT>::BuildIndexImpl(const paraT para) {
 template <typename dataT, typename paraT>
 void BBAnnIndex<dataT, paraT>::RangeSearchCpp(const dataT *pquery, uint64_t dim, uint64_t numQuery,
                                               double radius, const paraT para,
-                                              std::vector<std::vector<uint32_t>> ids,
-                                              std::vector<std::vector<float>> dists,
-                                              std::vector<uint64_t> lims) {
+                                              std::vector<std::vector<uint32_t>> &ids,
+                                              std::vector<std::vector<float>> &dists,
+                                              std::vector<uint64_t> &lims) {
   Computer<dataT, dataT, float> dis_computer =
       L2sqr<const dataT, const dataT, float>;
   range_search_bbann<dataT, float>(
@@ -106,9 +106,9 @@ void BBAnnIndex<dataT, paraT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
   template void BBAnnIndex<dataT, paraT>::RangeSearchCpp(                 \
       const dataT *pquery, uint64_t dim, uint64_t numQuery,               \
       double radius, const paraT para,                                    \
-      std::vector<std::vector<uint32_t>> ids,                             \
-      std::vector<std::vector<float>> dists,                              \
-      std::vector<uint64_t> lims);                                        \
+      std::vector<std::vector<uint32_t>> &ids,                             \
+      std::vector<std::vector<float>> &dists,                              \
+      std::vector<uint64_t> &lims);                                        \
   template void BBAnnIndex<dataT, paraT>::BuildIndexImpl(const paraT para);
 
 BBANNLIB_DECL(float, BBAnnParameters);

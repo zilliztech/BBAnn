@@ -13,20 +13,19 @@ class BbANN(BaseANN):
         self.metric = metric
         self.index_params = index_params
         self.identifier = index_params.get("identifier")
-        self.para =  bbannpy.BBAnnParameters()
+        self.para = bbannpy.BBAnnParameters()
         print("init BbAnn with the following parameters")
         for key in index_params:
             print(key, index_params[key])
             if hasattr(self.para, key):
-              setattr(self.para, key, index_params[key])
-
+                setattr(self.para, key, index_params[key])
 
     def set_query_arguments(self, query_args):
         print("query BbAnn with the following parameters")
         for key in query_args:
             print(key, query_args[key])
             if hasattr(self.para, key):
-              setattr(self.para, key, query_args[key])
+                setattr(self.para, key, query_args[key])
         pass
 
     def done(self):
@@ -85,7 +84,7 @@ class BbANN(BaseANN):
         index_dir = self.create_index_dir(ds)
         if not self.set_index_type(ds.distance(), ds.dtype):
             return False
-        
+
         self.para.dataFilePath = ds.get_dataset_fn()
         self.para.indexPrefixPath = index_dir+"/"
 
@@ -115,7 +114,8 @@ class BbANN(BaseANN):
     def query(self, X, k):
         """Carry out a batch query for k-NN of query set X."""
         nq, dim = (np.shape(X))
-        self.res, self.query_dists = self.index.batch_search(X, dim, nq, k, self.para)
+        self.res, self.query_dists = self.index.batch_search(
+            X, dim, nq, k, self.para)
         print(self.res)
 
     def range_query(self, X, radius):
@@ -124,7 +124,8 @@ class BbANN(BaseANN):
         radius.
         """
         nq, dim = (np.shape(X))
-        self.rangeres_lim, (self.rangeres_ids, self.rangeres_dists) = self.index.range_search(X, dim, nq, radius, self.para)
+        self.rangeres_lim, (self.rangeres_ids, self.rangeres_dists) = self.index.range_search(
+            X, dim, nq, radius, self.para)
 
     def get_results(self):
         """

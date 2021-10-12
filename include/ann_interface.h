@@ -42,18 +42,28 @@ public:
                               uint32_t *answer_ids,
                               distanceT *answer_dists) = 0;
 
+  //
+  // Conduct a range search.
+  // input:
+  // *pquery, which is an arry of dataT type,  converted from numpy
+  // array of dim*numQuery items.
+  // returns: following three vectors
+  // 
+
   // Range search with a radius, returns vectors's ids and distances within that
-  // radius from each query, the lims array represents prefix sums of results' lengths
-  virtual void RangeSearchCpp(const dataT *pquery, uint64_t dim, uint64_t numQuery,
-                              double radius, const paraT para,
-                              std::vector<std::vector<uint32_t>> ids,
-                              std::vector<std::vector<float>> dists,
-                              std::vector<uint64_t> lims) = 0;
+  // radius from each query, the lims array represents prefix sums of results'
+  // lengths
+  virtual void RangeSearchCpp(const dataT *pquery, uint64_t dim,
+                              uint64_t numQuery, double radius,
+                              const paraT para,
+                              std::vector<std::vector<uint32_t>> &ids,
+                              std::vector<std::vector<float>> &dists,
+                              std::vector<uint64_t> &lims) = 0;
 };
-namespace bbann{
+namespace bbann {
 enum class MetricType {
-    None = 0,
-    L2 = 1,
-    IP = 2,
+  None = 0,
+  L2 = 1,
+  IP = 2,
 };
 }

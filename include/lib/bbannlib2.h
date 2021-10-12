@@ -63,11 +63,9 @@ public:
 
   void RangeSearchCpp(const dataT *pquery, uint64_t dim, uint64_t numQuery,
                       double radius, const BBAnnParameters para,
-                      std::vector<std::vector<uint32_t>> ids,
-                      std::vector<std::vector<float>> dists,
-                      std::vector<uint64_t> lims) override {
-    std::cerr << "TODO!";
-  }
+                      std::vector<std::vector<uint32_t>> &ids,
+                      std::vector<std::vector<float>> &dists,
+                      std::vector<uint64_t> &lims) override;
   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw_;
   std::string indexPrefix_;
   std::string dataFilePath_;
