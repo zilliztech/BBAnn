@@ -13,7 +13,7 @@ parser.add_argument('--index_path_prefix', type=str,
                     help='Index path prefix.')
 parser.add_argument('--K', type=int, default=20, help='k value for recall@K.')
 parser.add_argument('--nprobe', type=int, default=2, help='nprobe')
-parser.add_argument('--efC', type=int, default=200, help='Parameter for hnsw')
+parser.add_argument('--efSearch', type=int, default=100, help='Parameter for hnsw')
 parser.add_argument('--metric', type=str, default='L2',
                     help='Metric type, can be L2 or INNER_PRODUCT')
 parser.add_argument('--K1', type=int, default=20,
@@ -37,7 +37,7 @@ para.queryPath = args.query_path
 para.K = args.K
 para.indexPrefixPath = args.index_path_prefix
 para.nProbe = args.nprobe
-para.hnswefC = args.efC
+para.efSearch = args.efSearch
 para.K1 = args.K1
 para.blockSize = args.page_per_block * 4096  # pagesize=4096
 

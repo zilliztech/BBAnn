@@ -66,6 +66,7 @@ void IndexBindWrapper(py::module_ &m) {
              return std::make_pair(ids, dists);
            },
            py::arg("query"), py::arg("dim"), py::arg("num_query"),
+           py::arg("knn"), py::arg("para"))
       .def("range_search",
            [](indexT &self,
               py::array_t<dataT, py::array::c_style | py::array::forcecast>
@@ -153,6 +154,7 @@ PYBIND11_MODULE(bbannpy, m) {
       .def_readwrite("queryPath", &BBAnnParameters::queryPath)
       .def_readwrite("hnswM", &BBAnnParameters::hnswM)
       .def_readwrite("hnswefC", &BBAnnParameters::hnswefC)
+      .def_readwrite("efSearch", &BBAnnParameters::efSearch)
       .def_readwrite("K1", &BBAnnParameters::K1)
       .def_readwrite("K", &BBAnnParameters::K)
       .def_readwrite("nProbe", &BBAnnParameters::nProbe)

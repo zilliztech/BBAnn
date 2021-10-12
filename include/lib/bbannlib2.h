@@ -37,6 +37,7 @@ struct BBAnnParameters {
   int K1 = 20;
   int blockSize = 1;
   int nProbe = 2;
+  int efSearch = 250;
 };
 
 template <typename dataT>
@@ -60,6 +61,13 @@ public:
                       uint64_t knn, const BBAnnParameters para,
                       uint32_t *answer_ids, distanceT *answer_dists) override;
 
+  void RangeSearchCpp(const dataT *pquery, uint64_t dim, uint64_t numQuery,
+                      double radius, const BBAnnParameters para,
+                      std::vector<std::vector<uint32_t>> ids,
+                      std::vector<std::vector<float>> dists,
+                      std::vector<uint64_t> lims) override {
+    std::cerr << "TODO!";
+  }
   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw_;
   std::string indexPrefix_;
   std::string dataFilePath_;

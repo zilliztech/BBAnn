@@ -928,11 +928,11 @@ void search_bbann_queryonly(
   std::cout << "search graph parameters:" << std::endl;
   std::cout << " index_hnsw: " << index_hnsw << " num_query: " << num_query
             << " query dims: " << dim << " nprobe: " << para.nProbe
-            << " refine_nprobe: " << para.hnswefC
+            << " refine_nprobe: " << para.efSearch
             << " pquery: " << static_cast<const void *>(pquery)
             << " bucket_labels: " << static_cast<void *>(bucket_labels)
             << std::endl;
-  index_hnsw->setEf(para.hnswefC);
+  index_hnsw->setEf(para.efSearch);
 #pragma omp parallel for
   for (int64_t i = 0; i < num_query; i++) {
     // auto queryi = pquery + i * dim;

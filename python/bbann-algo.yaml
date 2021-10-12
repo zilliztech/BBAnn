@@ -6,33 +6,25 @@ random-xs:
     base-args: ["@metric"]
     run-groups:
       base:
-        args:
-          [
-            {
-              "hnswM": 32,
-              "hnswefC": 200,
-              "K1": 20,
-              "blockSize": 4096,
-              "identifier": "abc", # this is used to identify the index files
-            },
+        args: |
+          [{"hnswM": 32,"hnswefC": 200, "K1": 20, "blockSize": 4096, "identifier": "abc"}]
+        query-args: |
+          [{"nProbe":2, "efSearch":100, "K1":20, "blockSize":4096, "identifier": "abc"},
+          {"nProbe":10, "efSearch":100, "K1":20, "blockSize":4096, "identifier": "abc"},
+          {"nProbe":22, "efSearch":100, "K1":20, "blockSize":4096, "identifier": "abc"},
+          {"nProbe":30, "efSearch":250, "K1":20, "blockSize":4096, "identifier": "abc"}
           ]
-        query-args: [{}]
 random-range-xs:
   bbann:
-    docker-tag: billion-scale-benchmark
+    docker-tag: billion-scale-benchmark-bbann
     module: benchmark.algorithms.bbann
     constructor: BbANN
     base-args: ["@metric"]
     run-groups:
       base:
-        args:
-          [
-            {
-              "hnswM": 32,
-              "hnswefC": 200,
-              "K1": 1,
-              "blockSize": 1,
-              "identifier": "abc", # this is used to identify the index files
-            },
-          ]
-        query-args: [{}]
+        args: |
+          [{"hnswM":32, "hnswefC":500, "K1":128, "blockSize":4096,},]
+        query-args: |
+          [{"nProbe":50, "efSearch":250, "K1":128, "blockSize":4096,},
+          {"nProbe":100, "efSearch":500, "K1":128, "blockSize":4096,},
+          {"nProbe":200, "efSearch":1000, "K1":128, "blockSize":4096,}]
