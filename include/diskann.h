@@ -16,7 +16,7 @@
 #include "pq/pq.h"
 #include "pq/pq_residual.h"
 #include "flat/flat.h"
-#include "ivf/clustering.h"
+#include "ivf/kmeans.h"
 #include "util/TimeRecorder.h"
 
 

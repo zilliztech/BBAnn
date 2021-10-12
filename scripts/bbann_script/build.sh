@@ -6,14 +6,14 @@
 DATA_TYPE=uint8
 #DATA_TYPE=int8
 #DATA_TYPE=float
-DATA_FILE=/data/diskann-T2-baseline-indices/bigann-1B/base.1B.u8bin
-INDEX_PATH=/data/BBANN-BIGANN
-HNSW_M=32
-HNSW_EF=500
+DATA_FILE=/home/cqy/dataset/learn.100M.u8bin
+INDEX_PATH=/home/cqy/dataset/BBANN-BIGANN
+HNSW_M=100
+HNSW_EF=200
 METRIC_TYPE=L2
 #METRIC_TYPE=IP
-K1=128
-PAGE_PER_BLOCK=3
+K1=10
+PAGE_PER_BLOCK=1
 
 INDEX_PATH=${INDEX_PATH}-${HNSW_M}-${HNSW_EF}-${K1}-${PAGE_PER_BLOCK}/
 LOG_PREFIX=${INDEX_PATH}log/
@@ -61,7 +61,7 @@ else
   LOG_FILE=${LOG_PREFIX}.log
   echo "Log File: " $LOG_FILE
 
-  sudo ./build_bbann $DATA_TYPE $DATA_FILE $INDEX_PATH $HNSW_M $HNSW_EF $METRIC_TYPE $K1 $PAGE_PER_BLOCK 2>&1 | sudo tee $LOG_FILE
+  sudo ./build_bbann $DATA_TYPE $DATA_FILE $INDEX_PATH $HNSW_M $HNSW_EF $METRIC_TYPE $K1 $PAGE_PER_BLOCK 2>&1 | sudo tee $LOG_FILE &
   pid=$!
   echo "PID: " $pid
   pidstat -rud -h -t -p $pid 5 > ${LOG_PREFIX}.stat

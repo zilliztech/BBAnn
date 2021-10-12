@@ -54,7 +54,42 @@ void IndexBindWrapper(py::module_ &m) {
            py::arg("knn"), py::arg("para"))
       .def("build",
            [](indexT &self, paraT para) { return indexT::BuildIndex(para); },
-           py::arg("para"));
+           py::arg("para"))
+      .def("range_search",
+           [](indexT &self,
+              py::array_t<dataT, py::array::c_style | py::array::forcecast>
+                  &query,
+              uint64_t dim, uint64_t numQuery, double radius, const paraT para)
+               -> std::pair<py::array_t<unsigned>, std::pair<py::array_t<unsigned>, py::array_t<float>>> {
+              const dataT *pquery = query.data();
+              std::vector<std::vector<uint32_t>> ids(numQuery);
+              std::vector<std::vector<float>> dists(numQuery);
+              std::vector<uint64_t> lims(numQuery+1);
+
+              self.RangeSearchCpp(pquery, dim, numQuery, radius, para, ids, dists, lims);
+
+              uint64_t total = lims.back();
+              py::array_t<unsigned> res_ids(total);
+              py::array_t<float> res_dists(total);
+              py::array_t<unsigned> res_lims(numQuery+1);
+
+              auto res_ids_mutable = res_ids.mutable_unchecked();
+              auto res_dists_mutable = res_dists.mutable_unchecked();
+              auto res_lims_mutable = res_lims.mutable_unchecked();
+              size_t pos = 0;
+              for (uint64_t i = 0; i < numQuery; ++i) {
+                for (uint64_t j = 0; j < ids[i].size(); ++j) {
+                  res_ids_mutable(pos) = (unsigned)ids[i][j];
+                  res_dists_mutable(pos++) = dists[i][j];
+                }
+                res_lims_mutable(i) = lims[i];
+              }
+              res_lims_mutable(numQuery) = lims[numQuery];
+
+              return std::make_pair(res_lims, std::make_pair(res_ids, res_dists));
+           },
+           py::arg("query"), py::arg("dim"), py::arg("num_query"),
+           py::arg("radius"), py::arg("para"));
 }
 
 template <class dataT>

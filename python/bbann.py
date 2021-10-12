@@ -123,8 +123,8 @@ class BbANN(BaseANN):
         Carry out a batch query for range search with
         radius.
         """
-        # TODO(!!!!!)
-        pass
+        nq, dim = (np.shape(X))
+        self.rangeres_lim, (self.rangeres_ids, self.rangeres_dists) = self.index.range_search(X, dim, nq, radius, self.para)
 
     def get_results(self):
         """
@@ -148,7 +148,7 @@ class BbANN(BaseANN):
 
         are the distances.
         """
-        return self.res
+        return (self.rangeres_lim, self.rangeres_ids, self.rangeres_dists)
 
     def get_additional(self):
         """

@@ -10,7 +10,7 @@
 #include "hnswlib/hnswlib.h"
 #include "util/statistics.h"
 #include "util/heap.h"
-#include "ivf/clustering.h"
+#include "ivf/hierarchical_kmeans.h"
 #include "util/TimeRecorder.h"
 #include "flat/flat.h"
 
@@ -35,7 +35,7 @@ void search_bbann(const std::string& index_path,
                    const int K1,
                    const uint64_t block_size,
                    Computer<DATAT, DATAT, DISTT>& dis_computer);
-                
+
 
 template <typename DATAT, typename DISTT, typename HEAPT>
 void search_bbann_queryonly(
@@ -46,3 +46,18 @@ void search_bbann_queryonly(
     /* for IO */
     const DATAT *pquery, uint32_t *answer_ids, DISTT *answer_dists,
     uint32_t num_query, uint32_t dim);
+
+
+template <typename DATAT, typename DISTT>
+void range_search_bbann(
+    const std::string &index_path,
+    const int hnsw_ef,
+    const float radius, std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+    const int K1, const uint64_t block_size,
+    Computer<DATAT, DATAT, DISTT> &dis_computer,
+    /* for IO */
+    const DATAT *pquery, 
+    std::vector<std::vector<uint32_t>> &ids,
+    std::vector<std::vector<float>> &dists,
+    std::vector<uint64_t> &lims,
+    uint32_t nq, uint32_t dim);

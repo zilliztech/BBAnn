@@ -8,11 +8,11 @@ rm -f $temp
 rm -f $py
 rm -f $result
 DIR=`pwd`
-for file in `ls ${DIR}/*build.log`;
+for file in `ls ${DIR}/*.log`;
 do
     echo "Analysis Build Log File: " $file >> $temp
-    cat $file | grep "build bigann: train cluster to get 10 centroids done." | awk -F' ' '{print $10}' | awk -F'(' '{print $2}' >> $temp
-    cat $file | grep "build bigann: divide raw data into 10 clusters done" | awk -F' ' '{print $10}' | awk -F'(' '{print $2}' >> $temp
+    cat $file | grep "build bigann: train cluster to get" | awk -F' ' '{print $10}' | awk -F'(' '{print $2}' >> $temp
+    cat $file | grep "build bigann: divide raw data into" | awk -F' ' '{print $10}' | awk -F'(' '{print $2}' >> $temp
     cat $file | grep "build bigann: conquer each cluster into buckets done" | awk -F' ' '{print $9}' | awk -F'(' '{print $2}' >> $temp
     cat $file | grep "build bigann: build hnsw done." | awk -F' ' '{print $6}' | awk -F'(' '{print $2}' >> $temp
     cat $file | grep "build bigann: gather statistics done" | awk -F' ' '{print $6}'  | awk -F'(' '{print $2}' >> $temp

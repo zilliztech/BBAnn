@@ -43,6 +43,12 @@ public:
                       uint64_t knn, const paraT para, uint32_t *answer_ids,
                       distanceT *answer_dists) override;
 
+  void RangeSearchCpp(const dataT *pquery, uint64_t dim, uint64_t numQuery,
+                      double radius, const paraT para,
+                      std::vector<std::vector<uint32_t>> ids,
+                      std::vector<std::vector<float>> dists,
+                      std::vector<uint64_t> lims) override;
+
   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw_;
   std::string indexPrefix_;
 
