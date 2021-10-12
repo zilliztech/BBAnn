@@ -14,7 +14,7 @@ parser.add_argument('--M', type=int, default=32, help='Parameter for hnsw')
 parser.add_argument('--efC', type=int, default=200, help='Parameter for hnsw')
 parser.add_argument('--metric', type=str, default='L2',
                     help='Metric type, can be L2 or INNER_PRODUCT')
-parser.add_argument('--K1', type=int, default=20,
+parser.add_argument('--K1', type=int, default=1,
                     help=' number of centroid of the first round kmeans')
 parser.add_argument('--page_per_block', type=int, default=1,
                     help='number of pages in a block')
