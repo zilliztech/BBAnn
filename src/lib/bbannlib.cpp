@@ -70,13 +70,13 @@ void BBAnnIndex<dataT, paraT>::BuildIndexImpl(const paraT para) {
     std::cout << "dataT" << typeid(dataT).name() << std::endl;
     std::cout << "distanceT" << typeid(distanceT).name() << std::endl;
     build_bbann<dataT, distanceT, CMax<distanceT, uint32_t>>(
-        para.dataFilePath, para.indexPrefixPath, para.hnswM, para.hnswefC,
+        para.dataFilePath, para.indexPrefixPath, para.hnswM, para.efSearch,
         para.metric, para.K1, para.blockSize);
     return;
   }
   case MetricType::IP: {
     build_bbann<dataT, distanceT, CMin<distanceT, uint32_t>>(
-        para.dataFilePath, para.indexPrefixPath, para.hnswM, para.hnswefC,
+        para.dataFilePath, para.indexPrefixPath, para.hnswM, para.efSearch,
         para.metric, para.K1, para.blockSize);
     return;
   }

@@ -142,6 +142,7 @@ PYBIND11_MODULE(bbannpy, m) {
       .def_readwrite("queryPath", &BBAnnParameters::queryPath)
       .def_readwrite("hnswM", &BBAnnParameters::hnswM)
       .def_readwrite("hnswefC", &BBAnnParameters::hnswefC)
+      .def_readwrite("efSearch", &BBAnnParameters::efSearch)
       .def_readwrite("K1", &BBAnnParameters::K1)
       .def_readwrite("K", &BBAnnParameters::K)
       .def_readwrite("nProbe", &BBAnnParameters::nProbe)

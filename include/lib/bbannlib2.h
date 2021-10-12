@@ -17,6 +17,7 @@ struct BBAnnParameters {
   int K = 20; // top k.
   int hnswM = 32;
   int hnswefC = 500;
+  int efSearch = 100;
   int K1 = 20;
   int blockSize = 1;
   int nProbe = 2;
