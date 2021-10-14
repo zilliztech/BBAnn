@@ -4,9 +4,11 @@ set -e
 mkdir -p ../build
 pushd ../build
 cmake ..
-cd src
+cd src/
+make TimeRecorder
+cd lib
 make clean
-make -j
+make BBAnnLib2_s
 popd
 
 sudo pip3 uninstall bbannpy -y

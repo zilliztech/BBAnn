@@ -61,3 +61,4 @@ target_link_libraries(build_bbann BBAnn)
 target_link_libraries(search_bbann BBAnn)
 
 
+add_compile_options(-march=native)
