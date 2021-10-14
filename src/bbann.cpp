@@ -585,6 +585,7 @@ void search_bbann(
   for (int64_t i = 0; i < nq; ++i) {
     const auto ii = i * nprobe;
     const DATAT *q_idx = pquery + i * dq;
+    std::unordered_set<uint32_t> hash_set;
 
     for (int64_t j = 0; j < nprobe; ++j) {
       parse_global_block_id(bucket_labels[ii + j], cid, bid);
@@ -601,12 +602,15 @@ void search_bbann(
 
       for (uint32_t k = 0; k < entry_num; ++k) {
         char *entry_begin = buf_begin + entry_size * k;
+        uint32_t id_this=*reinterpret_cast<uint32_t *>(entry_begin + vec_size);
+        auto got = hash_set.find (id_this);
+        if (got!=hash_set.end()) continue;
+        hash_set.emplace(id_this);
         vec = reinterpret_cast<DATAT *>(entry_begin);
         auto dis = dis_computer(vec, q_idx, dim);
         if (HEAPT::cmp(answer_dists[topk * i], dis)) {
           heap_swap_top<HEAPT>(
-              topk, answer_dists + topk * i, answer_ids + topk * i, dis,
-              *reinterpret_cast<uint32_t *>(entry_begin + vec_size));
+              topk, answer_dists + topk * i, answer_ids + topk * i, dis,id_this);
         }
       }
     }
