@@ -178,6 +178,73 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
         k2 = std::max((cluster_size + threshold - 1) / threshold, 1L);
         same_size_kmeans<T>(cluster_size, data, dim, k2, k2_centroids.data(), cluster_id.data(), kmpp, avg_len, niter, seed);
 
+        //  std::cout << "after same size kmeans： "<< cluster_size<<std::endl;
+        std::vector<std::pair<float, std::pair<uint32_t, uint32_t>>> vec_to_centroids_dist(cluster_size * k2,
+                                                                                           std::pair<float, std::pair<uint32_t, uint32_t>>(0, std::pair<uint32_t, uint32_t>(0,0)));
+        //   std::cout<<"calculate the dis"<<std::endl;
+#pragma omp parallel for schedule(static)
+        for (int i = 0; i < cluster_size; i++) {
+            for (int j = 0; j< k2; j++) {
+                vec_to_centroids_dist[i * k2 + j].first = L2sqr<const T, const float ,float >(data + i * dim, k2_centroids.data() + j * dim, dim);
+                vec_to_centroids_dist[i * k2 + j].second = std::pair<uint32_t, uint32_t>(i, j); //(vec_offest, cent_offest)
+            }
+        }
+        //  std::cout<<"sort"<<std::endl;
+        std::sort(vec_to_centroids_dist.begin(), vec_to_centroids_dist.end(),
+                  [&](const std::pair<float, std::pair<uint32_t, uint32_t>> &x, const std::pair<float, std::pair<uint32_t, uint32_t>> &y) {
+                      return x.first < y.first;
+                  });
+        // std::cout <<"the first one "<<vec_to_centroids_dist[0].first<<"the last one "<<vec_to_centroids_dist[vec_to_centroids_dist.size()-1].first<<std::endl;
+        // std::cout<<"coay data"<<std::endl;
+        //malloc the flush buffer:
+        char * buf = new char [blk_size * k2];
+        memset(buf, 0 , blk_size * k2);
+        uint64_t entry_size = dim * sizeof(T) + sizeof(uint32_t);
+        uint64_t entry_num = blk_size / entry_size;
+        assert(entry_num > 0);
+        std::vector<std::set<uint32_t>> blk_mask(k2, std::set<uint32_t>());
+        for (int i =0 ; i < cluster_size; i++) {
+            blk_mask[cluster_id[i]].insert(i);
+        }
+        uint64_t total_insert_size = cluster_size;
+        uint64_t max_total_insert_size = k2 * entry_num;
+        for (int i = 0; total_insert_size < max_total_insert_size && i < vec_to_centroids_dist.size(); i++) {
+            auto cen_id = vec_to_centroids_dist[i].second.second;
+            auto vec_id = vec_to_centroids_dist[i].second.first;
+            if(blk_mask[cen_id].size() < entry_num && blk_mask[cen_id].count(vec_id) != -1) {
+                blk_mask[cen_id].insert(vec_id);
+                total_insert_size ++;
+            }
+        }
+        std::cout<<"write back"<<std::endl;
+        //write back to disk buf
+#pragma omp parallel for schedule(static)
+        for (int i = 0; i < k2; i++) {
+            char * cen_buf = buf + blk_size * i;
+            *reinterpret_cast<uint32_t*>(cen_buf) = blk_mask[i].size();
+            std::cout <<"block size "<< blk_mask[i].size()<<std::endl;
+            char * insert_pos = cen_buf + sizeof(uint32_t);
+            for (auto iter = blk_mask[i].begin(); iter != blk_mask[i].end(); iter++) {
+                //   std::cout<<"i write back"<<i<<" "<<*iter<<std::endl;
+                memcpy(insert_pos, data + (int64_t)(*iter) * dim, dim * sizeof(T));
+                memcpy(insert_pos + dim * sizeof(T), &(ids[*iter]), sizeof(uint32_t));
+                insert_pos += entry_size;
+            }
+            assert (insert_pos < cen_buf + blk_size);
+        }
+        std::cout<<"after write back"<<std::endl;
+        data_writer.write((char*)buf, k2 * blk_size);
+        std::cout<<"write cen"<<std::endl;
+        //write back centroids
+        for (int i = 0; i < k2; i++) {
+            uint32_t glb_id = gen_global_block_id(k1_id, blk_num);
+            centroids_writer.write((char *)(k2_centroids.data() + i * dim), sizeof(float) * dim);
+            centroids_id_writer.write((char * )(&glb_id), sizeof(uint32_t));
+            blk_num++;
+        }
+        std::cout<<"end of write back"<<std::endl;
+        return ;
+
     } else {
         int64_t train_size = cluster_size;
         T* train_data = nullptr;

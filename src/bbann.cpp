@@ -172,8 +172,9 @@ void hierarchical_clusters(const std::string &output_path, const int K1,
       data_reader.read((char *)&cluster_dim, sizeof(uint32_t));
       ids_reader.read((char *)&ids_size, sizeof(uint32_t));
       ids_reader.read((char *)&ids_dim, sizeof(uint32_t));
-      entry_num = (blk_size - sizeof(uint32_t)) /
-                  (cluster_dim * sizeof(DATAT) + ids_dim * sizeof(uint32_t));
+      //entry_num = (blk_size - sizeof(uint32_t)) /
+       //           (cluster_dim * sizeof(DATAT) + ids_dim * sizeof(uint32_t));
+      entry_num = 9;
       centroids_dim = cluster_dim;
       assert(cluster_size == ids_size);
       assert(ids_dim == 1);
