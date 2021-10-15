@@ -1,3 +1,4 @@
+#include <fcntl.h>  // open, pread
 #include "bbann.h"
 
 template <typename DATAT>
@@ -579,107 +580,115 @@ void search_bbann(
   }
   rc.RecordSection("heapify answers heaps");
 
-  char *buf = new char[block_size];
-
-  /* flat */
+  // step1
+  std::unordered_map<uint32_t, std::pair<std::string, uint32_t>> blocks;
+  std::vector<uint32_t> locs;
+  std::unordered_map<uint32_t, uint32_t> inverted_locs;
   for (int64_t i = 0; i < nq; ++i) {
-    const auto ii = i * nprobe;
-    const DATAT *q_idx = pquery + i * dq;
-
-    for (int64_t j = 0; j < nprobe; ++j) {
-      parse_global_block_id(bucket_labels[ii + j], cid, bid);
-      std::string cluster_file_path =
-          index_path + CLUSTER + std::to_string(cid) + "-" + RAWDATA + BIN;
-      auto fh = std::ifstream(cluster_file_path, std::ios::binary);
-      assert(!fh.fail());
-
-      fh.seekg(bid * block_size);
-      fh.read(buf, block_size);
-
-      const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
-      char *buf_begin = buf + sizeof(uint32_t);
-
-      for (uint32_t k = 0; k < entry_num; ++k) {
-        char *entry_begin = buf_begin + entry_size * k;
-        vec = reinterpret_cast<DATAT *>(entry_begin);
-        auto dis = dis_computer(vec, q_idx, dim);
-        if (HEAPT::cmp(answer_dists[topk * i], dis)) {
-          heap_swap_top<HEAPT>(
-              topk, answer_dists + topk * i, answer_ids + topk * i, dis,
-              *reinterpret_cast<uint32_t *>(entry_begin + vec_size));
-        }
+      const auto ii = i * nprobe;
+      for (int64_t j = 0; j < nprobe; ++j) {
+          auto label = bucket_labels[ii + j];
+          if (blocks.find(label) == blocks.end()) {
+              parse_global_block_id(label, cid, bid);
+              std::string cluster_file_path = index_path + CLUSTER + std::to_string(cid) + "-" + RAWDATA + BIN;
+              std::pair<std::string, uint32_t> blockPair (cluster_file_path, bid);
+              blocks[label] = blockPair;
+              inverted_locs[label] = locs.size();
+              locs.push_back(label);
+          }
       }
-    }
   }
+  rc.RecordSection("calculate block position done");
 
-  /* remove duplications + parallel on queries when searching block */
-  //     for (int64_t i = 0; i < nq; ++i) {
-  //         const auto ii = i * nprobe;
-  //         for (int64_t j = 0; j < nprobe; ++j) {
-  //             parse_global_block_id(bucket_labels[ii+j], cid, bid);
-  //             mp[cid][bid].insert(i);
-  //         }
-  //     }
+  auto block_nums = blocks.size();
+  std::cout
+        << "block num: " << block_nums
+        << "\tloc num: " << locs.size()
+        << "\tnq: " << nq
+        << "\tnprobe: " << nprobe
+        << "\tblock_size: " << block_size
+        << std::endl;
 
-  //     for (const auto& [cid, bid_mp] : mp) {
-  //         std::string cluster_file_path = index_path + CLUSTER +
-  //         std::to_string(cid) + "-" + RAWDATA + BIN; auto fh =
-  //         std::ifstream(cluster_file_path, std::ios::binary);
-  //         assert(!fh.fail());
+  // step2 load unique blocks from IO
+  std::vector<char*> block_bufs;
+  block_bufs.resize(block_nums);
+  std::cout << "block_bufs.size(): " << block_bufs.size() << std::endl;
 
-  //         for (const auto& [bid, qs] : bid_mp) {
-  //             fh.seekg(bid * block_size);
-  //             fh.read(buf, block_size);
-  //             const uint32_t entry_num = *reinterpret_cast<uint32_t*>(buf);
-  //             char* buf_begin = buf + sizeof(uint32_t);
-  //     /*
-  //      * A few options here. We can parallelize cid, bid, qs,
-  //      dis_calculation.
-  //      * Parallelizing qs is the only option that does not require locks, but
-  //      having
-  //      * potential waste of resources when qs is less than number of threads
-  //      available.
-  //      *
-  //      * TODO: need more investigation here
-  //      *
-  //      * Other proposal like make hnsw_search, read_data and calculation as a
-  //      pipeline
-  //      * may also worth investigating.
-  //      */
-  //             std::vector<uint32_t> qv(qs.begin(), qs.end());
+  std::unordered_map<std::string, int> fds; // file -> file descriptor
+  for (auto iter = blocks.begin(); iter != blocks.end(); iter++) {
+      if (fds.find(iter->second.first) == fds.end()) {
+          auto fd = open(iter->second.first.c_str(), O_RDONLY);
+          assert(fd != 0);
+          fds[iter->second.first] = fd;
+      }
+  }
+  rc.RecordSection("open file done");
 
-  // #pragma omp parallel for
-  //             for (uint32_t i = 0; i < qv.size(); ++i) {
-  //                 const uint32_t qid = qv[i];
-  //                 const DATAT* q_idx = pquery + qid * dq;
-  //                 for (uint32_t j = 0; j < entry_num; ++j) {
-  //                     char *entry_begin = buf_begin + entry_size * j;
-  //                     vec = reinterpret_cast<DATAT*>(entry_begin);
-  //                     auto dis = dis_computer(vec, q_idx, dim);
-  //                     if (HEAPT::cmp(answer_dists[topk * qid], dis)) {
-  //                         heap_swap_top<HEAPT>(topk,
-  //                                              answer_dists + topk * qid,
-  //                                              answer_ids + topk * qid,
-  //                                              dis,
-  //                                              *reinterpret_cast<uint32_t*>(entry_begin
-  //                                              + vec_size));
-  //                     }
-  //                 }
-  //             }
-  //         }
-  //     }
-  rc.RecordSection("scan blocks done");
+  //TODO add metrics of the part
+#pragma omp parallel for schedule(static, 512)
+  for (auto i = 0; i < locs.size(); i++) {
+      auto block = blocks[locs[i]];
+
+      // auto fh = std::ifstream((block.first), std::ios::binary);
+      // assert(!fh.fail());
+      // fh.seekg(block.second * block_size);
+      // char *buf = new char[block_size];
+      // fh.read(buf, block_size);
+
+       auto fd = fds[block.first];
+       char *buf = new char[block_size];
+       pread(fd, buf, block_size, block.second * block_size);
+
+      block_bufs[i] = buf;
+  }
+  rc.RecordSection("io done");
+
+  for (auto iter = fds.begin(); iter != fds.end(); iter++) {
+      close(iter->second);
+  }
+  rc.RecordSection("close fds done");
+
+  // step3 result for all buckets and heapify
+  for (int64_t i = 0; i < nq; ++i) {
+      const auto ii = i * nprobe;
+      const DATAT *q_idx = pquery + i * dq;
+      for (int64_t j = 0; j < nprobe; ++j) {
+          // char * buf = blockbuf[bucket_labels[ii + j]];
+          auto label = bucket_labels[ii + j];
+          auto loc = inverted_locs[label];
+          char * buf = block_bufs[loc];
+          const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
+          char *buf_begin = buf + sizeof(uint32_t);
+           //std::cout << "entry num : "  <<  entry_num<< std::endl;
+
+          for (uint32_t k = 0; k < entry_num; ++k) {
+              char *entry_begin = buf_begin + entry_size * k;
+              vec = reinterpret_cast<DATAT *>(entry_begin);
+              auto dis = dis_computer(vec, q_idx, dim);
+              if (HEAPT::cmp(answer_dists[topk * i], dis)) {
+                  heap_swap_top<HEAPT>(
+                          topk, answer_dists + topk * i, answer_ids + topk * i, dis,
+                          *reinterpret_cast<uint32_t *>(entry_begin + vec_size));
+              }
+          }
+      }
+  }
+  rc.RecordSection("compute distance done");
 
   // write answers
   save_answers<DISTT, HEAPT>(answer_bin_file, topk, nq, answer_dists,
                              answer_ids);
   rc.RecordSection("write answers done");
 
-  gather_vec_searched_per_query(index_path, pquery, nq, nprobe, dq, block_size,
+  /*gather_vec_searched_per_query(index_path, pquery, nq, nprobe, dq, block_size,
                                 buf, bucket_labels);
-  rc.RecordSection("gather statistics done");
+  rc.RecordSection("gather statistics done");*/
 
-  delete[] buf;
+  for (auto i = 0; i < block_bufs.size(); i++) {
+      delete[] block_bufs[i];
+  }
+  rc.RecordSection("release buf done");
+
   delete[] bucket_labels;
   delete[] pquery;
   delete[] answer_ids;
@@ -687,6 +696,172 @@ void search_bbann(
 
   rc.ElapseFromBegin("search bigann totally done");
 }
+
+// template <typename DATAT, typename DISTT, typename HEAPT>
+// void search_bbann(
+//     const std::string &index_path, const std::string &query_bin_file,
+//     const std::string &answer_bin_file, const int nprobe, const int hnsw_ef,
+//     const int topk, std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+//     const int K1, const uint64_t block_size,
+//     Computer<DATAT, DATAT, DISTT> &dis_computer) {
+//   TimeRecorder rc("search bigann");
+//
+//   std::cout << "search bigann parameters:" << std::endl;
+//   std::cout << " index_path: " << index_path
+//             << " query_bin_file: " << query_bin_file
+//             << " answer_bin_file: " << answer_bin_file << " nprobe: " << nprobe
+//             << " hnsw_ef: " << hnsw_ef << " topk: " << topk << " K1: " << K1
+//             << std::endl;
+//
+//   DATAT *pquery = nullptr;
+//   DISTT *answer_dists = nullptr;
+//   uint32_t *answer_ids = nullptr;
+//   uint32_t *bucket_labels = nullptr;
+//
+//   uint32_t nq, dq;
+//
+//   read_bin_file<DATAT>(query_bin_file, pquery, nq, dq);
+//   rc.RecordSection("load query done.");
+//
+//   std::cout << "query numbers: " << nq << " query dims: " << dq << std::endl;
+//
+//   answer_dists = new DISTT[(int64_t)nq * topk];
+//   answer_ids = new uint32_t[(int64_t)nq * topk];
+//   bucket_labels = new uint32_t[(int64_t)nq * nprobe]; // 400K * nprobe
+//
+//   // cid -> [bid -> [qid]]
+//   std::unordered_map<uint32_t,
+//                      std::unordered_map<uint32_t, std::unordered_set<uint32_t>>>
+//       mp;
+//
+//   search_graph<DATAT>(index_hnsw, nq, dq, nprobe, hnsw_ef, pquery,
+//                       bucket_labels, nullptr);
+//   // search_flat<DATAT>(index_path, pquery, nq, dq, nprobe, bucket_labels);
+//   rc.RecordSection("search buckets done.");
+//
+//   uint32_t cid, bid;
+//   uint32_t dim = dq, gid;
+//   const uint32_t vec_size = sizeof(DATAT) * dim;
+//   const uint32_t entry_size = vec_size + sizeof(uint32_t);
+//   DATAT *vec;
+//
+//   // init answer heap
+// #pragma omp parallel for schedule(static, 128)
+//   for (int i = 0; i < nq; i++) {
+//     auto ans_disi = answer_dists + topk * i;
+//     auto ans_idsi = answer_ids + topk * i;
+//     heap_heapify<HEAPT>(topk, ans_disi, ans_idsi);
+//   }
+//   rc.RecordSection("heapify answers heaps");
+//
+//   char *buf = new char[block_size];
+//
+//   /* flat */
+//   for (int64_t i = 0; i < nq; ++i) {
+//     const auto ii = i * nprobe;
+//     const DATAT *q_idx = pquery + i * dq;
+//
+//     for (int64_t j = 0; j < nprobe; ++j) {
+//       parse_global_block_id(bucket_labels[ii + j], cid, bid);
+//       std::string cluster_file_path =
+//           index_path + CLUSTER + std::to_string(cid) + "-" + RAWDATA + BIN;
+//       auto fh = std::ifstream(cluster_file_path, std::ios::binary);
+//       assert(!fh.fail());
+//
+//       fh.seekg(bid * block_size);
+//       fh.read(buf, block_size);
+//
+//       const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
+//       char *buf_begin = buf + sizeof(uint32_t);
+//
+//       for (uint32_t k = 0; k < entry_num; ++k) {
+//         char *entry_begin = buf_begin + entry_size * k;
+//         vec = reinterpret_cast<DATAT *>(entry_begin);
+//         auto dis = dis_computer(vec, q_idx, dim);
+//         if (HEAPT::cmp(answer_dists[topk * i], dis)) {
+//           heap_swap_top<HEAPT>(
+//               topk, answer_dists + topk * i, answer_ids + topk * i, dis,
+//               *reinterpret_cast<uint32_t *>(entry_begin + vec_size));
+//         }
+//       }
+//     }
+//   }
+//
+//   /* remove duplications + parallel on queries when searching block */
+//   //     for (int64_t i = 0; i < nq; ++i) {
+//   //         const auto ii = i * nprobe;
+//   //         for (int64_t j = 0; j < nprobe; ++j) {
+//   //             parse_global_block_id(bucket_labels[ii+j], cid, bid);
+//   //             mp[cid][bid].insert(i);
+//   //         }
+//   //     }
+//
+//   //     for (const auto& [cid, bid_mp] : mp) {
+//   //         std::string cluster_file_path = index_path + CLUSTER +
+//   //         std::to_string(cid) + "-" + RAWDATA + BIN; auto fh =
+//   //         std::ifstream(cluster_file_path, std::ios::binary);
+//   //         assert(!fh.fail());
+//
+//   //         for (const auto& [bid, qs] : bid_mp) {
+//   //             fh.seekg(bid * block_size);
+//   //             fh.read(buf, block_size);
+//   //             const uint32_t entry_num = *reinterpret_cast<uint32_t*>(buf);
+//   //             char* buf_begin = buf + sizeof(uint32_t);
+//   //     /*
+//   //      * A few options here. We can parallelize cid, bid, qs,
+//   //      dis_calculation.
+//   //      * Parallelizing qs is the only option that does not require locks, but
+//   //      having
+//   //      * potential waste of resources when qs is less than number of threads
+//   //      available.
+//   //      *
+//   //      * TODO: need more investigation here
+//   //      *
+//   //      * Other proposal like make hnsw_search, read_data and calculation as a
+//   //      pipeline
+//   //      * may also worth investigating.
+//   //      */
+//   //             std::vector<uint32_t> qv(qs.begin(), qs.end());
+//
+//   // #pragma omp parallel for
+//   //             for (uint32_t i = 0; i < qv.size(); ++i) {
+//   //                 const uint32_t qid = qv[i];
+//   //                 const DATAT* q_idx = pquery + qid * dq;
+//   //                 for (uint32_t j = 0; j < entry_num; ++j) {
+//   //                     char *entry_begin = buf_begin + entry_size * j;
+//   //                     vec = reinterpret_cast<DATAT*>(entry_begin);
+//   //                     auto dis = dis_computer(vec, q_idx, dim);
+//   //                     if (HEAPT::cmp(answer_dists[topk * qid], dis)) {
+//   //                         heap_swap_top<HEAPT>(topk,
+//   //                                              answer_dists + topk * qid,
+//   //                                              answer_ids + topk * qid,
+//   //                                              dis,
+//   //                                              *reinterpret_cast<uint32_t*>(entry_begin
+//   //                                              + vec_size));
+//   //                     }
+//   //                 }
+//   //             }
+//   //         }
+//   //     }
+//   rc.RecordSection("scan blocks done");
+//
+//   // write answers
+//   save_answers<DISTT, HEAPT>(answer_bin_file, topk, nq, answer_dists,
+//                              answer_ids);
+//   rc.RecordSection("write answers done");
+//
+//   gather_vec_searched_per_query(index_path, pquery, nq, nprobe, dq, block_size,
+//                                 buf, bucket_labels);
+//   rc.RecordSection("gather statistics done");
+//
+//   delete[] buf;
+//   delete[] bucket_labels;
+//   delete[] pquery;
+//   delete[] answer_ids;
+//   delete[] answer_dists;
+//
+//   rc.ElapseFromBegin("search bigann totally done");
+// }
 
 template <typename DATAT, typename DISTT, typename HEAPT>
 void dynamic_search_bbann(
