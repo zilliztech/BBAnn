@@ -238,6 +238,8 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
     int entry_size = vector_size + id_size;
     uint32_t global_id;
 
+    float *new_cen  = new float [dim];
+
     char* data_blk_buf = new char[blk_size];
     for(int i=0; i < k2; i++) {
         if (i == 0) {
@@ -254,15 +256,24 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
             memset(data_blk_buf, 0, blk_size);
             *reinterpret_cast<uint32_t*>(data_blk_buf) = bucket_size;
             char* beg_address = data_blk_buf + sizeof(uint32_t);
+            std::pair<float, int64_t> min_cen = std::pair<float, uint32_t>(L2sqr<T, float, float>
+                    (data + dim*bucket_offest,k2_centroids.data() + i * dim, dim), 0);
 
             for (int j = 0; j < bucket_size; j++) {
+                float dis = L2sqr<T, float, float>(data + dim*(bucket_offest+j),k2_centroids.data() + i * dim, dim);
+                if(dis < min_cen.first) min_cen = std::pair<float, uint32_t>(dis, j);
                 memcpy(beg_address + j * entry_size, data + dim * (bucket_offest + j), vector_size);
                 memcpy(beg_address + j * entry_size + vector_size, ids + bucket_offest + j, id_size);
             }
             global_id = gen_global_block_id(k1_id, blk_num);
 
             data_writer.write((char *) data_blk_buf, blk_size);
-            centroids_writer.write((char *) (k2_centroids.data() + i * dim), sizeof(float) * dim);
+
+
+            for (int d =0; d < dim; d++) new_cen[d] = (float)data[dim * (bucket_offest + min_cen.second) + d];
+            centroids_writer.write((char *) new_cen, sizeof(float) * dim);
+
+
             centroids_id_writer.write((char *) (&global_id), sizeof(uint32_t));
             blk_num++;
 
@@ -271,5 +282,6 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
                              blk_num, data_writer, centroids_writer, centroids_id_writer, level + 1, kmpp, avg_len, niter, seed);
         }
     }
+    delete [] new_cen;
     delete [] data_blk_buf;
 }
