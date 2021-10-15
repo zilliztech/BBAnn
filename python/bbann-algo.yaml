@@ -53,11 +53,11 @@ random-range-xs:
       run-groups:
         base:
           args: |
-              [{"hnswM":32, "hnswefC":500, "K1":1, "blockSize":2048}]
+              [{"hnswM":32, "hnswefC":500, "K1":1, "blockSize":4096}]
           query-args: |
-              [{"nProbe":50, "efSearch":250, "K1":1, "blockSize":2048},
-              {"nProbe":100, "efSearch":500, "K1":1, "blockSize":2048},
-              {"nProbe":200, "efSearch":1000, "K1":1, "blockSize":2048}]
+              [{"nProbe":50, "efSearch":250, "K1":1, "blockSize":4096},
+              {"nProbe":100, "efSearch":500, "K1":1, "blockSize":4096},
+              {"nProbe":200, "efSearch":1000, "K1":1, "blockSize":4096}]
 random-xs:
     faiss-t1:
       docker-tag: billion-scale-benchmark-faissconda
@@ -94,11 +94,11 @@ random-xs:
       run-groups:
         base:
           args: |
-              [{"hnswM":32, "hnswefC":500, "K1":1, "blockSize":2048}]
+              [{"hnswM":32, "hnswefC":500, "K1":1, "blockSize":4096}]
           query-args: |
-              [{"nProbe":50, "efSearch":250, "K1":1, "blockSize":2048},
-              {"nProbe":100, "efSearch":500, "K1":1, "blockSize":2048},
-              {"nProbe":200, "efSearch":1000, "K1":1, "blockSize":2048}]
+              [{"nProbe":50, "efSearch":250, "K1":1, "blockSize":4096},
+              {"nProbe":100, "efSearch":500, "K1":1, "blockSize":4096},
+              {"nProbe":200, "efSearch":1000, "K1":1, "blockSize":4096}]
 deep-1B:
     faiss-t1:
       docker-tag: billion-scale-benchmark-faissconda
@@ -177,11 +177,11 @@ deep-1B:
       run-groups:
         base:
           args: |
-              [{"hnswM":32, "hnswefC":500, "K1":128, "blockSize":2048}]
+              [{"hnswM":32, "hnswefC":500, "K1":128, "blockSize":4096}]
           query-args: |
-              [{"nProbe":50, "efSearch":250, "K1":128, "blockSize":2048},
-              {"nProbe":100, "efSearch":500, "K1":128, "blockSize":2048},
-              {"nProbe":200, "efSearch":1000, "K1":128, "blockSize":2048}]
+              [{"nProbe":50, "efSearch":250, "K1":128, "blockSize":4096},
+              {"nProbe":100, "efSearch":500, "K1":128, "blockSize":4096},
+              {"nProbe":200, "efSearch":1000, "K1":128, "blockSize":4096}]
 msspacev-1B:
     faiss-t1:
       docker-tag: billion-scale-benchmark-faissconda
@@ -251,11 +251,11 @@ msspacev-1B:
       run-groups:
         base:
           args: |
-              [{"hnswM":32, "hnswefC":500, "K1":128, "blockSize":2048}]
+              [{"hnswM":32, "hnswefC":500, "K1":128, "blockSize":4096}]
           query-args: |
-              [{"nProbe":50, "efSearch":250, "K1":128, "blockSize":2048},
-              {"nProbe":100, "efSearch":500, "K1":128, "blockSize":2048},
-              {"nProbe":200, "efSearch":1000, "K1":128, "blockSize":2048}]
+              [{"nProbe":50, "efSearch":250, "K1":128, "blockSize":4096},
+              {"nProbe":100, "efSearch":500, "K1":128, "blockSize":4096},
+              {"nProbe":200, "efSearch":1000, "K1":128, "blockSize":4096}]
 msturing-1B:
     faiss-t1:
       docker-tag: billion-scale-benchmark-faissconda
@@ -323,11 +323,11 @@ msturing-1B:
       run-groups:
         base:
           args: |
-              [{"hnswM":32, "hnswefC":500, "K1":128, "blockSize":2048}]
+              [{"hnswM":32, "hnswefC":500, "K1":128, "blockSize":4096}]
           query-args: |
-              [{"nProbe":50, "efSearch":250, "K1":128, "blockSize":2048},
-              {"nProbe":100, "efSearch":500, "K1":128, "blockSize":2048},
-              {"nProbe":200, "efSearch":1000, "K1":128, "blockSize":2048}]
+              [{"nProbe":50, "efSearch":250, "K1":128, "blockSize":4096},
+              {"nProbe":100, "efSearch":500, "K1":128, "blockSize":4096},
+              {"nProbe":200, "efSearch":1000, "K1":128, "blockSize":4096}]
 bigann-1B:
     faiss-t1:
       docker-tag: billion-scale-benchmark-faissconda
@@ -399,11 +399,11 @@ bigann-1B:
       run-groups:
         base:
           args: |
-              [{"hnswM":32, "hnswefC":500, "K1":128, "blockSize":2048}]
+              [{"hnswM":32, "hnswefC":500, "K1":128, "blockSize":4096}]
           query-args: |
-              [{"nProbe":50, "efSearch":250, "K1":128, "blockSize":2048},
-              {"nProbe":100, "efSearch":500, "K1":128, "blockSize":2048},
-              {"nProbe":200, "efSearch":1000, "K1":128, "blockSize":2048}]
+              [{"nProbe":50, "efSearch":250, "K1":128, "blockSize":4096},
+              {"nProbe":100, "efSearch":500, "K1":128, "blockSize":4096},
+              {"nProbe":200, "efSearch":1000, "K1":128, "blockSize":4096}]
 ssnpp-1B:
     faiss-t1:
       docker-tag: billion-scale-benchmark-faissconda
@@ -475,11 +475,11 @@ ssnpp-1B:
       run-groups:
         base:
           args: |
-              [{"hnswM":32, "hnswefC":500, "K1":128, "blockSize":2048}]
+              [{"hnswM":32, "hnswefC":500, "K1":128, "blockSize":4096}]
           query-args: |
-              [{"nProbe":50, "efSearch":250, "K1":128, "blockSize":2048},
-              {"nProbe":100, "efSearch":500, "K1":128, "blockSize":2048},
-              {"nProbe":200, "efSearch":1000, "K1":128, "blockSize":2048}]
+              [{"nProbe":50, "efSearch":250, "K1":128, "blockSize":4096},
+              {"nProbe":100, "efSearch":500, "K1":128, "blockSize":4096},
+              {"nProbe":200, "efSearch":1000, "K1":128, "blockSize":4096}]
 text2image-1B:
     faiss-t1:
       docker-tag: billion-scale-benchmark-faissconda
@@ -544,11 +544,11 @@ text2image-1B:
       run-groups:
         base:
           args: |
-              [{"hnswM":32, "hnswefC":500, "K1":128, "blockSize":2048}]
+              [{"hnswM":32, "hnswefC":500, "K1":128, "blockSize":4096}]
           query-args: |
-              [{"nProbe":50, "efSearch":250, "K1":128, "blockSize":2048},
-              {"nProbe":100, "efSearch":500, "K1":128, "blockSize":2048},
-              {"nProbe":200, "efSearch":1000, "K1":128, "blockSize":2048}]
+              [{"nProbe":50, "efSearch":250, "K1":128, "blockSize":4096},
+              {"nProbe":100, "efSearch":500, "K1":128, "blockSize":4096},
+              {"nProbe":200, "efSearch":1000, "K1":128, "blockSize":4096}]
 ssnpp-10M:
     faiss-t1:
       docker-tag: billion-scale-benchmark-faissconda
@@ -573,9 +573,9 @@ ssnpp-10M:
       run-groups:
         base:
           args: |
-              [{"hnswM":32, "hnswefC":500, "K1":10, "blockSize":2048}]
+              [{"hnswM":32, "hnswefC":500, "K1":10, "blockSize":4096}]
           query-args: |
-              [{"nProbe":50, "efSearch":250, "K1":10, "blockSize":2048}]
+              [{"nProbe":50, "efSearch":250, "K1":10, "blockSize":4096}]
 deep-10M:
    diskann-t2:
       docker-tag: billion-scale-benchmark-diskann
@@ -596,9 +596,9 @@ deep-10M:
       run-groups:
         base:
           args: |
-              [{"hnswM":32, "hnswefC":500, "K1":10, "blockSize":2048}]
+              [{"hnswM":32, "hnswefC":500, "K1":10, "blockSize":4096}]
           query-args: |
-              [{"nProbe":50, "efSearch":250, "K1":10, "blockSize":2048}]
+              [{"nProbe":50, "efSearch":250, "K1":10, "blockSize":4096}]
 bigann-10M:
    diskann-t2:
       docker-tag: billion-scale-benchmark-diskann
@@ -619,9 +619,9 @@ bigann-10M:
       run-groups:
         base:
           args: |
-              [{"hnswM":32, "hnswefC":500, "K1":10, "blockSize":2048}]
+              [{"hnswM":32, "hnswefC":500, "K1":10, "blockSize":4096}]
           query-args: |
-              [{"nProbe":50, "efSearch":250, "K1":10, "blockSize":2048}]
+              [{"nProbe":50, "efSearch":250, "K1":10, "blockSize":4096}]
 msturing-1M:
    diskann-t2:
       docker-tag: billion-scale-benchmark-diskann
@@ -642,9 +642,9 @@ msturing-1M:
       run-groups:
         base:
           args: |
-              [{"hnswM":32, "hnswefC":500, "K1":10, "blockSize":2048}]
+              [{"hnswM":32, "hnswefC":500, "K1":10, "blockSize":4096}]
           query-args: |
-              [{"nProbe":50, "efSearch":250, "K1":10, "blockSize":2048}]
+              [{"nProbe":50, "efSearch":250, "K1":10, "blockSize":4096}]
 msspacev-1M:
    diskann-t2:
       docker-tag: billion-scale-benchmark-diskann
@@ -665,9 +665,9 @@ msspacev-1M:
       run-groups:
         base:
           args: |
-              [{"hnswM":32, "hnswefC":500, "K1":10, "blockSize":2048}]
+              [{"hnswM":32, "hnswefC":500, "K1":10, "blockSize":4096}]
           query-args: |
-              [{"nProbe":50, "efSearch":250, "K1":10, "blockSize":2048}]
+              [{"nProbe":50, "efSearch":250, "K1":10, "blockSize":4096}]
 text2image-1M:
    diskann-t2: 
       docker-tag: billion-scale-benchmark-diskann
@@ -688,9 +688,9 @@ text2image-1M:
       run-groups:
         base:
           args: |
-              [{"hnswM":32, "hnswefC":500, "K1":10, "blockSize":2048}]
+              [{"hnswM":32, "hnswefC":500, "K1":10, "blockSize":4096}]
           query-args: |
-              [{"nProbe":50, "efSearch":250, "K1":10, "blockSize":2048}]
+              [{"nProbe":50, "efSearch":250, "K1":10, "blockSize":4096}]
 text2image-10M:
    diskann-t2: 
       docker-tag: billion-scale-benchmark-diskann
@@ -711,6 +711,6 @@ text2image-10M:
       run-groups:
         base:
           args: |
-              [{"hnswM":32, "hnswefC":500, "K1":10, "blockSize":2048}]
+              [{"hnswM":32, "hnswefC":500, "K1":10, "blockSize":4096}]
           query-args: |
-              [{"nProbe":50, "efSearch":250, "K1":10, "blockSize":2048}]
+              [{"nProbe":50, "efSearch":250, "K1":10, "blockSize":4096}]
