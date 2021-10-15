@@ -16,7 +16,7 @@ parser.add_argument('--nprobe', type=int, default=2, help='nprobe')
 parser.add_argument('--efSearch', type=int, default=100, help='Parameter for hnsw')
 parser.add_argument('--metric', type=str, default='L2',
                     help='Metric type, can be L2 or INNER_PRODUCT')
-parser.add_argument('--K1', type=int, default=20,
+parser.add_argument('--K1', type=int, default=1,
                     help=' number of centroid of the first round kmeans')
 parser.add_argument('--page_per_block', type=int, default=1,
                     help='number of pages in a block')
