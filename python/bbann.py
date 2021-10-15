@@ -126,6 +126,9 @@ class BbANN(BaseANN):
         nq, dim = (np.shape(X))
         self.rangeres_lim, (self.rangeres_ids, self.rangeres_dists) = self.index.range_search(
             X, dim, nq, radius, self.para)
+        print(self.rangeres_lim[0:10])
+        print(self.rangeres_ids[self.rangeres_lim[0]:self.rangeres_lim[1]])
+        print(self.rangeres_dists[self.rangeres_lim[0]:self.rangeres_lim[1]])
 
     def get_results(self):
         """
@@ -147,9 +150,14 @@ class BbANN(BaseANN):
 
             D[lims[q]:lims[q + 1]] in float
 
-        are the distances.
+        are the distances. 
+        --------------------------
+        NEED TO CHECK THE ORDER of I and D in plot.py/ utils.py.
+        
+        --------------------------
+
         """
-        return (self.rangeres_lim, self.rangeres_ids, self.rangeres_dists)
+        return (self.rangeres_lim, self.rangeres_dists, self.rangeres_ids)
 
     def get_additional(self):
         """

@@ -11,7 +11,7 @@ make clean
 make BBAnnLib2_s
 popd
 
-sudo pip3 uninstall bbannpy -y
+# sudo pip3 uninstall bbannpy -y
 rm -rf build/
 sudo python3 setup.py install -f
 rm -rf /tmp/dat

@@ -1116,18 +1116,26 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
 
   std::cout << "query numbers: " << numQuery << " query dims: " << dim
             << std::endl;
+  /*
+  for (int i = 0 ; i < numQuery; i++) {
+    std::cout << "query " << i <<": "; 
+    for (int j = 0; j < dim; j++) {
+      std::cout << pquery[i*dim + j] << " ";
+    }
+    std::cout << std::endl;
+  }
+   */
 
   std::vector<std::vector<uint32_t>> bucket_labels(numQuery);
 
   index_hnsw_->setEf(para.hnswefC);
 #pragma omp parallel for
   for (int64_t i = 0; i < numQuery; i++) {
-    // auto queryi = pquery + i * dim;
     // todo: hnsw need to support query data is not float
     float *queryi = new float[dim];
     for (int j = 0; j < dim; j++)
       queryi[j] = (float)(*(pquery + i * dim + j));
-    auto reti = index_hnsw_->searchRange(queryi, radius);
+    auto reti = index_hnsw_->searchRange(queryi, radius*20);
     while (!reti.empty()) {
       bucket_labels[i].push_back(reti.top().second);
       reti.pop();
@@ -1151,7 +1159,7 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
   std::cout << std::endl;
   /* flat */
   for (int64_t i = 0; i < numQuery; ++i) {
-    const dataT *q_idx = pquery + i * numQuery;
+    const dataT *q_idx = pquery + i * dim;
 
     for (int64_t j = 0; j < bucket_labels[i].size(); ++j) {
       util::parse_global_block_id(bucket_labels[i][j], cid, bid);
@@ -1168,7 +1176,7 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
         char *entry_begin = buf_begin + entry_size * k;
         vec = reinterpret_cast<dataT *>(entry_begin);
         auto dis = dis_computer(vec, q_idx, dim);
-
+      /*
         for (int qq = 0; qq < dim; qq++) {
           std::cout << q_idx[qq] << " ";
         }
@@ -1179,6 +1187,7 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
         std::cout << "----" << dis << std::endl;
         
         std::cout << " " << dis << " " << radius << std::endl;
+        */
         if (dis < radius) {
           dists[i].push_back(dis);
           ids[i].push_back(
@@ -1195,7 +1204,7 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
     idx += ids[i].size();
     if (ids[i].size() > 0) {
       for (int j = 0; j < ids[i].size(); j++) {
-        std::cout << dists[i][j] << std::endl;
+        std::cout << dists[i][j] << " ";
       }
       std::cout << "---> " << i << std::endl;
     }
