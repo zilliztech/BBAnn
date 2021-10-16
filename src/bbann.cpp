@@ -182,7 +182,7 @@ void hierarchical_clusters(const std::string &output_path, const int K1,
 
 
       int64_t data_size = static_cast<int64_t>(cluster_size);
-
+      std::cout << "train cluster" << std::to_string(i) << "data files" << data_file << "size" << data_size << std::endl;
       DATAT *datai = new DATAT[data_size * cluster_dim * 1ULL];
 
       uint32_t *idi = new uint32_t[ids_size * ids_dim];
@@ -214,8 +214,7 @@ void hierarchical_clusters(const std::string &output_path, const int K1,
                               sizeof(uint32_t));
   centroids_meta_writer.write((char *)&centroids_dim, sizeof(uint32_t));
   centroids_ids_meta_writer.seekp(0);
-  centroids_ids_meta_writer.write((char *)&global_centroids_number,
-                                  sizeof(uint32_t));
+  centroids_ids_meta_writer.write((char *)&global_centroids_number,sizeof(uint32_t));
   centroids_ids_meta_writer.write((char *)&centroids_id_dim, sizeof(uint32_t));
   centroids_meta_writer.close();
   centroids_ids_meta_writer.close();
@@ -649,6 +648,8 @@ void search_bbann(
   rc.RecordSection("close fds done");
 
   // step3 result for all buckets and heapify
+  uint64_t totalEntry = 0;
+  uint32_t maxEntry = 0;
   for (int64_t i = 0; i < nq; ++i) {
       const auto ii = i * nprobe;
       const DATAT *q_idx = pquery + i * dq;
@@ -659,8 +660,9 @@ void search_bbann(
           char * buf = block_bufs[loc];
           const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
           char *buf_begin = buf + sizeof(uint32_t);
+          maxEntry = entry_num > maxEntry? entry_num : maxEntry;
+          totalEntry += entry_num;
            //std::cout << "entry num : "  <<  entry_num<< std::endl;
-
           for (uint32_t k = 0; k < entry_num; ++k) {
               char *entry_begin = buf_begin + entry_size * k;
               vec = reinterpret_cast<DATAT *>(entry_begin);
@@ -673,6 +675,12 @@ void search_bbann(
           }
       }
   }
+
+  std::cout
+        << "max entry: " << maxEntry
+        << "\taverage entry: " << totalEntry / (nq * nprobe)
+        << std::endl;
+
   rc.RecordSection("compute distance done");
 
   // write answers

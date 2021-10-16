@@ -302,7 +302,8 @@ template <typename T>
 void kmeans (int64_t nx, const T* x_in, int64_t dim, int64_t k, float* centroids,
              bool kmpp = false, float avg_len = 0.0, int64_t niter = 10, 
              int64_t seed = 1234) {
-
+    clock_t start, end;
+    start = clock();
     if (k > 1000)
         nx = k * 40;
     std::cout << "new nx = " << nx << std::endl;
@@ -362,7 +363,7 @@ void kmeans (int64_t nx, const T* x_in, int64_t dim, int64_t k, float* centroids
                 cur_err += dis[j];
 
             if (fabs(cur_err - err) < err * 0.01) {
-                std::cout << "exit kmeans iteration after the " << i << "th iteration, err = " << err << ", cur_err = " << cur_err << std::endl;
+                //std::cout << "exit kmeans iteration after the " << i << "th iteration, err = " << err << ", cur_err = " << cur_err << std::endl;
                 break;
             }
             err = cur_err;
@@ -381,9 +382,11 @@ void kmeans (int64_t nx, const T* x_in, int64_t dim, int64_t k, float* centroids
             mn = hassign[i];
        // std::cout<<hassign[i]<<std::endl;
     }
+    end = clock();
      std::cout << "after the kmeans with nx = " << nx << ", k = " << k
               << ", has " << empty_cnt << " empty clusters," 
               << " max cluster: " << mx
               << " min cluster: " << mn
+              << " time spent " << ((double)end - start) / CLOCKS_PER_SEC * 1000 << "ms"
               << std::endl;
 }
