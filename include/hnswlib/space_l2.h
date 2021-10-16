@@ -177,6 +177,8 @@ namespace hnswlib {
         #if defined(USE_SSE) || defined(USE_AVX)
             if (dim % 16 == 0)
                 fstdistfunc_ = L2SqrSIMD16Ext;
+            else if (dim >= 100)
+                fstdistfunc_ = L2SqrSIMD16ExtResiduals;
             else if (dim % 4 == 0)
                 fstdistfunc_ = L2SqrSIMD4Ext;
             else if (dim > 16)
