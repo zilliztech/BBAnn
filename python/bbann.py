@@ -109,9 +109,9 @@ class BbANN(BaseANN):
             return False
         if not self.set_index_type(ds.distance(), ds.dtype):
             return False
-        self.index_path = index_dir + "/"
-        print(f"Loading index from {self.index_path}")
-        self.index.load_index(self.index_path)
+        self.para.indexPrefixPath = index_dir + "/"
+        print(f"Loading index from {self.para.indexPrefixPath}")
+        self.index.load_index(self.para.indexPrefixPath)
         return True
 
     def query(self, X, k):
