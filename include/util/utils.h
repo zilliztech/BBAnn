@@ -31,6 +31,30 @@ Computer<T1, T2, R> select_computer(MetricType metric_type) {
     }
 }
 
+template<typename T>
+inline void encode_uint8(T* max_len, T* min_len, T* data, uint8_t* code, int64_t n, uint32_t dim)  {
+#pragma omp parallel for
+    for (int64_t i = 0; i < n; i++) {
+        auto * __restrict x = data + i * dim;
+        auto * __restrict y = code + i * dim;
+        for(int d = 0; d < dim; d++) {
+            y[d] = (uint8_t)((x[d] - min_len[d])/(max_len[d] - min_len[d] + 1) * 256);
+        }
+    }
+}
+
+template<typename T>
+inline void decode_uint8(T* max_len, T* min_len, T* data, uint8_t* code, int64_t n, uint32_t dim)  {
+#pragma omp parallel for
+    for (int64_t i = 0; i < n; i++) {
+        auto * __restrict x = data + i * dim;
+        auto * __restrict y = code + i * dim;
+        for(int d = 0; d < dim; d++) {
+            x[d] = y[d] * (max_len[d] - min_len[d] + 1) / 256 + min_len[d];
+        }
+    }
+}
+
 inline void get_bin_metadata(const std::string& bin_file, uint32_t& nrows, uint32_t& ncols) {
     std::ifstream reader(bin_file, std::ios::binary);
     reader.read((char*) &nrows, sizeof(uint32_t));

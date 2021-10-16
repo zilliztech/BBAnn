@@ -149,10 +149,10 @@ void merge_clusters(LevelType level, int64_t dim, int64_t nx, int64_t& k, const 
     return ;
 }
 
-
 template <typename T>
 void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* ids, int64_t dim, uint32_t threshold, const uint64_t blk_size,
                       uint32_t& blk_num, IOWriter& data_writer, IOWriter& centroids_writer, IOWriter& centroids_id_writer, int level,
+                      T* max_len = nullptr, T* min_len = nullptr,
                       bool kmpp = false, float avg_len = 0.0, int64_t niter = 10, int64_t seed = 1234) {
     //std::cout<< "level" <<level<<" cluster_size"<<cluster_size<<std::endl;
 
@@ -161,7 +161,7 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
     int id_size = sizeof(uint32_t);
     int64_t k2;
     bool do_same_size_kmeans = (LevelType (level) >= LevelType ::BALANCE_LEVEL) ||
-            (LevelType (level) == LevelType ::THIRTH_LEVEL && cluster_size >= MIN_SAME_SIZE_THRESHOLD && cluster_size <= MAX_SAME_SIZE_THRESHOLD);
+                               (LevelType (level) == LevelType ::THIRTH_LEVEL && cluster_size >= MIN_SAME_SIZE_THRESHOLD && cluster_size <= MAX_SAME_SIZE_THRESHOLD);
     if (do_same_size_kmeans) {
         k2 = std::max((cluster_size + threshold - 1) / threshold, 1L);
     } else {
@@ -179,6 +179,7 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
         same_size_kmeans<T>(cluster_size, data, dim, k2, k2_centroids.data(), cluster_id.data(), kmpp, avg_len, niter, seed);
 
     } else {
+
         int64_t train_size = cluster_size;
         T* train_data = nullptr;
         if (cluster_size > k2 * K2_MAX_POINTS_PER_CENTROID) {
@@ -235,10 +236,12 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
 
     int64_t bucket_size;
     int64_t bucket_offest;
-    int entry_size = vector_size + id_size;
+    int code_size = sizeof(uint8_t) * dim;
+    int entry_size = code_size+ id_size;
     uint32_t global_id;
 
     char* data_blk_buf = new char[blk_size];
+    uint8_t* code = new uint8_t[blk_size * dim];
     for(int i=0; i < k2; i++) {
         if (i == 0) {
             bucket_size = bucket_pre_size[i];
@@ -249,15 +252,19 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
         }
         // std::cout<<"after kmeans : centroids i"<<i<<" has vectors "<<(int)bucket_size<<std::endl;
         if (bucket_size <= threshold) {
+          //  std::cout<<"flush into the ssd"<<std::endl;
             //write a blk to file
             //std::cout << bucket_size<<std::endl;
             memset(data_blk_buf, 0, blk_size);
+            memset(code, 0, dim * bucket_size * sizeof(uint8_t));
             *reinterpret_cast<uint32_t*>(data_blk_buf) = bucket_size;
             char* beg_address = data_blk_buf + sizeof(uint32_t);
-
+            encode_uint8(max_len, min_len, data + dim * bucket_offest, code, bucket_size, dim);
             for (int j = 0; j < bucket_size; j++) {
-                memcpy(beg_address + j * entry_size, data + dim * (bucket_offest + j), vector_size);
-                memcpy(beg_address + j * entry_size + vector_size, ids + bucket_offest + j, id_size);
+                //memcpy(beg_address + j * entry_size, data + dim * (bucket_offest + j), vector_size);
+               // std::cout<< "vec len "<< IP<uint8_t, uint8_t, double>(code + j * dim, code + j * dim, dim);
+                memcpy(beg_address + j * entry_size , code + j * dim, sizeof(uint8_t) * dim);
+                memcpy(beg_address + j * entry_size + code_size, ids + bucket_offest + j, id_size);
             }
             global_id = gen_global_block_id(k1_id, blk_num);
 
@@ -268,7 +275,7 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
 
         } else {
             recursive_kmeans(k1_id, bucket_size, data + bucket_offest * dim, ids + bucket_offest, dim, threshold, blk_size,
-                             blk_num, data_writer, centroids_writer, centroids_id_writer, level + 1, kmpp, avg_len, niter, seed);
+                             blk_num, data_writer, centroids_writer, centroids_id_writer, level + 1, max_len, min_len, kmpp, avg_len, niter, seed);
         }
     }
     delete [] data_blk_buf;
