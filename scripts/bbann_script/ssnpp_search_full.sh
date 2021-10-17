@@ -1,24 +1,24 @@
 #!/bin/bash
 
 DATA_TYPE=uint8
-K=10
+K=10 # TODO:
 METRIC_TYPE=L2
 # ================================================================================
 # ========================Begin Of Parameters=====================================
 # ================================================================================
 # DATA_TYPE
-INDEX_PATH=/data/index/bigann-1b-32-500-128-3
-QUERY_FILE=/data/dataset/bigann/query.public.10K.u8bin
+INDEX_PATH=/data/BBANN-Indexes/ssnpp-1B-32-500-128-1
+QUERY_FILE=/data/datasets/ssnpp/FB_ssnpp_public_queries.u8bin
 # RESULT_OUTPUT
-RESULT_OUTPUT_PREFIX=/data/answers/bigann-1b-32-500-128-3/
-TRUTH_SET_FILE=/data/dataset/bigann/bigann-1B-gt
+RESULT_OUTPUT_PREFIX=/data/answers/ssnpp-1B-32-500-128-1/
+TRUTH_SET_FILE=/data/datasets/ssnpp/ssnpp-1B-gt
 # NPROBE
 NPROBE_LIST=(50 100 200 300 400 500 600 700 800 900 1000)
 # REFINE_NPROBE
 # K
 K1=128
 # METRIC_TYPE
-PAGE_PER_BLOCK=3
+PAGE_PER_BLOCK=1
 # ================================================================================
 # ===========================End Of Parameters====================================
 # ================================================================================
@@ -26,7 +26,7 @@ PAGE_PER_BLOCK=3
 echo "Please run this script with root permission."
 echo "Copy this file as well as analyze_stat.py to release/ folder, where project is compiled."
 
-echo "Data Type: uint8 for BIGANN"
+echo "Data Type: uint8 for SSNPP"
 echo "Index Folder: " $INDEX_PATH
 echo "QUERY_FILE: " $QUERY_FILE
 echo "Result Answer Path Prefix: " $RESULT_OUTPUT_PREFIX
@@ -56,7 +56,6 @@ else
     LOG_FILE=${RESULT_OUTPUT_PREFIX}${NPROBE}_${REFINE_NPROBE}.log
     echo "LOG_FILE: " $LOG_FILE
 
-    echo "Cleaning the OS page cache. Run this if you want a real QPS. If you only want a recall, it is not necessary to kill page cache!"
     sync; echo 3 | sudo tee /proc/sys/vm/drop_caches
     pkill -f "search_bbann"
     time ./search_bbann $DATA_TYPE $INDEX_PATH $QUERY_FILE $RESULT_OUTPUT $TRUTH_SET_FILE $NPROBE $REFINE_NPROBE $K $K1 $METRIC_TYPE $PAGE_PER_BLOCK | sudo tee $LOG_FILE &

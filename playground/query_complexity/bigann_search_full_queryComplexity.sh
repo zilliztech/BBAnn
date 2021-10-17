@@ -1,24 +1,26 @@
 #!/bin/bash
 
 DATA_TYPE=uint8
-K=10
 METRIC_TYPE=L2
 # ================================================================================
 # ========================Begin Of Parameters=====================================
 # ================================================================================
 # DATA_TYPE
-INDEX_PATH=/data/index/bigann-1b-32-500-128-3
-QUERY_FILE=/data/dataset/bigann/query.public.10K.u8bin
+INDEX_PATH=/data/index/BBANN-BIGANN-32-500-128-1-32-500-128-1/
+QUERY_FILE=/data/datasets/bigann/query.public.10K.u8bin
 # RESULT_OUTPUT
-RESULT_OUTPUT_PREFIX=/data/answers/bigann-1b-32-500-128-3/
-TRUTH_SET_FILE=/data/dataset/bigann/bigann-1B-gt
+RESULT_OUTPUT_PREFIX=/data/answers/query_complexity_continue/
+TRUTH_SET_FILE=/data/datasets/bigann/bigann-1B-gt
 # NPROBE
-NPROBE_LIST=(50 100 200 300 400 500 600 700 800 900 1000)
+#NPROBE_LIST=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20)
+NPROBE_LIST=(25 30 35 40 45 50 60 70 80 90 100 150 200 250 300 350 400 450 500)
+#NPROBE_LIST=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 25 30 35 40 45 50 60 70 80 90 100 150 200 250 300 350 400 450 500)
 # REFINE_NPROBE
 # K
+K=1 # TODO: 1, 5, 9
 K1=128
 # METRIC_TYPE
-PAGE_PER_BLOCK=3
+PAGE_PER_BLOCK=1
 # ================================================================================
 # ===========================End Of Parameters====================================
 # ================================================================================
@@ -55,15 +57,7 @@ else
     echo "Result Answer Path: " $RESULT_OUTPUT
     LOG_FILE=${RESULT_OUTPUT_PREFIX}${NPROBE}_${REFINE_NPROBE}.log
     echo "LOG_FILE: " $LOG_FILE
-
-    echo "Cleaning the OS page cache. Run this if you want a real QPS. If you only want a recall, it is not necessary to kill page cache!"
-    sync; echo 3 | sudo tee /proc/sys/vm/drop_caches
-    pkill -f "search_bbann"
-    time ./search_bbann $DATA_TYPE $INDEX_PATH $QUERY_FILE $RESULT_OUTPUT $TRUTH_SET_FILE $NPROBE $REFINE_NPROBE $K $K1 $METRIC_TYPE $PAGE_PER_BLOCK | sudo tee $LOG_FILE &
-    pid=$!
-    pidstat -rud -h -t -p $pid 1 > $LOG_FILE.stat
-    wait $pid
-    python3 analyze_stat.py $LOG_FILE.stat > $LOG_FILE.max.stat
+    time ./search_bbann $DATA_TYPE $INDEX_PATH $QUERY_FILE $RESULT_OUTPUT $TRUTH_SET_FILE $NPROBE $REFINE_NPROBE $K $K1 $METRIC_TYPE $PAGE_PER_BLOCK | sudo tee $LOG_FILE
   done
 fi
 
