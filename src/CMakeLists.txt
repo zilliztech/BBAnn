@@ -6,3 +6,6 @@ add_library(BigAnn_static STATIC ${BigAnn_SRCS})
 
 add_library(BBAnn SHARED ${BBAnn_SRCS})
 add_library(BBAnn_static STATIC ${BBAnn_SRCS})
+
+target_link_libraries(BBAnn aio)
+target_link_libraries(BBAnn_static aio)
