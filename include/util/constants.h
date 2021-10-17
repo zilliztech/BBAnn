@@ -43,6 +43,7 @@ constexpr static float SEARCH_PRUNING_RATE = 0.9;
 constexpr const char* GLOBAL = "global-";
 constexpr const char* CLUSTER = "cluster-";
 constexpr const char* BUCKET = "bucket-";
+constexpr const char* SQ="SQ-CENTERS";
 
 // file_name
 constexpr const char* HNSW = "hnsw-";

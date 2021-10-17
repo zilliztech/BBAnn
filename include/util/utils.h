@@ -96,6 +96,52 @@ inline void read_bin_file(const std::string& file_name, T*& data, uint32_t& n,
 }
 
 template<typename T>
+inline void read_bin_file_half(const std::string& file_name,T*&data,uint32_t& n,
+                               uint32_t& dim,const uint32_t & have_read){
+    std::ifstream reader(file_name, std::ios::binary);
+
+    reader.read((char*)&n, sizeof(uint32_t));
+    reader.read((char*)&dim, sizeof(uint32_t));
+    uint32_t offset=0;
+    if (have_read==0){
+        n=n/2;
+        if (data == nullptr) {
+            data = new T[(uint64_t)n * (uint64_t)dim];
+        }
+        reader.read((char*)data, sizeof(T) * (uint64_t)n * dim);
+        reader.close();
+        std::cout << "read binary file from " << file_name << " done in ... seconds, n = "
+                  << n << ", dim = " << dim << std::endl;
+    }
+    else{
+        offset=n-have_read;
+        n=offset;
+        {
+            T* buf=new T[(uint64_t)have_read*(uint64_t)dim];
+            reader.read((char*)buf,sizeof(T)*(uint64_t)have_read*dim);
+        }
+        if (data== nullptr){
+            data=new T[(uint64_t)offset*(uint64_t)dim];
+        }
+        reader.read((char*)data,sizeof(T)*(uint64_t)offset*dim);
+        reader.close();
+        std::cout << "read binary file from " << file_name << " done in ... seconds, n = "
+                  << offset << ", dim = " << dim << std::endl;
+    }
+    std::cout<<"finish reading"<<std::endl;
+    std::cout<<data[0]<<std::endl;
+    std::cout<<"finish function"<<std::endl;
+}
+
+inline void read_meta(const std::string& file_name,uint32_t& n,uint32_t& dim){
+    std::ifstream reader(file_name, std::ios::binary);
+
+    reader.read((char*)&n, sizeof(uint32_t));
+    reader.read((char*)&dim, sizeof(uint32_t));
+    reader.close();
+}
+
+template<typename T>
 void reservoir_sampling(const std::string& data_file, const size_t sample_num, T* sample_data) {
     assert(sample_data != nullptr);
     std::random_device rd;

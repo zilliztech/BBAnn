@@ -13,6 +13,7 @@
 #include "ivf/hierarchical_kmeans.h"
 #include "util/TimeRecorder.h"
 #include "flat/flat.h"
+#include "sq_hnswlib/hnswlib.h"
 
 template<typename DATAT, typename DISTT, typename HEAPT>
 void build_bbann(const std::string& raw_data_bin_file,
@@ -31,7 +32,7 @@ void search_bbann(const std::string& index_path,
                    const int nprobe,
                    const int hnsw_ef,
                    const int topk,
-                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   std::shared_ptr<sq_hnswlib::HierarchicalNSW<float>> index_hnsw,
                    const int K1,
                    const uint64_t block_size,
                    Computer<DATAT, DATAT, DISTT>& dis_computer);

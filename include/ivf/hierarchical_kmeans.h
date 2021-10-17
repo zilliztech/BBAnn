@@ -3,6 +3,7 @@
 #include "ivf/kmeans.h"
 #include "ivf/balanced_kmeans.h"
 #include "ivf/same_size_kmeans.h"
+#include <set>
 
 template<typename T>
 void find_nearest_large_bucket (

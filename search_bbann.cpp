@@ -57,16 +57,16 @@ int main(int argc, char **argv) {
 
   uint32_t bucket_num, dim;
   get_bin_metadata(bucket_centroids_file, bucket_num, dim);
-  hnswlib::SpaceInterface<float> *space = nullptr;
+  sq_hnswlib::SpaceInterface<float> *space = nullptr;
 
   if (MetricType::L2 == metric_type) {
-    space = new hnswlib::L2Space(dim);
+    space = new sq_hnswlib::L2Space(dim);
   } else if (MetricType::IP == metric_type) {
-    space = new hnswlib::InnerProductSpace(dim);
+    space = new sq_hnswlib::InnerProductSpace(dim);
   }
   // load hnsw
   auto index_hnsw =
-      std::make_shared<hnswlib::HierarchicalNSW<float>>(space, hnsw_index_file);
+      std::make_shared<sq_hnswlib::HierarchicalNSW<float>>(space, hnsw_index_file);
   rc.RecordSection("load hnsw done.");
 
   if (argv[1] == std::string("float")) {
