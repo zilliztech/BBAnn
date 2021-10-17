@@ -334,6 +334,71 @@ namespace hnswlib {
             return top_candidates;
         }
 
+        void
+        getNeighboursWithinRadius (
+                std::priority_queue<std::pair<dist_t, tableint>,
+                                    std::vector<std::pair<dist_t, tableint>>,
+                                    CompareByFirst> &top_candidates,
+                const void *data_point,
+                float radius,
+                std::priority_queue<std::pair<dist_t, labeltype >> &result) const {
+
+            VisitedList *vl = visited_list_pool_->getFreeVisitedList();
+            vl_type *visited_array = vl->mass;
+            vl_type visited_array_tag = vl->curV;
+
+            std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst> radius_queue;
+
+            while (!top_candidates.empty()) {
+                auto cand = top_candidates.top();
+                top_candidates.pop();
+                if (cand.first < radius) {
+                    radius_queue.push(cand);
+                    result.emplace(cand.first, getExternalLabel(cand.second));
+                }
+                visited_array[cand.second] = visited_array_tag;
+            }
+
+            while (!radius_queue.empty()) {
+                auto cur = radius_queue.top();
+                radius_queue.pop();
+
+                tableint current_id = cur.second;
+                int *data = (int *) get_linklist0(current_id);
+                size_t size = getListCount((linklistsizeint*)data);
+
+#ifdef USE_SSE
+                _mm_prefetch((char *) (visited_array + *(data + 1)), _MM_HINT_T0);
+                _mm_prefetch((char *) (visited_array + *(data + 1) + 64), _MM_HINT_T0);
+                _mm_prefetch(data_level0_memory_ + (*(data + 1)) * size_data_per_element_ + offsetData_, _MM_HINT_T0);
+                _mm_prefetch((char *) (data + 2), _MM_HINT_T0);
+#endif
+                for (size_t j = 1; j <= size; j++) {
+                    int candidate_id = *(data + j);
+
+#ifdef USE_SSE
+                    _mm_prefetch((char *) (visited_array + *(data + j + 1)), _MM_HINT_T0);
+                    _mm_prefetch(data_level0_memory_ + (*(data + j + 1)) * size_data_per_element_ + offsetData_,
+                                 _MM_HINT_T0);////////////
+#endif
+                    if (!(visited_array[candidate_id] == visited_array_tag)) {
+                        visited_array[candidate_id] = visited_array_tag;
+
+                        char *cand_obj = (getDataByInternalId(candidate_id));
+                        dist_t dist = fstdistfunc_(data_point, cand_obj, dist_func_param_);
+
+                        if (dist < radius) {
+                            radius_queue.emplace(dist, candidate_id);
+                            result.emplace(dist, getExternalLabel(candidate_id));
+                        }
+                    }
+                }
+            }
+
+            visited_list_pool_->releaseVisitedList(vl);
+        }
+
+        /* deprecated */
         template <bool has_deletions, bool collect_metrics=false>
         std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst>
         searchBaseLayerRange(tableint ep_id, const void *data_point, size_t ef, float radius) const {
@@ -1236,7 +1301,7 @@ namespace hnswlib {
         };
 
         std::priority_queue<std::pair<dist_t, labeltype >>
-        searchRange(const void *query_data, float radius) const {
+        searchRange(const void *query_data, size_t k, float radius) const {
             std::priority_queue<std::pair<dist_t, labeltype >> result;
             if (cur_element_count == 0) return result;
 
@@ -1271,15 +1336,17 @@ namespace hnswlib {
             }
 
             std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst> top_candidates;
+            top_candidates=searchBaseLayerST<false,true>(
+                    currObj, query_data, std::max(ef_, k));
 
-            top_candidates=searchBaseLayerRange<false,true>(
-                    currObj, query_data, ef_, radius);
-
-            while (top_candidates.size() > 0) {
-                std::pair<dist_t, tableint> rez = top_candidates.top();
-                result.push(std::pair<dist_t, labeltype>(rez.first, getExternalLabel(rez.second)));
+            while (top_candidates.size() > k) {
                 top_candidates.pop();
             }
+
+            if (top_candidates.size() == 0) return result;
+
+            getNeighboursWithinRadius(top_candidates, query_data, radius, result);
+
             return result;
         }
 

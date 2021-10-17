@@ -543,7 +543,7 @@ void range_search_bbann(
     float *queryi = new float[dq];
     for (int j = 0; j < dq; j++)
       queryi[j] = (float)(*(pquery + i * dq + j));
-    auto reti = index_hnsw->searchRange(queryi, radius);
+    auto reti = index_hnsw->searchRange(queryi, 20, radius);
     while (!reti.empty()) {
       bucket_labels[i].push_back(reti.top().second);
       reti.pop();

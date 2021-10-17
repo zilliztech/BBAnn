@@ -53,7 +53,7 @@ int main() {
     index_hnsw->setEf(hnswef);
 
     // for (float radius = 2.4; radius > 0; radius -= 0.1) {
-    auto reti = index_hnsw->searchRange(xq, radius);
+    auto reti = index_hnsw->searchRange(xq, 20, radius);
     std::cout << radius << " size: " << reti.size() << std::endl;
 
     while (!reti.empty()) {

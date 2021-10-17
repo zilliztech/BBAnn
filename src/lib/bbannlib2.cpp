@@ -1135,7 +1135,7 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
     float *queryi = new float[dim];
     for (int j = 0; j < dim; j++)
       queryi[j] = (float)(*(pquery + i * dim + j));
-    auto reti = index_hnsw_->searchRange(queryi, radius);
+    auto reti = index_hnsw_->searchRange(queryi, 20, radius);
     while (!reti.empty()) {
       bucket_labels[i].push_back(reti.top().second);
       reti.pop();
