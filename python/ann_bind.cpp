@@ -93,11 +93,11 @@ void IndexBindWrapper(py::module_ &m) {
                 for (uint64_t j = 0; j < ids[i].size(); ++j) {
                   res_ids_mutable(pos) = (unsigned)ids[i][j];
                   res_dists_mutable(pos) = dists[i][j];
-                  std::cout << ids[i][j]<<":"<<dists[i][j] <<" ";
+                  // std::cout << ids[i][j]<<":"<<dists[i][j] <<" ";
                   pos++;
                 }
                 res_lims_mutable(i) = lims[i];
-                                std::cout << "!"<< lims[i] <<"!"<< std::endl;
+                                // std::cout << "!"<< lims[i] <<"!"<< std::endl;
                
               }
               res_lims_mutable(numQuery) = lims[numQuery];

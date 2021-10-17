@@ -390,12 +390,12 @@ void kmeans(int64_t nx, const T *x_in, int64_t dim, int64_t k, float *centroids,
 
   if (k > 1000)
     nx = k * 40;
-  std::cout << "new nx = " << nx << std::endl;
+  // std::cout << "new nx = " << nx << std::endl;
   const int64_t max_points_per_centroid = 256;
   const int64_t min_points_per_centroid = 39;
 
   if (nx < k) {
-    printf("trained points is not enough %ld given %ld\n", k, nx);
+    // printf("trained points is not enough %ld given %ld\n", k, nx);
     return;
   }
 
@@ -405,13 +405,13 @@ void kmeans(int64_t nx, const T *x_in, int64_t dim, int64_t k, float *centroids,
     return;
   }
 
-  if (nx < k * min_points_per_centroid) {
-    printf("Too little trained points need %ld given %ld\n",
-           k * min_points_per_centroid, nx);
-  } else if (nx > k * max_points_per_centroid) {
-    printf("Too many trained points need %ld given %ld\n",
-           k * max_points_per_centroid, nx);
-  }
+  // if (nx < k * min_points_per_centroid) {
+  //   printf("Too little trained points need %ld given %ld\n",
+  //          k * min_points_per_centroid, nx);
+  // } else if (nx > k * max_points_per_centroid) {
+  //   printf("Too many trained points need %ld given %ld\n",
+  //          k * max_points_per_centroid, nx);
+  // }
 
   std::unique_ptr<int64_t[]> hassign(new int64_t[k]);
 
@@ -441,16 +441,16 @@ void kmeans(int64_t nx, const T *x_in, int64_t dim, int64_t k, float *centroids,
     int64_t split = split_clusters_half(dim, k, nx, x_in, hassign.get(),
                                         assign.get(), centroids, avg_len);
     if (split != 0) {
-      printf("split %ld\n", split);
+      // printf("split %ld\n", split);
     } else {
       float cur_err = 0.0;
       for (auto j = 0; j < nx; j++)
         cur_err += dis[j];
 
       if (fabs(cur_err - err) < err * 0.01) {
-        std::cout << "exit kmeans iteration after the " << i
-                  << "th iteration, err = " << err << ", cur_err = " << cur_err
-                  << std::endl;
+        // std::cout << "exit kmeans iteration after the " << i
+        //           << "th iteration, err = " << err << ", cur_err = " << cur_err
+        //           << std::endl;
         break;
       }
       err = cur_err;
@@ -469,9 +469,9 @@ void kmeans(int64_t nx, const T *x_in, int64_t dim, int64_t k, float *centroids,
       mn = hassign[i];
     // std::cout<<hassign[i]<<std::endl;
   }
-  std::cout << "after the kmeans with nx = " << nx << ", k = " << k << ", has "
-            << empty_cnt << " empty clusters,"
-            << " max cluster: " << mx << " min cluster: " << mn << std::endl;
+  // std::cout << "after the kmeans with nx = " << nx << ", k = " << k << ", has "
+  //           << empty_cnt << " empty clusters,"
+  //           << " max cluster: " << mx << " min cluster: " << mn << std::endl;
 }
 
 template <typename DATAT>
@@ -1126,7 +1126,7 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
   }
    */
 
-  std::vector<std::vector<uint32_t>> bucket_labels(numQuery);
+  std::vector<uint32_t>* bucket_labels = new std::vector<uint32_t>[numQuery];
 
   index_hnsw_->setEf(para.hnswefC);
 #pragma omp parallel for
@@ -1135,7 +1135,7 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
     float *queryi = new float[dim];
     for (int j = 0; j < dim; j++)
       queryi[j] = (float)(*(pquery + i * dim + j));
-    auto reti = index_hnsw_->searchRange(queryi, radius*20);
+    auto reti = index_hnsw_->searchRange(queryi, radius);
     while (!reti.empty()) {
       bucket_labels[i].push_back(reti.top().second);
       reti.pop();
@@ -1153,12 +1153,16 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
   char *buf = new char[para.blockSize];
   auto dis_computer = select_computer<dataT, dataT, distanceT>(para.metric);
 
-  for (int i = 0; i < numQuery; i++) {
-    std::cout << bucket_labels[i].size() << " ";
-  }
-  std::cout << std::endl;
+  // for (int i = 0; i < numQuery; i++) {
+  //   std::cout << bucket_labels[i].size() << " ";
+  // }
+  // std::cout << std::endl;
   /* flat */
   for (int64_t i = 0; i < numQuery; ++i) {
+    if (i % 10000 == 0) {
+      std::cout << i << "/" << numQuery << std::endl;
+    }
+
     const dataT *q_idx = pquery + i * dim;
 
     for (int64_t j = 0; j < bucket_labels[i].size(); ++j) {
@@ -1202,17 +1206,18 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
   for (int64_t i = 0; i < numQuery; ++i) {
     lims[i] = idx;
     idx += ids[i].size();
-    if (ids[i].size() > 0) {
-      for (int j = 0; j < ids[i].size(); j++) {
-        std::cout << dists[i][j] << " ";
-      }
-      std::cout << "---> " << i << std::endl;
-    }
+    // if (ids[i].size() > 0) {
+    //   for (int j = 0; j < ids[i].size(); j++) {
+    //     std::cout << dists[i][j] << " ";
+    //   }
+    //   std::cout << "---> " << i << std::endl;
+    // }
   }
   lims[numQuery] = idx;
 
   rc.RecordSection("format answer done");
 
+  delete[] bucket_labels;
   delete[] buf;
   rc.ElapseFromBegin("range search bbann totally done");
 }

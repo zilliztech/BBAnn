@@ -13,6 +13,7 @@
 #include "file_handler.h" 
 #include "distance.h"
 #include "defines.h"
+#include "constants.h"
 
 
 template <typename T1, typename T2, typename R>
