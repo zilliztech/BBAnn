@@ -1,4 +1,10 @@
+#include <array>
+#include <vector>
+#include <mutex>
+#include <deque>
+#include <stdlib.h> // posix_memalign
 #include <fcntl.h>  // open, pread
+#include <libaio.h>
 #include "bbann.h"
 
 template <typename DATAT>
@@ -522,6 +528,20 @@ void gather_vec_searched_per_query(const std::string index_path,
             << " max: " << stats[1] << " min: " << stats[2] << std::endl;
 }
 
+int get_max_events_num_of_aio() {
+    auto file = "/proc/sys/fs/aio-max-nr";
+    auto f = std::ifstream(file);
+
+    if (!f.good()) {
+        return 1024;
+    }
+
+    int num;
+    f >> num;
+    f.close();
+    return num;
+}
+
 template <typename DATAT, typename DISTT, typename HEAPT>
 void search_bbann(
     const std::string &index_path, const std::string &query_bin_file,
@@ -581,6 +601,7 @@ void search_bbann(
 
   // step1
   std::unordered_map<uint32_t, std::pair<std::string, uint32_t>> blocks;
+  std::unordered_map<uint32_t, std::vector<int64_t>> labels_2_qidxs;  // label -> query idxs
   std::vector<uint32_t> locs;
   std::unordered_map<uint32_t, uint32_t> inverted_locs;
   for (int64_t i = 0; i < nq; ++i) {
@@ -590,10 +611,20 @@ void search_bbann(
           if (blocks.find(label) == blocks.end()) {
               parse_global_block_id(label, cid, bid);
               std::string cluster_file_path = index_path + CLUSTER + std::to_string(cid) + "-" + RAWDATA + BIN;
-              std::pair<std::string, uint32_t> blockPair (cluster_file_path, bid);
+              std::pair<std::string, uint32_t> blockPair(cluster_file_path, bid);
               blocks[label] = blockPair;
+              labels_2_qidxs[label] = std::vector<int64_t>{i};
               inverted_locs[label] = locs.size();
               locs.push_back(label);
+          }
+
+          if (labels_2_qidxs.find(label) == labels_2_qidxs.end()) {
+              labels_2_qidxs[label] = std::vector<int64_t>{i};
+          } else {
+              auto qidxs = labels_2_qidxs[label];
+              if (std::find(qidxs.begin(), qidxs.end(), i) == qidxs.end()) {
+                  labels_2_qidxs[label].push_back(i);
+              }
           }
       }
   }
@@ -611,86 +642,156 @@ void search_bbann(
   // step2 load unique blocks from IO
   std::vector<char*> block_bufs;
   block_bufs.resize(block_nums);
+  for (auto i = 0; i < block_nums; i++) {
+      auto r = posix_memalign((void**)(&block_bufs[i]), 512, block_size);
+      if (r != 0) {
+          std::cout << "posix_memalign() failed, returned: " << r
+                    << ", errno: " << errno
+                    << ", error: " << strerror(errno)
+                    << std::endl;
+          exit(-1);
+      }
+  }
   std::cout << "block_bufs.size(): " << block_bufs.size() << std::endl;
 
   std::unordered_map<std::string, int> fds; // file -> file descriptor
   for (auto iter = blocks.begin(); iter != blocks.end(); iter++) {
       if (fds.find(iter->second.first) == fds.end()) {
-          auto fd = open(iter->second.first.c_str(), O_RDONLY);
-          assert(fd != 0);
+          auto fd = open(iter->second.first.c_str(), O_RDONLY | O_DIRECT);
+          if (fd == 0) {
+              std::cout << "open() failed, fd: " << fd
+                        << ", errno: " << errno
+                        << ", error: " << strerror(errno)
+                        << std::endl;
+              exit(-1);
+          }
           fds[iter->second.first] = fd;
       }
   }
+  std::cout << "num of fds: " << fds.size() << std::endl;
   rc.RecordSection("open file done");
 
-  //TODO add metrics of the part
-#pragma omp parallel for schedule(static, 512)
+  std::cout << "EAGAIN: " << EAGAIN
+            << ", EFAULT: " << EFAULT
+            << ", EINVAL: " << EINVAL
+            << ", ENOMEM: " << ENOMEM
+            << ", ENOSYS: " << ENOSYS
+            << std::endl;
+
+  auto max_events_num = get_max_events_num_of_aio();
+  max_events_num = 1024;
+  io_context_t ctx = 0;
+  auto r = io_setup(max_events_num, &ctx);
+  if (r) {
+      std::cout << "io_setup() failed, returned: " << r
+                << ", strerror(r): " << strerror(r)
+                << ", errno: " << errno
+                << ", error: " << strerror(errno)
+                << std::endl;
+      exit(-1);
+  }
+
+  auto n_batch = (block_nums + max_events_num - 1) / max_events_num;
+  std::cout << "block_nums: " << block_nums << ", q_depth: " << max_events_num << ", n_batch: " << n_batch << std::endl;
+
+  auto io_thread_nums = 64;
+
+  for (auto n = 0; n < n_batch; n++) {
+      auto begin = n * max_events_num;
+      auto end = std::min(int((n + 1) * max_events_num), int(block_nums));
+      auto num = end - begin;
+
+      auto num_per_batch = (num + io_thread_nums - 1) / io_thread_nums;
+
+#pragma omp parallel for
+      for (auto th = 0; th < io_thread_nums; th++) {
+        auto begin_th = begin + num_per_batch * th;
+        auto end_th = std::min(int(begin_th + num_per_batch), end);
+        auto num_th = end_th - begin_th;
+
+        std::vector<struct iocb> ios(num_th);
+        std::vector<struct iocb*> cbs(num_th, nullptr);
+        std::vector<struct io_event> events(num_th);
+        for (auto i = begin_th; i < end_th; i++) {
+            auto block = blocks[locs[i]];
+            auto offset = block.second * block_size;
+            io_prep_pread(ios.data() + (i - begin_th), fds[block.first], block_bufs[i], block_size, offset);
+        }
+
+        for (auto i = 0; i < num_th; i++) {
+            cbs[i] = ios.data() + i;
+        }
+
+        r = io_submit(ctx, num_th, cbs.data());
+        if (r != num_th) {
+            std::cout << "io_submit() failed, returned: " << r
+                      << ", strerror(-r): " << strerror(-r)
+                      << ", errno: " << errno
+                      << ", error: " << strerror(errno)
+                      << std::endl;
+            exit(-1);
+        }
+
+        r = io_getevents(ctx, num_th, num_th, events.data(), NULL);
+        if (r != num_th) {
+            std::cout << "io_getevents() failed, returned: " << r
+                      << ", strerror(-r): " << strerror(-r)
+                      << ", errno: " << errno
+                      << ", error: " << strerror(errno)
+                      << std::endl;
+            exit(-1);
+        }
+      }
+  }
+  rc.RecordSection("async io done");
+
   for (auto i = 0; i < locs.size(); i++) {
-      auto block = blocks[locs[i]];
+      auto label = locs[i];
+      char * buf = block_bufs[i];
+      const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
+      char *buf_begin = buf + sizeof(uint32_t);
 
-      // auto fh = std::ifstream((block.first), std::ios::binary);
-      // assert(!fh.fail());
-      // fh.seekg(block.second * block_size);
-      // char *buf = new char[block_size];
-      // fh.read(buf, block_size);
+      auto nq_idxs = labels_2_qidxs[label];
+      for (auto iter = 0; iter < nq_idxs.size(); iter++) {
+          auto nq_idx = nq_idxs[iter];
+          const DATAT *q_idx = pquery + nq_idx * dq;
 
-       auto fd = fds[block.first];
-       char *buf = new char[block_size];
-       pread(fd, buf, block_size, block.second * block_size);
-
-      block_bufs[i] = buf;
-  }
-  rc.RecordSection("io done");
-
-  for (auto iter = fds.begin(); iter != fds.end(); iter++) {
-      close(iter->second);
-  }
-  rc.RecordSection("close fds done");
-
-  // step3 result for all buckets and heapify
-  uint64_t totalEntry = 0;
-  uint32_t maxEntry = 0;
-  for (int64_t i = 0; i < nq; ++i) {
-      const auto ii = i * nprobe;
-      const DATAT *q_idx = pquery + i * dq;
-      for (int64_t j = 0; j < nprobe; ++j) {
-          // char * buf = blockbuf[bucket_labels[ii + j]];
-          auto label = bucket_labels[ii + j];
-          auto loc = inverted_locs[label];
-          char * buf = block_bufs[loc];
-          const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
-          char *buf_begin = buf + sizeof(uint32_t);
-          maxEntry = entry_num > maxEntry? entry_num : maxEntry;
-          totalEntry += entry_num;
-           //std::cout << "entry num : "  <<  entry_num<< std::endl;
+          std::vector<DISTT> diss(entry_num);
+          std::vector<uint32_t> ids(entry_num);
           for (uint32_t k = 0; k < entry_num; ++k) {
               char *entry_begin = buf_begin + entry_size * k;
               vec = reinterpret_cast<DATAT *>(entry_begin);
               auto dis = dis_computer(vec, q_idx, dim);
-              if (HEAPT::cmp(answer_dists[topk * i], dis)) {
+              auto id = *reinterpret_cast<uint32_t *>(entry_begin + vec_size);
+              diss[k] = dis;
+              ids[k] = id;
+          }
+
+          for (auto k = 0; k < entry_num; k++) {
+              auto dis = diss[k];
+              auto id = ids[k];
+              if (HEAPT::cmp(answer_dists[topk * nq_idx], dis)) {
                   heap_swap_top<HEAPT>(
-                          topk, answer_dists + topk * i, answer_ids + topk * i, dis,
-                          *reinterpret_cast<uint32_t *>(entry_begin + vec_size));
+                          topk, answer_dists + topk * nq_idx, answer_ids + topk * nq_idx, dis, id);
               }
           }
       }
   }
-
-  std::cout
-        << "max entry: " << maxEntry
-        << "\taverage entry: " << totalEntry / (nq * nprobe)
-        << std::endl;
-
   rc.RecordSection("compute distance done");
 
   // write answers
   save_answers<DISTT, HEAPT>(answer_bin_file, topk, nq, answer_dists,
-                             answer_ids);
+                               answer_ids);
   rc.RecordSection("write answers done");
 
   /*gather_vec_searched_per_query(index_path, pquery, nq, nprobe, dq, block_size,
                                 buf, bucket_labels);
   rc.RecordSection("gather statistics done");*/
+
+  for (auto iter = fds.begin(); iter != fds.end(); iter++) {
+      close(iter->second);
+  }
+  rc.RecordSection("close fds done");
 
   for (auto i = 0; i < block_bufs.size(); i++) {
       delete[] block_bufs[i];
