@@ -603,7 +603,8 @@ void search_bbann(
   std::unordered_map<uint32_t, std::pair<std::string, uint32_t>> blocks;
   std::unordered_map<uint32_t, std::vector<int64_t>> labels_2_qidxs;  // label -> query idxs
   std::vector<uint32_t> locs;
-  std::unordered_map<uint32_t, uint32_t> inverted_locs;
+  // std::unordered_map<uint32_t, uint32_t> inverted_locs;  // not required
+  std::unordered_map<std::string, int> fds; // file -> file descriptor
   for (int64_t i = 0; i < nq; ++i) {
       const auto ii = i * nprobe;
       for (int64_t j = 0; j < nprobe; ++j) {
@@ -613,8 +614,22 @@ void search_bbann(
               std::string cluster_file_path = index_path + CLUSTER + std::to_string(cid) + "-" + RAWDATA + BIN;
               std::pair<std::string, uint32_t> blockPair(cluster_file_path, bid);
               blocks[label] = blockPair;
+
+              if (fds.find(cluster_file_path) == fds.end()) {
+                auto fd = open(cluster_file_path.c_str(), O_RDONLY | O_DIRECT);
+                if (fd == 0) {
+                    std::cout << "open() failed, fd: " << fd
+                              << ", file: " << cluster_file_path
+                              << ", errno: " << errno
+                              << ", error: " << strerror(errno)
+                              << std::endl;
+                    exit(-1);
+                }
+                fds[cluster_file_path] = fd;
+              }
+
               labels_2_qidxs[label] = std::vector<int64_t>{i};
-              inverted_locs[label] = locs.size();
+              // inverted_locs[label] = locs.size();
               locs.push_back(label);
           }
 
@@ -642,34 +657,9 @@ void search_bbann(
   // step2 load unique blocks from IO
   std::vector<char*> block_bufs;
   block_bufs.resize(block_nums);
-  for (auto i = 0; i < block_nums; i++) {
-      auto r = posix_memalign((void**)(&block_bufs[i]), 512, block_size);
-      if (r != 0) {
-          std::cout << "posix_memalign() failed, returned: " << r
-                    << ", errno: " << errno
-                    << ", error: " << strerror(errno)
-                    << std::endl;
-          exit(-1);
-      }
-  }
   std::cout << "block_bufs.size(): " << block_bufs.size() << std::endl;
 
-  std::unordered_map<std::string, int> fds; // file -> file descriptor
-  for (auto iter = blocks.begin(); iter != blocks.end(); iter++) {
-      if (fds.find(iter->second.first) == fds.end()) {
-          auto fd = open(iter->second.first.c_str(), O_RDONLY | O_DIRECT);
-          if (fd == 0) {
-              std::cout << "open() failed, fd: " << fd
-                        << ", errno: " << errno
-                        << ", error: " << strerror(errno)
-                        << std::endl;
-              exit(-1);
-          }
-          fds[iter->second.first] = fd;
-      }
-  }
   std::cout << "num of fds: " << fds.size() << std::endl;
-  rc.RecordSection("open file done");
 
   std::cout << "EAGAIN: " << EAGAIN
             << ", EFAULT: " << EFAULT
@@ -694,28 +684,90 @@ void search_bbann(
   auto n_batch = (block_nums + max_events_num - 1) / max_events_num;
   std::cout << "block_nums: " << block_nums << ", q_depth: " << max_events_num << ", n_batch: " << n_batch << std::endl;
 
-  auto io_thread_nums = 64;
+  auto io_submit_threads_num = 8;
+  auto io_wait_threads_num = 8;
+
+  std::deque<std::mutex> heap_mtxs;
+  heap_mtxs.resize(nq);
 
   for (auto n = 0; n < n_batch; n++) {
       auto begin = n * max_events_num;
       auto end = std::min(int((n + 1) * max_events_num), int(block_nums));
       auto num = end - begin;
 
-      auto num_per_batch = (num + io_thread_nums - 1) / io_thread_nums;
+      auto num_per_batch = (num + io_submit_threads_num - 1) / io_submit_threads_num;
+
+      for (auto th = begin; th < end; th++) {
+        auto r = posix_memalign((void**)(&block_bufs[th]), 512, block_size);
+        if (r != 0) {
+            std::cout << "posix_memalign() failed, returned: " << r
+                      << ", errno: " << errno
+                      << ", error: " << strerror(errno)
+                      << std::endl;
+            exit(-1);
+        }
+      }
 
 #pragma omp parallel for
-      for (auto th = 0; th < io_thread_nums; th++) {
+      for (auto th = 0; th < io_submit_threads_num; th++) {
         auto begin_th = begin + num_per_batch * th;
         auto end_th = std::min(int(begin_th + num_per_batch), end);
         auto num_th = end_th - begin_th;
 
         std::vector<struct iocb> ios(num_th);
         std::vector<struct iocb*> cbs(num_th, nullptr);
-        std::vector<struct io_event> events(num_th);
         for (auto i = begin_th; i < end_th; i++) {
             auto block = blocks[locs[i]];
             auto offset = block.second * block_size;
             io_prep_pread(ios.data() + (i - begin_th), fds[block.first], block_bufs[i], block_size, offset);
+
+            // Unfortunately, a lambda fundtion with capturing variables cannot convert to a function pointer.
+            // But fortunately, in fact we only need the location of label when the io is done.
+            // https://stackoverflow.com/questions/28746744/passing-capturing-lambda-as-function-pointer
+            /*
+            auto callback = [&](io_context_t ctx, struct iocb *cb, long res, long res2) {
+              auto label = locs[i];
+              char * buf = reinterpret_cast<char*>(cb->u.c.buf);
+              const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
+              char *buf_begin = buf + sizeof(uint32_t);
+
+              auto nq_idxs = labels_2_qidxs[label];
+              for (auto iter = 0; iter < nq_idxs.size(); iter++) {
+                  auto nq_idx = nq_idxs[iter];
+                  const DATAT *q_idx = pquery + nq_idx * dq;
+
+                  std::vector<DISTT> diss(entry_num);
+                  std::vector<uint32_t> ids(entry_num);
+                  for (uint32_t k = 0; k < entry_num; ++k) {
+                      char *entry_begin = buf_begin + entry_size * k;
+                      vec = reinterpret_cast<DATAT *>(entry_begin);
+                      auto dis = dis_computer(vec, q_idx, dim);
+                      auto id = *reinterpret_cast<uint32_t *>(entry_begin + vec_size);
+                      diss[k] = dis;
+                      ids[k] = id;
+                  }
+
+                  heap_mtxs[nq_idx].lock();
+                  for (auto k = 0; k < entry_num; k++) {
+                      auto dis = diss[k];
+                      auto id = ids[k];
+                      if (HEAPT::cmp(answer_dists[topk * nq_idx], dis)) {
+                          heap_swap_top<HEAPT>(
+                                  topk, answer_dists + topk * nq_idx, answer_ids + topk * nq_idx, dis, id);
+                      }
+                  }
+                  heap_mtxs[nq_idx].unlock();
+              }
+            };
+            */
+
+            // auto callback = static_cast<void*>(locs.data() + i);
+            // auto callback = (locs.data() + i);
+            auto callback = new int[1];
+            callback[0] = i;
+
+            // io_set_callback(ios.data() + (i - begin_th), callback);
+            ios[i - begin_th].data = callback;
         }
 
         for (auto i = 0; i < num_th; i++) {
@@ -731,53 +783,73 @@ void search_bbann(
                       << std::endl;
             exit(-1);
         }
-
-        r = io_getevents(ctx, num_th, num_th, events.data(), NULL);
-        if (r != num_th) {
-            std::cout << "io_getevents() failed, returned: " << r
-                      << ", strerror(-r): " << strerror(-r)
-                      << ", errno: " << errno
-                      << ", error: " << strerror(errno)
-                      << std::endl;
-            exit(-1);
-        }
       }
-  }
-  rc.RecordSection("async io done");
 
-  for (auto i = 0; i < locs.size(); i++) {
-      auto label = locs[i];
-      char * buf = block_bufs[i];
-      const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
-      char *buf_begin = buf + sizeof(uint32_t);
+      auto wait_num_per_batch = (num + io_wait_threads_num - 1) / io_wait_threads_num;
 
-      auto nq_idxs = labels_2_qidxs[label];
-      for (auto iter = 0; iter < nq_idxs.size(); iter++) {
-          auto nq_idx = nq_idxs[iter];
-          const DATAT *q_idx = pquery + nq_idx * dq;
+#pragma omp parallel for
+      for (auto th = 0; th < io_wait_threads_num; th++) {
+          auto begin_th = begin + wait_num_per_batch * th;
+          auto end_th = std::min(int(begin_th + wait_num_per_batch), end);
+          auto num_th = end_th - begin_th;
 
-          std::vector<DISTT> diss(entry_num);
-          std::vector<uint32_t> ids(entry_num);
-          for (uint32_t k = 0; k < entry_num; ++k) {
-              char *entry_begin = buf_begin + entry_size * k;
-              vec = reinterpret_cast<DATAT *>(entry_begin);
-              auto dis = dis_computer(vec, q_idx, dim);
-              auto id = *reinterpret_cast<uint32_t *>(entry_begin + vec_size);
-              diss[k] = dis;
-              ids[k] = id;
+          std::vector<struct io_event> events(num_th);
+
+          r = io_getevents(ctx, num_th, num_th, events.data(), NULL);
+          if (r != num_th) {
+              std::cout << "io_getevents() failed, returned: " << r
+                        << ", strerror(-r): " << strerror(-r)
+                        << ", errno: " << errno
+                        << ", error: " << strerror(errno)
+                        << std::endl;
+              exit(-1);
           }
 
-          for (auto k = 0; k < entry_num; k++) {
-              auto dis = diss[k];
-              auto id = ids[k];
-              if (HEAPT::cmp(answer_dists[topk * nq_idx], dis)) {
-                  heap_swap_top<HEAPT>(
-                          topk, answer_dists + topk * nq_idx, answer_ids + topk * nq_idx, dis, id);
+          for (auto en = 0; en < num_th; en++) {
+            auto loc = *reinterpret_cast<int*>(events[en].data);
+            delete[] reinterpret_cast<int*>(events[en].data);
+            auto label = locs[loc];
+            // auto label = *reinterpret_cast<uint32_t *>(events[en].data);
+            // char * buf = reinterpret_cast<char*>(events[en].obj->u.c.buf);
+            char* buf = block_bufs[loc];
+            const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
+            char *buf_begin = buf + sizeof(uint32_t);
+
+            auto nq_idxs = labels_2_qidxs[label];
+            for (auto iter = 0; iter < nq_idxs.size(); iter++) {
+                auto nq_idx = nq_idxs[iter];
+                const DATAT *q_idx = pquery + nq_idx * dq;
+
+                std::vector<DISTT> diss(entry_num);
+                std::vector<uint32_t> ids(entry_num);
+                for (uint32_t k = 0; k < entry_num; ++k) {
+                    char *entry_begin = buf_begin + entry_size * k;
+                    vec = reinterpret_cast<DATAT *>(entry_begin);
+                    auto dis = dis_computer(vec, q_idx, dim);
+                    auto id = *reinterpret_cast<uint32_t *>(entry_begin + vec_size);
+                    diss[k] = dis;
+                    ids[k] = id;
+                }
+
+                heap_mtxs[nq_idx].lock();
+                for (auto k = 0; k < entry_num; k++) {
+                    auto dis = diss[k];
+                    auto id = ids[k];
+                    if (HEAPT::cmp(answer_dists[topk * nq_idx], dis)) {
+                        heap_swap_top<HEAPT>(
+                                topk, answer_dists + topk * nq_idx, answer_ids + topk * nq_idx, dis, id);
+                    }
+                }
+                heap_mtxs[nq_idx].unlock();
               }
           }
       }
+
+      for (auto th = begin; th < end; th++) {
+        delete[] block_bufs[th];
+      }
   }
-  rc.RecordSection("compute distance done");
+  rc.RecordSection("async io done");
 
   // write answers
   save_answers<DISTT, HEAPT>(answer_bin_file, topk, nq, answer_dists,
@@ -792,11 +864,6 @@ void search_bbann(
       close(iter->second);
   }
   rc.RecordSection("close fds done");
-
-  for (auto i = 0; i < block_bufs.size(); i++) {
-      delete[] block_bufs[i];
-  }
-  rc.RecordSection("release buf done");
 
   delete[] bucket_labels;
   delete[] pquery;
