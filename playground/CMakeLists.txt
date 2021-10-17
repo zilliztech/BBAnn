@@ -1,17 +1,29 @@
 add_executable(genenrate_sample genenrate_sample.cpp)
 
-add_executable(gt_reader gt_reader.cpp)
+add_executable(gt_reader groundtruth_analyzer/gt_reader.cpp)
 
 add_executable(sequenital_slicer sequenital_slicer.cpp)
+add_executable(gt_sequential_slicer gt_sequential_slicer.cpp)
 
-add_executable(equal_width_histogram equal_width_histogram.cpp)
+add_executable(equal_width_histogram norm_distribution/equal_width_histogram.cpp)
 
-add_executable(equal_height_histogram equal_height_histogram.cpp)
+add_executable(equal_height_histogram norm_distribution/equal_height_histogram.cpp)
 
-add_executable(norm_bias_histogram norm_bias_histogram.cpp)
+add_executable(norm_bias_histogram norm_distribution/norm_bias_histogram.cpp)
 
-add_executable(breakdown_bigann breakdown_bigann.cpp)
-target_link_libraries(breakdown_bigann benchmark::benchmark BigAnn)
+#add_executable(breakdown_bigann breakdown_bigann.cpp)
+#target_link_libraries(breakdown_bigann benchmark::benchmark BigAnn)
+#
+#add_executable(breakdown_text2iamge breakdown_text2iamge.cpp)
+#target_link_libraries(breakdown_text2iamge benchmark::benchmark BigAnn)
 
-add_executable(breakdown_text2iamge breakdown_text2iamge.cpp)
-target_link_libraries(breakdown_text2iamge benchmark::benchmark BigAnn)
+add_executable(gt_nth_NN_distance_histogram groundtruth_analyzer/gt_nth_NN_distance_histogram.cpp)
+
+add_executable(centroid_distance_histogram centroid_analyzer/centroid_distance_histogram.cpp)
+target_link_libraries(centroid_distance_histogram BBAnn)
+
+add_executable(offset_slicer query_complexity/offset_slicer.cpp)
+add_executable(gt_offset_slicer query_complexity/gt_offset_slicer.cpp)
+
+add_executable(read_range_gt range_query_dataset/read_range_gt.cpp)
+add_executable(range_gt_offset_slicer range_query_dataset/range_gt_offset_slicer.cpp)

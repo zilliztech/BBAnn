@@ -30,17 +30,17 @@ target_link_libraries(test_recursive_kmeans BigAnn)
 add_executable(test_same_size_kmeans test_same_size_kmeans.cpp)
 target_link_libraries(test_same_size_kmeans BigAnn)
 
-## Google Test
-set(TEST_SOURCES
-        # add your *.cpp files here
-        Tester.cpp
-        TestIOPerf.cpp)
-
-
-add_executable(tester ${TEST_SOURCES})
-target_link_libraries(tester PUBLIC
-        BigAnn
-        GTest::GTest)
-
-add_executable(dummy_benchmark dummy_benchmark.cpp)
-target_link_libraries(dummy_benchmark benchmark::benchmark)
+### Google Test
+#set(TEST_SOURCES
+#        # add your *.cpp files here
+#        Tester.cpp
+#        TestIOPerf.cpp)
+#
+#
+#add_executable(tester ${TEST_SOURCES})
+#target_link_libraries(tester PUBLIC
+#        BigAnn
+#        GTest::GTest)
+#
+#add_executable(dummy_benchmark dummy_benchmark.cpp)
+#target_link_libraries(dummy_benchmark benchmark::benchmark)

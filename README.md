@@ -32,8 +32,6 @@ $ make -j
 
 ### Current Approach: Block-based index
 
-#### Build Scripts
-
 **Please Build With the Script**: 
 ```
 $ cp scripts/bbann_script/build.sh release/
