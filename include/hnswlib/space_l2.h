@@ -150,6 +150,17 @@ namespace hnswlib {
     inline static float
     L2SqrSIMD16ExtResiduals(const void *pVect1v, const void *pVect2v, const void *qty_ptr) {
         size_t qty = *((size_t *) qty_ptr);
+        int8_t *pVect1 = (int8_t *) pVect1v;
+        int8_t *pVect2 = (int8_t *) pVect2v;
+
+        float res = 0;
+        for (size_t i = 0; i < qty; i += 4) {
+            int8_t t = *(pVect1+4) - *(pVect2+4);
+            res += t * t;
+        }
+        return (res);
+
+        /*size_t qty = *((size_t *) qty_ptr);
         size_t qty16 = qty >> 4 << 4;
         float res = L2SqrSIMD16Ext(pVect1v, pVect2v, &qty16);
         float *pVect1 = (float *) pVect1v + qty16;
@@ -161,7 +172,7 @@ namespace hnswlib {
             return res + L2SqrSIMD4Ext(pVect1, pVect2, &qty_left);
         } else {
             return res + L2SqrSIMD4ExtResiduals(pVect1, pVect2, &qty_left);
-        }
+        }*/
     }
 #endif
 

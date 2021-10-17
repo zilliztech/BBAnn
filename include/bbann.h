@@ -13,6 +13,7 @@
 #include "ivf/hierarchical_kmeans.h"
 #include "util/TimeRecorder.h"
 #include "flat/flat.h"
+#include "util/threadpool.h"
 
 template<typename DATAT, typename DISTT, typename HEAPT>
 void build_bbann(const std::string& raw_data_bin_file,

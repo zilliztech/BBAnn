@@ -50,6 +50,7 @@ namespace hnswlib {
             label_offset_ = size_links_level0_ + data_size_;
             offsetLevel0_ = 0;
 
+            // level 0 data
             data_level0_memory_ = (char *) malloc(max_elements_ * size_data_per_element_);
             if (data_level0_memory_ == nullptr)
                 throw std::runtime_error("Not enough memory");
@@ -64,6 +65,7 @@ namespace hnswlib {
             enterpoint_node_ = -1;
             maxlevel_ = -1;
 
+            // 2-d array, all the neighourhood relationships in each layer.
             linkLists_ = (char **) malloc(sizeof(void *) * max_elements_);
             if (linkLists_ == nullptr)
                 throw std::runtime_error("Not enough memory: HierarchicalNSW failed to allocate linklists");
@@ -995,6 +997,7 @@ namespace hnswlib {
                     throw std::runtime_error("The number of elements exceeds the specified limit");
                 };
 
+                // get unique id
                 cur_c = cur_element_count;
                 cur_element_count++;
                 label_lookup_[label] = cur_c;
