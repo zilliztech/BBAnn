@@ -243,6 +243,8 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
             centroids_id_writer.write((char * )(&glb_id), sizeof(uint32_t));
             blk_num++;
         }
+        delete [] buf;
+        buf= nullptr;
         std::cout<<"end of write back"<<std::endl;
         return ;
 

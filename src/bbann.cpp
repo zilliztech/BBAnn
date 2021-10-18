@@ -245,33 +245,8 @@ void build_graph(const std::string &index_path, const int hnswM,
   auto *codebook=new uint8_t [(uint64_t)total_n*(uint64_t)ndim];
   memset(codebook,0,sizeof(uint8_t)*(uint64_t)total_n*(uint64_t)ndim);
   std::cout<<"start sq"<<std::endl;
-  {
-      float *buf_data = nullptr;
-      read_bin_file_half<float>(index_path + BUCKET + CENTROIDS + BIN, buf_data, npts,
-                                ndim, 0);
-      for (int i=0;i<npts;++i){
-          for (int j=0;j<half_dim;++j){
-              pdata[j*total_n+i]=buf_data[i*ndim+j];
-          }
-          std::cout<<std::endl;
-      }
-      delete[] buf_data;
-      buf_data= nullptr;
-  }
-  std::cout<<"first pdata of first part initialized"<<std::endl;
-  {
-      float *buf_data= nullptr;
-      read_bin_file_half<float>(index_path + BUCKET + CENTROIDS + BIN, buf_data, npts2,
-                                ndim, npts);
-      for (uint32_t i=0;i<npts2;++i){
-          for (uint32_t j=0;j<half_dim;++j){
-              pdata[j*total_n+(i+npts)]=buf_data[i*ndim+j];
-          }
-      }
-      delete[] buf_data;
-      buf_data= nullptr;
-  }
-  std::cout<<"first pdata of second part initialized"<<std::endl;
+  read_bin_file_half_dimension(index_path+BUCKET+CENTROIDS+BIN,pdata,npts,ndim,0);
+  std::cout<<"first pdata  initialized"<<std::endl;
 #pragma omp parallel for
   for (uint32_t i=0;i<half_dim;++i){
       float *centers=new float[256];
@@ -296,33 +271,8 @@ void build_graph(const std::string &index_path, const int hnswM,
   std::cout<<"first part code computed"<<std::endl;
 
   delete[] pdata;
-  pdata=new float[(uint64_t)total_n*(uint64_t)(ndim-half_dim)];
-
-    {
-        float *buf_data = nullptr;
-        read_bin_file_half<float>(index_path + BUCKET + CENTROIDS + BIN, buf_data, npts,
-                                  ndim, 0);
-        for (uint32_t i=0;i<npts;++i){
-            for (uint32_t j=half_dim;j<ndim;++j){
-                pdata[(j-half_dim)*total_n+i]=buf_data[i*ndim+j];
-            }
-        }
-        delete[] buf_data;
-        buf_data= nullptr;
-    }
-    std::cout<<"second pdata of first part initialized"<<std::endl;
-    {
-        float *buf_data= nullptr;
-        read_bin_file_half<float>(index_path + BUCKET + CENTROIDS + BIN, buf_data, npts2,
-                                  ndim, npts);
-        for (uint32_t i=0;i<npts2;++i){
-            for (uint32_t j=half_dim;j<ndim;++j){
-                pdata[(j-half_dim)*total_n+(i+npts)]=buf_data[i*ndim+j];
-            }
-        }
-        delete[] buf_data;
-        buf_data= nullptr;
-    }
+  pdata=nullptr;
+  read_bin_file_half_dimension(index_path+BUCKET+CENTROIDS+BIN,pdata,npts,ndim,half_dim);
     std::cout<<"second pdata of second part initialized"<<std::endl;
 #pragma omp parallel for
     for (uint32_t i=half_dim;i<ndim;++i){
