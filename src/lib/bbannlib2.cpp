@@ -947,12 +947,12 @@ void search_bbann_queryonly(
     }
     delete[] queryi;
   }
-  rc.ElapseFromBegin("search+graph+done.");
-  for (int i = 0; i < 10; i++) {
-    for (int j = 0; j < para.nProbe; j++)
-      std::cout << bucket_labels[i * para.nProbe + j] << " ";
-    std::cout << std::endl;
-  }
+  // rc.ElapseFromBegin("search+graph+done.");
+  // for (int i = 0; i < 10; i++) {
+  //   for (int j = 0; j < para.nProbe; j++)
+  //     std::cout << bucket_labels[i * para.nProbe + j] << " ";
+  //   std::cout << std::endl;
+  // }
   rc.RecordSection("search buckets done.");
 
   uint32_t cid, bid;
