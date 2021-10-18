@@ -149,6 +149,49 @@ namespace hnswlib {
 
     inline static float
     L2SqrSIMD16ExtResiduals(const void *pVect1v, const void *pVect2v, const void *qty_ptr) {
+        size_t n = *((size_t *) qty_ptr);
+        float *a = (float *) pVect1v;
+        float *b = (float *) pVect2v;
+
+        __m256 msum1 = _mm256_setzero_ps();
+        while (n >= 8) {
+            v1 = _mm256_loadu_ps(a);
+            pVect1 += 8;
+            v2 = _mm256_loadu_ps(v);
+            pVect2 += 8;
+            diff = _mm256_sub_ps(v1, v2);
+            //sum = _mm256_add_ps(sum, _mm256_mul_ps(diff, diff));
+            sum = _mm256_fmadd_ps(diff, diff, sum);
+        }
+        __m128 msum2 = _mm256_extractf128_ps(msum1, 1);
+        msum2 += _mm256_extractf128_ps(msum1, 0);
+        if (n >= 4) {
+            v1 = _mm_loadu_ps(a);
+            a += 4;
+            v2 = _mm_loadu_ps(b);
+            b += 4;
+            diff = _mm_sub_ps(v1, v2);
+            //sum = _mm_add_ps(sum, _mm_mul_ps(diff, diff));
+            msum2 = _mm_fmadd_ps(diff, diff, msum2);
+        msum2 = _mm_hadd_ps(msum2, msum2);
+        msum2 = _mm_hadd_ps(msum2, msum2);
+        float dis = _mm_cvtss_f32(msum2);
+        if (n > 0) {
+            float dif;
+            switch (n) {
+            case 3:
+              dif = *(a + 2) - *(b + 2);
+              dis += dif * dif;
+            case 2:
+              dif = *(a + 1) - *(b + 1);
+              dis += dif * dif;
+            case 1:
+              dif = *a - *b;
+              dis += dif * dif;
+            }
+        }
+
+        // verify result correct
         size_t qty = *((size_t *) qty_ptr);
         size_t qty16 = qty >> 4 << 4;
         float res = L2SqrSIMD16Ext(pVect1v, pVect2v, &qty16);
@@ -158,10 +201,14 @@ namespace hnswlib {
         size_t qty_left = qty - qty16;
 
         if (qty_left % 4 == 0) {
-            return res + L2SqrSIMD4Ext(pVect1, pVect2, &qty_left);
+            res = res + L2SqrSIMD4Ext(pVect1, pVect2, &qty_left);
         } else {
-            return res + L2SqrSIMD4ExtResiduals(pVect1, pVect2, &qty_left);
+            res = res + L2SqrSIMD4ExtResiduals(pVect1, pVect2, &qty_left);
         }
+        if (dis != res) {
+            cout << "not equal" << "dis" << dis << "res" << "res";
+        }
+        return res;
     }
 #endif
 
