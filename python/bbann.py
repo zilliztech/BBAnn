@@ -105,7 +105,7 @@ class BbANN(BaseANN):
         """
         ds = DATASETS[dataset]()
         index_dir = self.create_index_dir(ds)
-        if not (os.path.exists(index_dir)) and 'url' not in self._index_params:
+        if not (os.path.exists(index_dir)) and 'url' not in self.index_params:
             return False
         if not self.set_index_type(ds.distance(), ds.dtype):
             return False
