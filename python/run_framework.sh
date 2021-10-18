@@ -9,7 +9,7 @@ set -e
 pushd ../benchmark
 cp ../python/Dockerfile.bbann  install/
 cp ../python/bbann.py benchmark/algorithms/bbann.py
-rm -rf results/random-xs/*
+# rm -rf results/random-xs/*
 
 python3 install.py --algorithm bbann
 

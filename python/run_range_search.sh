@@ -15,14 +15,12 @@ make clean
 make BBAnnLib2_s
 popd
 
-
-sudo rm -rf build/
-sudo python3 setup.py install -f
+python3 install.py --algorithm bbann
 
 set -e
 pushd ../benchmark
 cp ../python/bbann.py benchmark/algorithms/bbann.py
-rm -rf results/random-range-xs/*
-python3 run.py --definitions ../python/bbann-algo.yaml --nodocker --dataset random-range-xs --algorithm bbann --force --rebuild
+# rm -rf results/random-range-xs/*
+python3 run.py --definitions ../python/bbann-algo.yaml --dataset random-range-xs --algorithm bbann # --force --rebuild
 python3 plot.py --definitions ../python/bbann-algo.yaml --dataset  random-range-xs --recompute
 popd
