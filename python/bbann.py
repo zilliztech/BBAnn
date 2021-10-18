@@ -41,6 +41,10 @@ class BbANN(BaseANN):
         """
         Return a folder name, in which we would store the index.
         """
+        print("trying to create index dir:", self.index_params)
+        if "overrideIndexPath" in self.index_params:
+            print("Override index path:", self.index_params["overrideIndexPath"])
+            return self.index_params["overrideIndexPath"]
         index_dir = os.path.join(os.getcwd(), "data", "indices")
         os.makedirs(index_dir, mode=0o777, exist_ok=True)
         index_dir = os.path.join(index_dir, "T2")

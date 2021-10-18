@@ -14,7 +14,7 @@ namespace bbann {
 template <typename T1, typename T2, typename R>
 R L2sqr(T1 *a, T2 *b, size_t n) {
   size_t i = 0;
-  R dis = 0, dif;
+R dis = 0, dif;
   switch (n & 7) {
   default:
     while (n > 7) {
@@ -513,15 +513,6 @@ void train_cluster(const std::string &raw_data_bin_file,
   delete[] sample_data;
   rc.ElapseFromBegin("train cluster done.");
 }
-namespace {
-std::string getClusterRawDataFileName(std::string prefix, int cluster_id) {
-  return prefix + "cluster-" + std::to_string(cluster_id) + "-raw_data.bin";
-}
-std::string getClusterGlobalIdsFileName(std::string prefix, int cluster_id) {
-  return prefix + "cluster-" + std::to_string(cluster_id) + "-global_ids.bin";
-}
-
-} // namespace
 
 template <typename DATAT, typename DISTT>
 void divide_raw_data(const BBAnnParameters para, const float *centroids) {
@@ -1171,7 +1162,6 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
   sort(bucketToQuery.begin(), bucketToQuery.end());
   rc.RecordSection("sort query results done");
 
-  uint32_t cid, bid;
   uint32_t gid;
   const uint32_t vec_size = sizeof(dataT) * dim;
   const uint32_t entry_size = vec_size + sizeof(uint32_t);
@@ -1180,22 +1170,10 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
   uint64_t total_bucket_searched = 0;
   char *buf = new char[para.blockSize];
   auto dis_computer = select_computer<dataT, dataT, distanceT>(para.metric);
-
-  // for (int i = 0; i < numQuery; i++) {
-  //   std::cout << bucket_labels[i].size() << " ";
-  // }
-  // std::cout << std::endl;
-  /* flat */
+  auto reader = std::make_unique<CachedBucketReader>(para.indexPrefixPath);
   for (const auto [bucketid, i] : bucketToQuery) {
     const dataT *q_idx = pquery + i * dim;
-
-    util::parse_global_block_id(bucketid, cid, bid);
-    auto fh = std::ifstream(getClusterRawDataFileName(cid), std::ios::binary);
-    assert(!fh.fail());
-
-    fh.seekg(bid * para.blockSize);
-    fh.read(buf, para.blockSize);
-
+    reader->readToBuf(bucketid, buf, para.blockSize);
     const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
     char *buf_begin = buf + sizeof(uint32_t);
 
@@ -1203,18 +1181,6 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
       char *entry_begin = buf_begin + entry_size * k;
       vec = reinterpret_cast<dataT *>(entry_begin);
       auto dis = dis_computer(vec, q_idx, dim);
-      /*
-        for (int qq = 0; qq < dim; qq++) {
-          std::cout << q_idx[qq] << " ";
-        }
-        std::cout << std::endl;
-        for (int qq = 0; qq < dim; qq++) {
-          std::cout << vec[qq] << " ";
-        }
-        std::cout << "----" << dis << std::endl;
-
-        std::cout << " " << dis << " " << radius << std::endl;
-        */
       if (dis < radius) {
         dists[i].push_back(dis);
         ids[i].push_back(*reinterpret_cast<uint32_t *>(entry_begin + vec_size));
@@ -1227,12 +1193,6 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
   for (int64_t i = 0; i < numQuery; ++i) {
     lims[i] = idx;
     idx += ids[i].size();
-    // if (ids[i].size() > 0) {
-    //   for (int j = 0; j < ids[i].size(); j++) {
-    //     std::cout << dists[i][j] << " ";
-    //   }
-    //   std::cout << "---> " << i << std::endl;
-    // }
   }
   lims[numQuery] = idx;
 

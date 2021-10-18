@@ -1,19 +1,22 @@
 #pragma once
+#include "util/utils_inline.h"
 #include <cassert>
 #include <cstring>
 #include <fstream>
 #include <iostream>
 #include <sstream>
-//#include "util/constants.h"
-namespace ioreader{
+
+namespace ioreader {
 constexpr static uint64_t KILOBYTE = 1024;
 constexpr static uint64_t MEGABYTE = 1024 * 1024;
 constexpr static uint64_t GIGABYTE = 1024 * 1024 * 1024;
-}
+} // namespace ioreader
+
 class IOReader {
 
 public:
-  IOReader(const std::string &file_name, const uint64_t cache_size = ioreader::GIGABYTE)
+  IOReader(const std::string &file_name,
+           const uint64_t cache_size = ioreader::GIGABYTE)
       : cache_size_(cache_size), cur_off_(0) {
     reader_.open(file_name, std::ios::binary | std::ios::ate);
     assert(reader_.is_open() == true);
@@ -68,7 +71,8 @@ private:
 
 class IOWriter {
 public:
-  IOWriter(const std::string &file_name, const uint64_t cache_size = ioreader::GIGABYTE)
+  IOWriter(const std::string &file_name,
+           const uint64_t cache_size = ioreader::GIGABYTE)
       : cache_size_(cache_size), cur_off_(0) {
     writer_.open(file_name, std::ios::binary);
     std::cout << "writing file" << file_name << std::endl;
@@ -122,3 +126,38 @@ private:
   // file size
   uint64_t fsize_ = 0;
 };
+
+namespace bbann {
+std::string getClusterRawDataFileName(std::string prefix, int cluster_id) {
+  return prefix + "cluster-" + std::to_string(cluster_id) + "-raw_data.bin";
+}
+std::string getClusterGlobalIdsFileName(std::string prefix, int cluster_id) {
+  return prefix + "cluster-" + std::to_string(cluster_id) + "-global_ids.bin";
+}
+
+class CachedBucketReader {
+public:
+  CachedBucketReader(std::string prefix) : prefix_(prefix), last_cid_(-1), last_bid_(-1) {}
+  void readToBuf(int bucketid, char *buf, int blockSize) {
+    uint32_t cid, bid;
+    util::parse_global_block_id(bucketid, cid, bid);
+    if (last_cid_ != cid) {
+      fh_ = std::ifstream(getClusterRawDataFileName(prefix_, cid), std::ios::binary);
+      fh_.seekg(bid * blockSize);
+      fh_.read(buf, blockSize);
+      last_cid_ = cid;
+      last_bid_ = bid;
+      return;
+    }
+    if (last_bid_ != bid) {
+      last_bid_ = bid;
+      fh_.seekg(bid * blockSize);
+      fh_.read(buf, blockSize);
+    }
+  }
+  std::string prefix_;
+  int last_cid_, last_bid_;
+  std::ifstream fh_;
+};
+
+} // namespace bbann

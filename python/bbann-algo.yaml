@@ -522,7 +522,7 @@ ssnpp-1B:
       run-groups:
         base:
           args: |
-              [{"hnswM":32, "hnswefC":500, "K1":128, "blockSize":8192}]
+              [{"hnswM":32, "hnswefC":500, "K1":128, "blockSize":8192, "overrideIndexPath": "/data/BBANN-ssnpp-t-32-500-128-2"}]
           query-args: |
               [{"nProbe":50, "efSearch":250, "K1":128, "blockSize":8192}]
 text2image-1B:
