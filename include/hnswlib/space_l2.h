@@ -162,9 +162,12 @@ namespace hnswlib {
             diff = _mm256_sub_ps(v1, v2);
             //sum = _mm256_add_ps(sum, _mm256_mul_ps(diff, diff));
             sum = _mm256_fmadd_ps(diff, diff, sum);
+            n -= 8;
         }
         __m128 msum2 = _mm256_extractf128_ps(msum1, 1);
         msum2 += _mm256_extractf128_ps(msum1, 0);
+
+        const float *end = pVect1 + (n << 4);
         if (n >= 4) {
             v1 = _mm_loadu_ps(a);
             a += 4;
@@ -173,6 +176,8 @@ namespace hnswlib {
             diff = _mm_sub_ps(v1, v2);
             //sum = _mm_add_ps(sum, _mm_mul_ps(diff, diff));
             msum2 = _mm_fmadd_ps(diff, diff, msum2);
+            n -= 4;
+        }
         msum2 = _mm_hadd_ps(msum2, msum2);
         msum2 = _mm_hadd_ps(msum2, msum2);
         float dis = _mm_cvtss_f32(msum2);
