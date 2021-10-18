@@ -75,9 +75,9 @@ inline void encode_uint8_kmeans(T* data, uint8_t* code, float * centroids, int64
 #pragma omp parallel for
     for (int i = 0; i < n; i++) {
         auto * __restrict x = data + i * dim;
+        auto * __restrict x_code = code + i * dim;
         for (int d = 0; d < dim; d++) {
-            auto * x_code = code + i * dim;
-            auto * cen = centroids + 256 * dim;
+            auto * cen = centroids + 256 * d;
             c_id = 0;
             c_dis = std::abs(x[d] - cen[c_id]);
             for (int k = 0; k < 256; k++) {
@@ -100,7 +100,7 @@ inline void decode_uint8_kmeans(T* data, uint8_t* code, float * centroids, int64
         auto * __restrict x_code = code + i * dim;
         for (int d = 0; d < dim; d++) {
             auto * cent = centroids + d * 256;
-            x[d] = cent[x_code[d]];
+            x[d] = (T)cent[x_code[d]];
         }
     }
 }

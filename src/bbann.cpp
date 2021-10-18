@@ -47,9 +47,9 @@ void train_cluster(const std::string &raw_data_bin_file,
     }
 
 
-    std::string meta_file = output_path + SQ_CODEBOOK;
-    IOWriter meta_writer(meta_file);
-    meta_writer.write((char*)codebook.data(), sizeof(DATAT) * dim);
+    std::string codebook_file = output_path + SQ_CODEBOOK;
+    IOWriter codebook_writer(codebook_file);
+    codebook_writer.write((char*)codebook.data(), sizeof(float) * dim * d_k);
 
     delete[] d_data;
     delete[] sample_data;
