@@ -620,6 +620,18 @@ bigann-10M:
               [{"hnswM":32, "hnswefC":500, "K1":10, "blockSize":4096}]
           query-args: |
               [{"nProbe":50, "efSearch":250, "K1":10, "blockSize":4096}]
+msspacev-10M:
+   bbann: 
+      docker-tag: billion-scale-benchmark-bbann
+      module: benchmark.algorithms.bbann
+      constructor: BbANN
+      base-args: ["@metric"]
+      run-groups:
+        base:
+          args: |
+              [{"hnswM":32, "hnswefC":500, "K1":10, "blockSize":4096}]
+          query-args: |
+              [{"nProbe":50, "efSearch":250, "K1":10, "blockSize":4096}]
 msturing-1M:
    diskann-t2:
       docker-tag: billion-scale-benchmark-diskann
