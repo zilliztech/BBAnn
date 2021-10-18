@@ -7,11 +7,13 @@
 #include <functional>
 #include <memory>
 #include <unordered_map>
+#include <algorithm>
 #include <sys/stat.h>
 
 #include "file_handler.h" 
 #include "distance.h"
 #include "defines.h"
+#include "constants.h"
 
 
 template <typename T1, typename T2, typename R>
@@ -183,6 +185,26 @@ void reservoir_sampling_residual(
             ivf_cen + ivf_cen_offsets[i] * dim,
             dim * sizeof(float));
     }
+}
+
+template<typename T>
+void random_sampling_k2(
+        const T* data,
+        const int64_t data_size,
+        const int64_t dim,
+        const int64_t sample_size,
+        T* sample_data,
+        int64_t seed = 1234
+) {
+    std::vector<int> perm(data_size);
+    for (int64_t i = 0; i < data_size; i++) {
+        perm[i] = i;
+    }
+    std::shuffle(perm.begin(), perm.end(), std::default_random_engine(seed));
+    for (int64_t i = 0; i < sample_size; i++) {
+        memcpy(sample_data + i * dim, data + perm[i] * dim,  dim * sizeof(T));
+    }
+    return ;
 }
 
 inline uint32_t gen_global_block_id(const uint32_t cid, const uint32_t bid) {

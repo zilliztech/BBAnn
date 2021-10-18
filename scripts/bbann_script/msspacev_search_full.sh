@@ -1,24 +1,24 @@
 #!/bin/bash
 
-DATA_TYPE=uint8
+DATA_TYPE=int8
 K=10
 METRIC_TYPE=L2
 # ================================================================================
 # ========================Begin Of Parameters=====================================
 # ================================================================================
 # DATA_TYPE
-INDEX_PATH=/data/10M_test/indexes
-QUERY_FILE=/data/10M_test/datasets/query.public.10K.u8bin
+INDEX_PATH=/data/index/BBANN-msspacev-32-500-128-1-32-500-128-1/
+QUERY_FILE=/data/datasets/msspacev/query100K.fbin
 # RESULT_OUTPUT
-RESULT_OUTPUT_PREFIX=/data/answers/BBANN-BIGANN-32-500-128-3/
-TRUTH_SET_FILE=/data/10M_test/datasets/bigann-10M-gt
+RESULT_OUTPUT_PREFIX=/data/answers/BBANN-msspacev-32-500-128-1-32-500-128-1/
+TRUTH_SET_FILE=/data/datasets/msspacev/msspacev-1B-gt
 # NPROBE
-NPROBE_LIST=(50 100 200 300 400 500 600 700 800 900 1000)
+NPROBE_LIST=(25 50 100 200 300 400 500 600 700 800 900 1000)
 # REFINE_NPROBE
 # K
 K1=128
 # METRIC_TYPE
-PAGE_PER_BLOCK=3
+PAGE_PER_BLOCK=1
 # ================================================================================
 # ===========================End Of Parameters====================================
 # ================================================================================

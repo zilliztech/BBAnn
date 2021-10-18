@@ -1,6 +1,6 @@
 #include "flat/flat.h"
 #include "ivf/ivf_flat.h"
-#include "ivf/clustering.h"
+#include "ivf/same_size_kmeans.h"
 #include "util/merge.h"
 #include "util/read_file.h"
 #include "util/utils.h"
