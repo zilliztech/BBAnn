@@ -25,7 +25,7 @@ namespace sq_hnswlib {
             loadIndex(location, s, max_elements);
         }
 
-        HierarchicalNSW(SpaceInterface<dist_t> *s, size_t max_elements, size_t M = 16, size_t ef_construction = 200, size_t random_seed = 100) :
+        HierarchicalNSW(SpaceInterface<dist_t> *s, size_t max_elements, size_t M = 16, size_t ef_construction = 200, size_t random_seed = 100,float* codes= nullptr) :
                 link_list_locks_(max_elements), link_list_update_locks_(max_update_element_locks), element_levels_(max_elements) {
             max_elements_ = max_elements;
 
@@ -38,6 +38,9 @@ namespace sq_hnswlib {
             maxM0_ = M_ * 2;
             ef_construction_ = std::max(ef_construction,M_);
             ef_ = 10;
+
+            codes_=new float[256*(*s->get_dist_func_param())];
+            memcpy(codes_,codes,sizeof(float)*256*(*(size_t*)dist_func_param_));
 
             level_generator_.seed(random_seed);
             update_probability_generator_.seed(random_seed + 1);
@@ -101,6 +104,7 @@ namespace sq_hnswlib {
         double mult_, revSize_;
         int maxlevel_;
 
+        float * codes_;
 
         VisitedListPool *visited_list_pool_;
         std::mutex cur_element_count_guard_;
@@ -160,7 +164,7 @@ namespace sq_hnswlib {
 
 
         std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst>
-        searchBaseLayer(tableint ep_id, const void *data_point, int layer,const float* codes,const bool both_codes) {
+        searchBaseLayer(tableint ep_id, const void *data_point, int layer,const bool both_codes) {
             VisitedList *vl = visited_list_pool_->getFreeVisitedList();
             vl_type *visited_array = vl->mass;
             vl_type visited_array_tag = vl->curV;
@@ -170,7 +174,7 @@ namespace sq_hnswlib {
 
             dist_t lowerBound;
             if (!isMarkedDeleted(ep_id)) {
-                dist_t dist = fstdistfunc_(data_point, getDataByInternalId(ep_id), dist_func_param_,codes,both_codes);
+                dist_t dist = fstdistfunc_(data_point, getDataByInternalId(ep_id), dist_func_param_,codes_,both_codes);
                 top_candidates.emplace(dist, ep_id);
                 lowerBound = dist;
                 candidateSet.emplace(-dist, ep_id);
@@ -209,7 +213,7 @@ namespace sq_hnswlib {
                     visited_array[candidate_id] = visited_array_tag;
                     char *currObj1 = (getDataByInternalId(candidate_id));
 
-                    dist_t dist1 = fstdistfunc_(data_point, currObj1, dist_func_param_,codes,both_codes);
+                    dist_t dist1 = fstdistfunc_(data_point, currObj1, dist_func_param_,codes_,both_codes);
                     if (top_candidates.size() < ef_construction_ || lowerBound > dist1) {
                         candidateSet.emplace(-dist1, candidate_id);
 
@@ -234,7 +238,7 @@ namespace sq_hnswlib {
 
         template <bool has_deletions, bool collect_metrics=false>
         std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst>
-        searchBaseLayerST(tableint ep_id, const void *data_point, size_t ef,const float* codes,const bool both_code) const {
+        searchBaseLayerST(tableint ep_id, const void *data_point, size_t ef,const bool both_code) const {
             VisitedList *vl = visited_list_pool_->getFreeVisitedList();
             vl_type *visited_array = vl->mass;
             vl_type visited_array_tag = vl->curV;
@@ -244,7 +248,7 @@ namespace sq_hnswlib {
 
             dist_t lowerBound;
             if (!has_deletions || !isMarkedDeleted(ep_id)) {
-                dist_t dist = fstdistfunc_(data_point, getDataByInternalId(ep_id), dist_func_param_,codes,both_code);
+                dist_t dist = fstdistfunc_(data_point, getDataByInternalId(ep_id), dist_func_param_,codes_,both_code);
                 lowerBound = dist;
                 top_candidates.emplace(dist, ep_id);
                 candidate_set.emplace(-dist, ep_id);
@@ -293,7 +297,7 @@ namespace sq_hnswlib {
                         visited_array[candidate_id] = visited_array_tag;
 
                         char *currObj1 = (getDataByInternalId(candidate_id));
-                        dist_t dist = fstdistfunc_(data_point, currObj1, dist_func_param_,codes,both_code);
+                        dist_t dist = fstdistfunc_(data_point, currObj1, dist_func_param_,codes_,both_code);
 
                         if (top_candidates.size() < ef || lowerBound > dist) {
                             candidate_set.emplace(-dist, candidate_id);
@@ -322,7 +326,7 @@ namespace sq_hnswlib {
 
         void getNeighborsByHeuristic2(
                 std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst> &top_candidates,
-        const size_t M,const float* codes,const bool both_code) {
+        const size_t M,const bool both_code) {
             if (top_candidates.size() < M) {
                 return;
             }
@@ -346,7 +350,7 @@ namespace sq_hnswlib {
                     dist_t curdist =
                             fstdistfunc_(getDataByInternalId(second_pair.second),
                                          getDataByInternalId(curent_pair.second),
-                                         dist_func_param_,codes,both_code);;
+                                         dist_func_param_,codes_,both_code);;
                     if (curdist < dist_to_query) {
                         good = false;
                         break;
@@ -381,9 +385,9 @@ namespace sq_hnswlib {
 
         tableint mutuallyConnectNewElement(const void *data_point, tableint cur_c,
                                        std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst> &top_candidates,
-        int level, bool isUpdate,const float* codes) {
+        int level, bool isUpdate) {
             size_t Mcurmax = level ? maxM_ : maxM0_;
-            getNeighborsByHeuristic2(top_candidates, M_,codes,true);
+            getNeighborsByHeuristic2(top_candidates, M_,true);
             if (top_candidates.size() > M_)
                 throw std::runtime_error("Should be not be more than M_ candidates returned by the heuristic");
 
@@ -458,7 +462,7 @@ namespace sq_hnswlib {
                     } else {
                         // finding the "weakest" element to replace it with the new one
                         dist_t d_max = fstdistfunc_(getDataByInternalId(cur_c), getDataByInternalId(selectedNeighbors[idx]),
-                                                    dist_func_param_,codes,true);
+                                                    dist_func_param_,codes_,true);
                         // Heuristic:
                         std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst> candidates;
                         candidates.emplace(d_max, cur_c);
@@ -466,10 +470,10 @@ namespace sq_hnswlib {
                         for (size_t j = 0; j < sz_link_list_other; j++) {
                             candidates.emplace(
                                     fstdistfunc_(getDataByInternalId(data[j]), getDataByInternalId(selectedNeighbors[idx]),
-                                                 dist_func_param_,codes,true), data[j]);
+                                                 dist_func_param_,codes_,true), data[j]);
                         }
 
-                        getNeighborsByHeuristic2(candidates, Mcurmax,codes,true);
+                        getNeighborsByHeuristic2(candidates, Mcurmax,true);
 
                         int indx = 0;
                         while (candidates.size() > 0) {
@@ -506,11 +510,11 @@ namespace sq_hnswlib {
         }
 
 
-        std::priority_queue<std::pair<dist_t, tableint>> searchKnnInternal(void *query_data, int k,const float* codes) {
+        std::priority_queue<std::pair<dist_t, tableint>> searchKnnInternal(void *query_data, int k) {
             std::priority_queue<std::pair<dist_t, tableint  >> top_candidates;
             if (cur_element_count == 0) return top_candidates;
             tableint currObj = enterpoint_node_;
-            dist_t curdist = fstdistfunc_(query_data, getDataByInternalId(enterpoint_node_), dist_func_param_,codes,false);
+            dist_t curdist = fstdistfunc_(query_data, getDataByInternalId(enterpoint_node_), dist_func_param_,codes_,false);
 
             for (size_t level = maxlevel_; level > 0; level--) {
                 bool changed = true;
@@ -524,7 +528,7 @@ namespace sq_hnswlib {
                         tableint cand = datal[i];
                         if (cand < 0 || cand > max_elements_)
                             throw std::runtime_error("cand error");
-                        dist_t d = fstdistfunc_(query_data, getDataByInternalId(cand), dist_func_param_,codes,false);
+                        dist_t d = fstdistfunc_(query_data, getDataByInternalId(cand), dist_func_param_,codes_,false);
 
                         if (d < curdist) {
                             curdist = d;
@@ -537,12 +541,12 @@ namespace sq_hnswlib {
 
             if (has_deletions_) {
                 std::priority_queue<std::pair<dist_t, tableint  >> top_candidates1=searchBaseLayerST<true>(currObj, query_data,
-                                                                                                           ef_,codes,false);
+                                                                                                           ef_,codes_,false);
                 top_candidates.swap(top_candidates1);
             }
             else{
                 std::priority_queue<std::pair<dist_t, tableint  >> top_candidates1=searchBaseLayerST<false>(currObj, query_data,
-                                                                                                            ef_,codes,false);
+                                                                                                            ef_,codes_,false);
                 top_candidates.swap(top_candidates1);
             }
 
@@ -589,7 +593,7 @@ namespace sq_hnswlib {
         void saveIndex(const std::string &location) {
             std::ofstream output(location, std::ios::binary);
             std::streampos position;
-
+            output.write((char*)codes_,sizeof(float)*256*(*(size_t*)dist_func_param_));
             writeBinaryPOD(output, offsetLevel0_);
             writeBinaryPOD(output, max_elements_);
             writeBinaryPOD(output, cur_element_count);
@@ -628,7 +632,7 @@ namespace sq_hnswlib {
             input.seekg(0,input.end);
             std::streampos total_filesize=input.tellg();
             input.seekg(0,input.beg);
-
+            input.read((char*)codes_,sizeof(float)*256*(*(size_t*)dist_func_param_));
             readBinaryPOD(input, offsetLevel0_);
             readBinaryPOD(input, max_elements_);
             readBinaryPOD(input, cur_element_count);
@@ -811,11 +815,11 @@ namespace sq_hnswlib {
             *((unsigned short int*)(ptr))=*((unsigned short int *)&size);
         }
 
-        void addPoint(const void *data_point, labeltype label,const float *codes) {
-            addPoint(data_point, label,-1,codes);
+        void addPoint(const void *data_point, labeltype label) {
+            addPoint(data_point, label,-1);
         }
 
-        void updatePoint(const void *dataPoint, tableint internalId, float updateNeighborProbability,const float*codes) {
+        void updatePoint(const void *dataPoint, tableint internalId, float updateNeighborProbability) {
             // update the feature vector associated with existing point with new vector
             memcpy(getDataByInternalId(internalId), dataPoint, data_size_);
 
@@ -861,7 +865,7 @@ namespace sq_hnswlib {
                         if (cand == neigh)
                             continue;
 
-                        dist_t distance = fstdistfunc_(getDataByInternalId(neigh), getDataByInternalId(cand), dist_func_param_,codes,true);
+                        dist_t distance = fstdistfunc_(getDataByInternalId(neigh), getDataByInternalId(cand), dist_func_param_,codes_,true);
                         if (candidates.size() < elementsToKeep) {
                             candidates.emplace(distance, cand);
                         } else {
@@ -873,7 +877,7 @@ namespace sq_hnswlib {
                     }
 
                     // Retrieve neighbours using heuristic and set connections.
-                    getNeighborsByHeuristic2(candidates, layer == 0 ? maxM0_ : maxM_,codes,true);
+                    getNeighborsByHeuristic2(candidates, layer == 0 ? maxM0_ : maxM_,true);
 
                     {
                         std::unique_lock <std::mutex> lock(link_list_locks_[neigh]);
@@ -890,13 +894,13 @@ namespace sq_hnswlib {
                 }
             }
 
-            repairConnectionsForUpdate(dataPoint, entryPointCopy, internalId, elemLevel, maxLevelCopy,codes);
+            repairConnectionsForUpdate(dataPoint, entryPointCopy, internalId, elemLevel, maxLevelCopy);
         };
 
-        void repairConnectionsForUpdate(const void *dataPoint, tableint entryPointInternalId, tableint dataPointInternalId, int dataPointLevel, int maxLevel,const float* codes) {
+        void repairConnectionsForUpdate(const void *dataPoint, tableint entryPointInternalId, tableint dataPointInternalId, int dataPointLevel, int maxLevel) {
             tableint currObj = entryPointInternalId;
             if (dataPointLevel < maxLevel) {
-                dist_t curdist = fstdistfunc_(dataPoint, getDataByInternalId(currObj), dist_func_param_,codes,true);
+                dist_t curdist = fstdistfunc_(dataPoint, getDataByInternalId(currObj), dist_func_param_,codes_,true);
                 for (int level = maxLevel; level > dataPointLevel; level--) {
                     bool changed = true;
                     while (changed) {
@@ -914,7 +918,7 @@ namespace sq_hnswlib {
                             _mm_prefetch(getDataByInternalId(*(datal + i + 1)), _MM_HINT_T0);
 #endif
                             tableint cand = datal[i];
-                            dist_t d = fstdistfunc_(dataPoint, getDataByInternalId(cand), dist_func_param_,codes,true);
+                            dist_t d = fstdistfunc_(dataPoint, getDataByInternalId(cand), dist_func_param_,codes_,true);
                             if (d < curdist) {
                                 curdist = d;
                                 currObj = cand;
@@ -930,7 +934,7 @@ namespace sq_hnswlib {
 
             for (int level = dataPointLevel; level >= 0; level--) {
                 std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst> topCandidates = searchBaseLayer(
-                        currObj, dataPoint, level,codes,true);
+                        currObj, dataPoint, level,true);
 
                 std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst> filteredTopCandidates;
                 while (topCandidates.size() > 0) {
@@ -945,12 +949,12 @@ namespace sq_hnswlib {
                 if (filteredTopCandidates.size() > 0) {
                     bool epDeleted = isMarkedDeleted(entryPointInternalId);
                     if (epDeleted) {
-                        filteredTopCandidates.emplace(fstdistfunc_(dataPoint, getDataByInternalId(entryPointInternalId), dist_func_param_,codes,true), entryPointInternalId);
+                        filteredTopCandidates.emplace(fstdistfunc_(dataPoint, getDataByInternalId(entryPointInternalId), dist_func_param_,codes_,true), entryPointInternalId);
                         if (filteredTopCandidates.size() > ef_construction_)
                             filteredTopCandidates.pop();
                     }
 
-                    currObj = mutuallyConnectNewElement(dataPoint, dataPointInternalId, filteredTopCandidates, level, true,codes);
+                    currObj = mutuallyConnectNewElement(dataPoint, dataPointInternalId, filteredTopCandidates, level, true);
                 }
             }
         }
@@ -965,7 +969,7 @@ namespace sq_hnswlib {
             return result;
         };
 
-        tableint addPoint(const void *data_point, labeltype label, int level,const float *codes) {
+        tableint addPoint(const void *data_point, labeltype label, int level) {
 
             tableint cur_c = 0;
             {
@@ -979,7 +983,7 @@ namespace sq_hnswlib {
                     templock_curr.unlock();
 
                     std::unique_lock <std::mutex> lock_el_update(link_list_update_locks_[(existingInternalId & (max_update_element_locks - 1))]);
-                    updatePoint(data_point, existingInternalId, 1.0,codes);
+                    updatePoint(data_point, existingInternalId, 1.0);
                     return existingInternalId;
                 }
 
@@ -1028,7 +1032,7 @@ namespace sq_hnswlib {
 
                 if (curlevel < maxlevelcopy) {
 
-                    dist_t curdist = fstdistfunc_(data_point, getDataByInternalId(currObj), dist_func_param_,codes,true);
+                    dist_t curdist = fstdistfunc_(data_point, getDataByInternalId(currObj), dist_func_param_,codes_,true);
                     for (int level = maxlevelcopy; level > curlevel; level--) {
 
 
@@ -1045,7 +1049,7 @@ namespace sq_hnswlib {
                                 tableint cand = datal[i];
                                 if (cand < 0 || cand > max_elements_)
                                     throw std::runtime_error("cand error");
-                                dist_t d = fstdistfunc_(data_point, getDataByInternalId(cand), dist_func_param_,codes,true);
+                                dist_t d = fstdistfunc_(data_point, getDataByInternalId(cand), dist_func_param_,codes_,true);
                                 if (d < curdist) {
                                     curdist = d;
                                     currObj = cand;
@@ -1062,13 +1066,13 @@ namespace sq_hnswlib {
                         throw std::runtime_error("Level error");
 
                     std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst> top_candidates = searchBaseLayer(
-                            currObj, data_point, level,codes,true);
+                            currObj, data_point, level,true);
                     if (epDeleted) {
-                        top_candidates.emplace(fstdistfunc_(data_point, getDataByInternalId(enterpoint_copy), dist_func_param_,codes,true), enterpoint_copy);
+                        top_candidates.emplace(fstdistfunc_(data_point, getDataByInternalId(enterpoint_copy), dist_func_param_,codes_,true), enterpoint_copy);
                         if (top_candidates.size() > ef_construction_)
                             top_candidates.pop();
                     }
-                    currObj = mutuallyConnectNewElement(data_point, cur_c, top_candidates, level, false,codes);
+                    currObj = mutuallyConnectNewElement(data_point, cur_c, top_candidates, level, false);
                 }
 
 
@@ -1088,12 +1092,12 @@ namespace sq_hnswlib {
         };
 
         std::priority_queue<std::pair<dist_t, labeltype >>
-        searchKnn(const void *query_data, size_t k,const float* codes) const {
+        searchKnn(const void *query_data, size_t k) const {
             std::priority_queue<std::pair<dist_t, labeltype >> result;
             if (cur_element_count == 0) return result;
 
             tableint currObj = enterpoint_node_;
-            dist_t curdist = fstdistfunc_(query_data, getDataByInternalId(enterpoint_node_), dist_func_param_,codes,false);
+            dist_t curdist = fstdistfunc_(query_data, getDataByInternalId(enterpoint_node_), dist_func_param_,codes_,false);
 
             for (int level = maxlevel_; level > 0; level--) {
                 bool changed = true;
@@ -1111,7 +1115,7 @@ namespace sq_hnswlib {
                         tableint cand = datal[i];
                         if (cand < 0 || cand > max_elements_)
                             throw std::runtime_error("cand error");
-                        dist_t d = fstdistfunc_(query_data, getDataByInternalId(cand), dist_func_param_,codes,false);
+                        dist_t d = fstdistfunc_(query_data, getDataByInternalId(cand), dist_func_param_,codes_,false);
 
                         if (d < curdist) {
                             curdist = d;
@@ -1125,11 +1129,11 @@ namespace sq_hnswlib {
             std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst> top_candidates;
             if (has_deletions_) {
                 top_candidates=searchBaseLayerST<true,true>(
-                        currObj, query_data, std::max(ef_, k),codes,false);
+                        currObj, query_data, std::max(ef_, k),false);
             }
             else{
                 top_candidates=searchBaseLayerST<false,true>(
-                        currObj, query_data, std::max(ef_, k),codes,false);
+                        currObj, query_data, std::max(ef_, k),false);
             }
 
             while (top_candidates.size() > k) {

@@ -300,15 +300,15 @@ void build_graph(const std::string &index_path, const int hnswM,
   pdata= nullptr;
 
   rc.RecordSection("load centroids of buckets and compute SQ done");
-  std::string sq_path=index_path+SQ+BIN;
-  std::ofstream sq_center_writer(sq_path,std::ios::out|std::ios::binary);
-  uint32_t nn=256;
-  sq_center_writer.write((char*)&nn,sizeof(uint32_t));
-  sq_center_writer.write((char*)&ndim,sizeof(uint32_t));
-  sq_center_writer.write((char*)codes,sizeof(float)*(uint64_t)nn*(uint64_t)ndim);
-  sq_center_writer.close();
+//  std::string sq_path=index_path+SQ+BIN;
+//  std::ofstream sq_center_writer(sq_path,std::ios::out|std::ios::binary);
+//  uint32_t nn=256;
+//  sq_center_writer.write((char*)&nn,sizeof(uint32_t));
+//  sq_center_writer.write((char*)&ndim,sizeof(uint32_t));
+//  sq_center_writer.write((char*)codes,sizeof(float)*(uint64_t)nn*(uint64_t)ndim);
+//  sq_center_writer.close();
 
-  rc.RecordSection("save sq codes done");
+ // rc.RecordSection("save sq codes done");
 
   sq_hnswlib::SpaceInterface<float> *space= nullptr;
   if (MetricType::L2==metric_type){
@@ -325,11 +325,11 @@ void build_graph(const std::string &index_path, const int hnswM,
                           nidsdim);
 
   auto index_hnsw = std::make_shared<sq_hnswlib::HierarchicalNSW<float>>(
-      space, total_n, hnswM, hnswefC);
-  index_hnsw->addPoint(codebook, pids[0],codes);
+      space, total_n, hnswM, hnswefC,100,codes);
+  index_hnsw->addPoint(codebook, pids[0]);
 #pragma omp parallel for
   for (int64_t i = 1; i < total_n; i++) {
-    index_hnsw->addPoint(codebook + i * ndim, pids[i],codes);
+    index_hnsw->addPoint(codebook + i * ndim, pids[i]);
   }
   std::cout << "hnsw totally add " << npts << " points" << std::endl;
   rc.RecordSection("create index hnsw done");
@@ -441,7 +441,7 @@ void search_graph(std::shared_ptr<sq_hnswlib::HierarchicalNSW<float>> index_hnsw
 
     for (int j = 0; j < dq; j++)
       queryi[j] = (float)(*(pquery + i * dq + j));
-    auto reti = index_hnsw->searchKnn(queryi, nprobe,codes);
+    auto reti = index_hnsw->searchKnn(queryi, nprobe);
     auto p_labeli = buckets_label + i * nprobe;
     while (!reti.empty()) {
       *p_labeli++ = reti.top().second;
