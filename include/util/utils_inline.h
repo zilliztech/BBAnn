@@ -39,6 +39,7 @@ inline void set_bin_metadata(const std::string &bin_file, const uint32_t &nrows,
 template <typename T>
 inline void read_bin_file(const std::string &file_name, T *&data, uint32_t &n,
                           uint32_t &dim) {
+  std::cout << "Reading bin file:" << file_name << std::endl;
   std::ifstream reader(file_name, std::ios::binary);
 
   reader.read((char *)&n, sizeof(uint32_t));

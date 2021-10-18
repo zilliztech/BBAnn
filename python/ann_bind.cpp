@@ -72,36 +72,37 @@ void IndexBindWrapper(py::module_ &m) {
               py::array_t<dataT, py::array::c_style | py::array::forcecast>
                   &query,
               uint64_t dim, uint64_t numQuery, double radius, const paraT para)
-               -> std::pair<py::array_t<unsigned>, std::pair<py::array_t<unsigned>, py::array_t<float>>> {
-              const dataT *pquery = query.data();
-              std::vector<std::vector<uint32_t>> ids(numQuery);
-              std::vector<std::vector<float>> dists(numQuery);
-              std::vector<uint64_t> lims(numQuery+1);
-              // returns a 
-              self.RangeSearchCpp(pquery, dim, numQuery, radius, para, ids, dists, lims);
+               -> std::pair<
+                   py::array_t<unsigned>,
+                   std::pair<py::array_t<unsigned>, py::array_t<float>>> {
+             const dataT *pquery = query.data();
+             std::vector<std::vector<uint32_t>> ids(numQuery);
+             std::vector<std::vector<float>> dists(numQuery);
+             std::vector<uint64_t> lims(numQuery + 1);
+             // returns a
+             self.RangeSearchCpp(pquery, dim, numQuery, radius, para, ids,
+                                 dists, lims);
 
-              uint64_t total = lims.back();
-              py::array_t<unsigned> res_ids(total);
-              py::array_t<float> res_dists(total);
-              py::array_t<unsigned> res_lims(numQuery+1);
+             uint64_t total = lims.back();
+             py::array_t<unsigned> res_ids(total);
+             py::array_t<float> res_dists(total);
+             py::array_t<unsigned> res_lims(numQuery + 1);
 
-              auto res_ids_mutable = res_ids.mutable_unchecked();
-              auto res_dists_mutable = res_dists.mutable_unchecked();
-              auto res_lims_mutable = res_lims.mutable_unchecked();
-              size_t pos = 0;
-              for (uint64_t i = 0; i < numQuery; ++i) {
-                for (uint64_t j = 0; j < ids[i].size(); ++j) {
-                  res_ids_mutable(pos) = (unsigned)ids[i][j];
-                  res_dists_mutable(pos) = dists[i][j];
-                  // std::cout << ids[i][j]<<":"<<dists[i][j] <<" ";
-                  pos++;
-                }
-                res_lims_mutable(i) = lims[i];
-                                // std::cout << "!"<< lims[i] <<"!"<< std::endl;
-               
-              }
-              res_lims_mutable(numQuery) = lims[numQuery];
-              return std::make_pair(res_lims, std::make_pair(res_ids, res_dists));
+             auto res_ids_mutable = res_ids.mutable_unchecked();
+             auto res_dists_mutable = res_dists.mutable_unchecked();
+             auto res_lims_mutable = res_lims.mutable_unchecked();
+             size_t pos = 0;
+             for (uint64_t i = 0; i < numQuery; ++i) {
+               for (uint64_t j = 0; j < ids[i].size(); ++j) {
+                 res_ids_mutable(pos) = (unsigned)ids[i][j];
+                 res_dists_mutable(pos) = dists[i][j];
+                 pos++;
+               }
+               res_lims_mutable(i) = lims[i];
+             }
+             res_lims_mutable(numQuery) = lims[numQuery];
+             return std::make_pair(res_lims,
+                                   std::make_pair(res_ids, res_dists));
            },
            py::arg("query"), py::arg("dim"), py::arg("num_query"),
            py::arg("radius"), py::arg("para"));
@@ -161,6 +162,8 @@ PYBIND11_MODULE(bbannpy, m) {
       .def_readwrite("K1", &BBAnnParameters::K1)
       .def_readwrite("K", &BBAnnParameters::K)
       .def_readwrite("nProbe", &BBAnnParameters::nProbe)
+      .def_readwrite("rangeSearchProbeCount",
+                     &BBAnnParameters::rangeSearchProbeCount)
       .def_readwrite("blockSize", &BBAnnParameters::blockSize);
 #define CLASSWRAPPER_DECL(className, index)                                    \
   class className {                                                            \

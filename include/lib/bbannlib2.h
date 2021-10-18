@@ -38,6 +38,7 @@ struct BBAnnParameters {
   int blockSize = 1;
   int nProbe = 2;
   int efSearch = 250;
+  int rangeSearchProbeCount = 20;
 };
 
 template <typename dataT>

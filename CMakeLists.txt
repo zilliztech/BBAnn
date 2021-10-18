@@ -41,6 +41,7 @@ if (DIRECTIO)
     add_compile_options(-DDIRECTIO=1)
     message(STATUS "Optional Flag DIRECTIO is ON: to do DIRECT IO: O_DIRECT")
 endif(DIRECTIO)
+add_compile_options(-march=native -O3)
 
 include_directories(include)
 
@@ -61,4 +62,5 @@ target_link_libraries(build_bbann BBAnn)
 target_link_libraries(search_bbann BBAnn)
 
 
-add_compile_options(-march=native)
+add_executable(test_bigannlib test_bigannlib.cpp)
+target_link_libraries(test_bigannlib BBAnnLib2_s)
