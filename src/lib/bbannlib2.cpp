@@ -1153,6 +1153,8 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
   char *buf = new char[para.blockSize];
   auto dis_computer = select_computer<dataT, dataT, distanceT>(para.metric);
 
+  uint64_t total_bucket_searched = 0;
+
   // for (int i = 0; i < numQuery; i++) {
   //   std::cout << bucket_labels[i].size() << " ";
   // }
@@ -1199,6 +1201,7 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
         }
       }
     }
+    total_bucket_searched += bucket_labels[i].size();
   }
   rc.RecordSection("scan blocks done");
 
@@ -1216,6 +1219,8 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
   lims[numQuery] = idx;
 
   rc.RecordSection("format answer done");
+
+  std::cout << "Total bucket searched: " << total_bucket_searched << std::endl;
 
   delete[] bucket_labels;
   delete[] buf;
