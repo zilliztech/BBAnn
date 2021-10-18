@@ -10,8 +10,8 @@ find_package(Threads REQUIRED)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
-include(BundledGTest)
-include(Gbenchmark)
+# include(BundledGTest)
+# include(Gbenchmark)
 include(EnableAddressSanitizer)
 include(EnableUndefinedSanitizer)
 
