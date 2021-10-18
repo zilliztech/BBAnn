@@ -189,7 +189,7 @@ void hierarchical_clusters(const std::string &output_path, const int K1,
       IOWriter data_writer(data_file, MEGABYTE * 100);
       recursive_kmeans<DATAT>(i, cluster_size, datai, idi, cluster_dim,
                               entry_num, blk_size, blk_num, data_writer,
-                              centroids_writer, centroids_id_writer, false,
+                              centroids_writer, centroids_id_writer, 0, false,
                               avg_len);
 
       global_centroids_number += blk_num;
@@ -510,6 +510,99 @@ void gather_vec_searched_per_query(const std::string index_path,
   }
   std::cout << "#vec/query avg: " << stats[0] * 1.0f / nq
             << " max: " << stats[1] << " min: " << stats[2] << std::endl;
+}
+
+template <typename DATAT, typename DISTT>
+void range_search_bbann(
+    const std::string &index_path,
+    const int hnsw_ef,
+    const float radius, std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+    const int K1, const uint64_t block_size,
+    Computer<DATAT, DATAT, DISTT> &dis_computer,
+    const DATAT *pquery, 
+    std::vector<std::vector<uint32_t>> &ids,
+    std::vector<std::vector<float>> &dists,
+    std::vector<uint64_t> &lims,
+    uint32_t nq, uint32_t dq) {
+    TimeRecorder rc("range search bbann");
+
+  std::cout << "search bigann parameters:" << std::endl;
+  std::cout << " index_path: " << index_path
+            << " hnsw_ef: " << hnsw_ef << " radius: " << radius << " K1: " << K1
+            << std::endl;
+
+  std::cout << "query numbers: " << nq << " query dims: " << dq << std::endl;
+
+  std::vector<std::vector<uint32_t>> bucket_labels(nq);
+
+  index_hnsw->setEf(hnsw_ef);
+#pragma omp parallel for
+  for (int64_t i = 0; i < nq; i++) {
+    // auto queryi = pquery + i * dq;
+    // todo: hnsw need to support query data is not float
+    float *queryi = new float[dq];
+    for (int j = 0; j < dq; j++)
+      queryi[j] = (float)(*(pquery + i * dq + j));
+    auto reti = index_hnsw->searchRange(queryi, 20, radius);
+    while (!reti.empty()) {
+      bucket_labels[i].push_back(reti.top().second);
+      reti.pop();
+    }
+    delete[] queryi;
+  }
+  rc.RecordSection("search buckets done.");
+
+  uint32_t cid, bid;
+  uint32_t dim = dq, gid;
+  const uint32_t vec_size = sizeof(DATAT) * dim;
+  const uint32_t entry_size = vec_size + sizeof(uint32_t);
+  DATAT *vec;
+
+  char *buf = new char[block_size];
+
+  /* flat */
+  for (int64_t i = 0; i < nq; ++i) {
+    const DATAT *q_idx = pquery + i * dq;
+
+    for (int64_t j = 0; j < bucket_labels[i].size(); ++j) {
+      parse_global_block_id(bucket_labels[i][j], cid, bid);
+      std::string cluster_file_path =
+          index_path + CLUSTER + std::to_string(cid) + "-" + RAWDATA + BIN;
+      auto fh = std::ifstream(cluster_file_path, std::ios::binary);
+      assert(!fh.fail());
+
+      fh.seekg(bid * block_size);
+      fh.read(buf, block_size);
+
+      const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
+      char *buf_begin = buf + sizeof(uint32_t);
+
+      for (uint32_t k = 0; k < entry_num; ++k) {
+        char *entry_begin = buf_begin + entry_size * k;
+        vec = reinterpret_cast<DATAT *>(entry_begin);
+        auto dis = dis_computer(vec, q_idx, dim);
+        if (dis < radius) {
+          dists[i].push_back(dis);
+          ids[i].push_back(*reinterpret_cast<uint32_t *>(entry_begin + vec_size));
+        }
+      }
+    }
+  }
+  rc.RecordSection("scan blocks done");
+
+  int64_t idx = 0;
+  for (int64_t i = 0; i < nq; ++i) {
+    lims[i] = idx;
+    idx += ids[i].size();
+  }
+  lims[nq] = idx;
+
+  rc.RecordSection("format answer done");
+
+  delete[] buf;
+  delete[] pquery;
+
+  rc.ElapseFromBegin("range search bbann totally done");
 }
 
 template <typename DATAT, typename DISTT, typename HEAPT>

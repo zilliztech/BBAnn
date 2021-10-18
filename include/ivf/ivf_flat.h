@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ivf/clustering.h"
+#include "ivf/kmeans.h"
 #include "flat/flat.h"
 
 #include <vector>

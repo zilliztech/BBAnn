@@ -12,7 +12,21 @@ class BbANN(BaseANN):
     def __init__(self, metric, index_params):
         self.metric = metric
         self.index_params = index_params
-        self.R = index_params.get("R")
+        self.identifier = index_params.get("identifier")
+        self.para = bbannpy.BBAnnParameters()
+        print("init BbAnn with the following parameters")
+        for key in index_params:
+            print(key, index_params[key])
+            if hasattr(self.para, key):
+                setattr(self.para, key, index_params[key])
+
+    def set_query_arguments(self, query_args):
+        print("query BbAnn with the following parameters")
+        for key in query_args:
+            print(key, query_args[key])
+            if hasattr(self.para, key):
+                setattr(self.para, key, query_args[key])
+        pass
 
     def done(self):
         pass
@@ -21,31 +35,48 @@ class BbANN(BaseANN):
         """
         File name for the index.
         """
-        return f"R{self._R}"
+        return f"{self.identifier}_index"
 
     def create_index_dir(self, dataset):
         """
         Return a folder name, in which we would store the index.
         """
-        index_dir = os.path.join(os.getcwd(), "bbann_index")
+        index_dir = os.path.join(os.getcwd(), "data", "indices")
+        os.makedirs(index_dir, mode=0o777, exist_ok=True)
+        index_dir = os.path.join(index_dir, "T2")
+        os.makedirs(index_dir, mode=0o777, exist_ok=True)
+        index_dir = os.path.join(index_dir, self.__str__())
+        os.makedirs(index_dir, mode=0o777, exist_ok=True)
+        index_dir = os.path.join(index_dir, dataset.short_name())
+        os.makedirs(index_dir, mode=0o777, exist_ok=True)
+        index_dir = os.path.join(index_dir, self.index_name())
+        os.makedirs(index_dir, mode=0o777, exist_ok=True)
+        return index_dir
+
+    def get_index_dir(self, dataset):
+        index_dir = os.path.join(os.getcwd(), "data", "indices")
+        index_dir = os.path.join(index_dir, "T2")
+        index_dir = os.path.join(index_dir, self.__str__())
+        index_dir = os.path.join(index_dir, dataset.short_name())
+        index_dir = os.path.join(index_dir, self.index_name())
         return index_dir
 
     def set_index_type(self, ds_distance, ds_dtype):
         if ds_distance == "euclidean":
-            metric = bbannpy.L2
+            self.para.metric = bbannpy.L2
         elif ds_distance == "ip":
-            metric = bbannpy.INNER_PRODUCT
+            self.para.metric = bbannpy.INNER_PRODUCT
         else:
             print("Unsuported distance function.")
             return False
 
         if not hasattr(self, 'index'):
             if ds_dtype == "float32":
-                self.index = bbannpy.FloatIndex(metric)
+                self.index = bbannpy.FloatIndex(self.para.metric)
             elif ds_dtype == "int8":
-                self.index = bbannpy.Int8Index(metric)
+                self.index = bbannpy.Int8Index(self.para.metric)
             elif ds_dtype == "uint8":
-                self.index = bbannpy.UInt8Index(metric)
+                self.index = bbannpy.UInt8Index(self.para.metric)
             else:
                 print("Unsupported data type.")
                 return False
@@ -59,18 +90,18 @@ class BbANN(BaseANN):
         ds = DATASETS[dataset]()
         d = ds.d
         index_dir = self.create_index_dir(ds)
-        self.index_path = os.path.join(index_dir, self.index_name())
         if not self.set_index_type(ds.distance(), ds.dtype):
             return False
 
+        self.para.dataFilePath = ds.get_dataset_fn()
+        self.para.indexPrefixPath = index_dir+"/"
+
         start = time.time()
-        self.index.build(
-            ds.get_dataset_fn(),
-            index_path=self.index_path)
+        self.index.build(self.para)
         end = time.time()
         print("bbAnn index built in %.3f s" % (end - start))
-        print(f"Loading index from {self.index_path}")
-        self.index.load_index(self.index_path)
+        print(f"Loading index from {self.para.indexPrefixPath}")
+        self.index.load_index(self.para.indexPrefixPath)
 
     def load_index(self, dataset):
         """
@@ -81,17 +112,21 @@ class BbANN(BaseANN):
         and the index build paramters passed during construction.
         """
         ds = DATASETS[dataset]()
-        index_dir = self.create_index_dir(ds)
-        if not (os.path.exists(index_dir)) and 'url' not in self._index_params:
+        index_dir = self.get_index_dir(ds)
+        if not (os.path.exists(index_dir)) and 'url' not in self.index_params:
             return False
-        index_path = os.path.join(index_dir, self.index_name())
-        print(f"Loading index from {self.index_path}")
-        self.index.load_index(self.index_path)
+        if not self.set_index_type(ds.distance(), ds.dtype):
+            return False
+        self.para.indexPrefixPath = index_dir + "/"
+        print(f"Loading index from {self.para.indexPrefixPath}")
+        self.index.load_index(self.para.indexPrefixPath)
+        return True
 
     def query(self, X, k):
         """Carry out a batch query for k-NN of query set X."""
         nq, dim = (np.shape(X))
-        self.res, self.query_dists = self.index.batch_search(X, dim, nq, k)
+        self.res, self.query_dists = self.index.batch_search(
+            X, dim, nq, k, self.para)
         print(self.res)
 
     def range_query(self, X, radius):
@@ -99,8 +134,12 @@ class BbANN(BaseANN):
         Carry out a batch query for range search with
         radius.
         """
-        # TODO(!!!!!)
-        pass
+        nq, dim = (np.shape(X))
+        self.rangeres_lim, (self.rangeres_ids, self.rangeres_dists) = self.index.range_search(
+            X, dim, nq, radius, self.para)
+        print(self.rangeres_lim[0:10])
+        print(self.rangeres_ids[self.rangeres_lim[0]:self.rangeres_lim[1]])
+        print(self.rangeres_dists[self.rangeres_lim[0]:self.rangeres_lim[1]])
 
     def get_results(self):
         """
@@ -122,9 +161,14 @@ class BbANN(BaseANN):
 
             D[lims[q]:lims[q + 1]] in float
 
-        are the distances.
+        are the distances. 
+        --------------------------
+        NEED TO CHECK THE ORDER of I and D in plot.py/ utils.py.
+        
+        --------------------------
+
         """
-        return self.res
+        return (self.rangeres_lim, self.rangeres_dists, self.rangeres_ids)
 
     def get_additional(self):
         """
