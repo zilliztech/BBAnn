@@ -12,9 +12,6 @@
 namespace bbann {
 namespace util {
 
-
-
-
 inline void get_bin_metadata(const std::string &bin_file, uint32_t &nrows,
                              uint32_t &ncols) {
   std::ifstream reader(bin_file, std::ios::binary);
@@ -54,11 +51,10 @@ inline void read_bin_file(const std::string &file_name, T *&data, uint32_t &n,
             << std::endl;
 }
 
-
 inline uint64_t fsize(const std::string filename) {
-    struct stat st;
-    stat(filename.c_str(), &st);
-    return st.st_size;
+  struct stat st;
+  stat(filename.c_str(), &st);
+  return st.st_size;
 }
 inline void rand_perm(int64_t *perm, int64_t n, int64_t k, int64_t seed) {
   std::mt19937 generator(seed);
@@ -91,10 +87,11 @@ inline int rand_int() {
   return generator() & 0x7fffffff;
 }
 
-
-inline void parse_global_block_id(uint32_t id, uint32_t& cid, uint32_t& bid) {
-    bid = (id & 0xffffff);
-    id >>= 24;
-    cid = (id & 0xff);
-    return ;
+inline void parse_global_block_id(uint32_t id, uint32_t &cid, uint32_t &bid) {
+  bid = (id & 0xffffff);
+  id >>= 24;
+  cid = (id & 0xff);
+  return;
 }
+} // namespace util
+} // namespace bbann
