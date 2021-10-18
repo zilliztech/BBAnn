@@ -58,6 +58,7 @@ constexpr const char* RAWDATA = "raw_data";
 constexpr const char* SAMPLEDATA = "sampledata";
 constexpr const char* META = "meta";
 constexpr const char* INDEX = "index";
+constexpr const char* SQ_CODEBOOK = "sq_codebook";
 
 // suffix
 constexpr const char* BIN = ".bin";

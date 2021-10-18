@@ -152,8 +152,7 @@ void merge_clusters(LevelType level, int64_t dim, int64_t nx, int64_t& k, const 
 template <typename T>
 void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* ids, int64_t dim, uint32_t threshold, const uint64_t blk_size,
                       uint32_t& blk_num, IOWriter& data_writer, IOWriter& centroids_writer, IOWriter& centroids_id_writer, int level,
-                      T* max_len = nullptr, T* min_len = nullptr,
-                      bool kmpp = false, float avg_len = 0.0, int64_t niter = 10, int64_t seed = 1234) {
+                      float* codebook, bool kmpp = false, float avg_len = 0.0, int64_t niter = 10, int64_t seed = 1234) {
     //std::cout<< "level" <<level<<" cluster_size"<<cluster_size<<std::endl;
 
     float weight = 0;
@@ -259,7 +258,7 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
             memset(code, 0, dim * bucket_size * sizeof(uint8_t));
             *reinterpret_cast<uint32_t*>(data_blk_buf) = bucket_size;
             char* beg_address = data_blk_buf + sizeof(uint32_t);
-            encode_uint8(max_len, min_len, data + dim * bucket_offest, code, bucket_size, dim);
+            encode_uint8_kmeans(data + dim * bucket_offest, code, codebook, bucket_size, dim);
             for (int j = 0; j < bucket_size; j++) {
                 //memcpy(beg_address + j * entry_size, data + dim * (bucket_offest + j), vector_size);
                // std::cout<< "vec len "<< IP<uint8_t, uint8_t, double>(code + j * dim, code + j * dim, dim);
@@ -275,7 +274,7 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
 
         } else {
             recursive_kmeans(k1_id, bucket_size, data + bucket_offest * dim, ids + bucket_offest, dim, threshold, blk_size,
-                             blk_num, data_writer, centroids_writer, centroids_id_writer, level + 1, max_len, min_len, kmpp, avg_len, niter, seed);
+                             blk_num, data_writer, centroids_writer, centroids_id_writer, level + 1, codebook, kmpp, avg_len, niter, seed);
         }
     }
     delete [] data_blk_buf;

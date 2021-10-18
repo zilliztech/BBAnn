@@ -3,7 +3,7 @@
 template <typename DATAT>
 void train_cluster(const std::string &raw_data_bin_file,
                    const std::string &output_path, const int32_t K1,
-                   float **centroids, double &avg_len) {
+                   float **centroids, double &avg_len, std::vector<float>& codebook) {
     TimeRecorder rc("train cluster");
     std::cout << "train_cluster parameters:" << std::endl;
     std::cout << " raw_data_bin_file: " << raw_data_bin_file
@@ -33,6 +33,25 @@ void train_cluster(const std::string &raw_data_bin_file,
     rc.RecordSection("kmeans done");
     assert((*centroids) != nullptr);
 
+    DATAT* d_data = new DATAT[sample_num * dim];
+    int32_t d_k = 256;
+    uint32_t d_dim = 1;
+    int64_t d_num = sample_num;
+    codebook.assign(0, dim * d_k);
+    //float* codebook = new float[dim * d_k];
+    transform_data(sample_data, d_data, sample_num, dim);
+    for (int d = 0; d < dim; d++) {
+        auto* train_data = d_data + d * d_num;
+        auto* d_cen = codebook.data() + d * d_k;
+        kmeans<DATAT>(d_num, train_data, d_dim, d_k, d_cen, false, 0.0);
+    }
+
+
+    std::string meta_file = output_path + SQ_CODEBOOK;
+    IOWriter meta_writer(meta_file);
+    meta_writer.write((char*)codebook.data(), sizeof(DATAT) * dim);
+
+    delete[] d_data;
     delete[] sample_data;
     rc.ElapseFromBegin("train cluster done.");
 }
@@ -40,7 +59,7 @@ void train_cluster(const std::string &raw_data_bin_file,
 template <typename DATAT, typename DISTT, typename HEAPT>
 void divide_raw_data(const std::string &raw_data_bin_file,
                      const std::string &output_path, const float *centroids,
-                     const int32_t K1, std::vector<DATAT> &max_in_dim, std::vector<DATAT> &min_in_dim) {
+                     const int32_t K1) {
     TimeRecorder rc("divide raw data");
     std::cout << "divide_raw_data parameters:" << std::endl;
     std::cout << " raw_data_bin_file: " << raw_data_bin_file
@@ -55,9 +74,6 @@ void divide_raw_data(const std::string &raw_data_bin_file,
     std::vector<std::ofstream> cluster_dat_writer(K1);
     std::vector<std::ofstream> cluster_ids_writer(K1);
     std::cout<<"malloc max & min place"<<std::endl;
-
-    max_in_dim.assign(dim, std::numeric_limits<DATAT>::min());
-    min_in_dim.assign(dim, std::numeric_limits<DATAT>::max());
 
 
 
@@ -109,11 +125,6 @@ void divide_raw_data(const std::string &raw_data_bin_file,
                 std::cout << std::endl;
             }
             */
-            for (int d = 0; d < dim; d++) {
-                vec_d = block_buf[j * dim + d];
-                if(max_in_dim[d] < vec_d) max_in_dim[d] = vec_d;
-                if(min_in_dim[d] > vec_d) min_in_dim[d] = vec_d;
-            }
             cluster_dat_writer[cid].write((char *)(block_buf + j * dim),
                                           sizeof(DATAT) * dim);
             cluster_ids_writer[cid].write((char *)&uid, sizeof(uint32_t));
@@ -141,14 +152,6 @@ void divide_raw_data(const std::string &raw_data_bin_file,
     rc.RecordSection("rewrite header done");
     std::cout << "total points num: " << sump << std::endl;
 
-    std::string meta_file = output_path + "meta";
-    IOWriter meta_writer(meta_file);
-    meta_writer.write((char*)max_in_dim.data(), sizeof(DATAT) * dim);
-    meta_writer.write((char*)min_in_dim.data(), sizeof(DATAT) * dim);
-    for(int i =0; i< dim; i++) {
-        std::cout<<"dim: "<<i<<"max: "<<max_in_dim[i]<<", min: "<<min_in_dim[i]<<std::endl;
-    }
-
     delete[] block_buf;
     block_buf = nullptr;
     rc.ElapseFromBegin("split_raw_data totally done");
@@ -156,8 +159,7 @@ void divide_raw_data(const std::string &raw_data_bin_file,
 
 template <typename DATAT, typename DISTT, typename HEAPT>
 void hierarchical_clusters(const std::string &output_path, const int K1,
-                           const double avg_len, const int blk_size,
-                           DATAT* max_len = nullptr, DATAT* min_len=nullptr) {
+                           const double avg_len, const int blk_size, float* codebook = nullptr) {
     TimeRecorder rc("hierarchical clusters");
     std::cout << "hierarchical clusters parameters:" << std::endl;
     std::cout << " output_path: " << output_path
@@ -195,7 +197,7 @@ void hierarchical_clusters(const std::string &output_path, const int K1,
             data_reader.read((char *)&cluster_dim, sizeof(uint32_t));
             ids_reader.read((char *)&ids_size, sizeof(uint32_t));
             ids_reader.read((char *)&ids_dim, sizeof(uint32_t));
-            if(max_len != nullptr && min_len != nullptr) {
+            if(codebook != nullptr) {
                 entry_num = (blk_size - sizeof(uint32_t)) /
                             (cluster_dim * sizeof(uint8_t) + ids_dim * sizeof(uint32_t));
             } else {
@@ -222,7 +224,7 @@ void hierarchical_clusters(const std::string &output_path, const int K1,
             IOWriter data_writer(data_file, MEGABYTE * 100);
             recursive_kmeans<DATAT>(i, data_size, datai, idi, cluster_dim,
                                     entry_num, blk_size, blk_num, data_writer,
-                                    centroids_writer, centroids_id_writer, 0, max_len, min_len,
+                                    centroids_writer, centroids_id_writer, 0, codebook,
                                     false, avg_len);
 
             global_centroids_number += blk_num;
@@ -362,19 +364,20 @@ void build_bbann(const std::string &raw_data_bin_file,
     std::vector<DATAT> min_len;
 
     double avg_len;
+    std::vector<float> codebook;
     // sampling and do K1-means to get the first round centroids
-    train_cluster<DATAT>(raw_data_bin_file, output_path, K1, &centroids, avg_len);
+    train_cluster<DATAT>(raw_data_bin_file, output_path, K1, &centroids, avg_len, codebook);
     assert(centroids != nullptr);
     rc.RecordSection("train cluster to get " + std::to_string(K1) +
                      " centroids done.");
 
     divide_raw_data<DATAT, DISTT, HEAPT>(raw_data_bin_file, output_path,
-                                         centroids, K1, max_len, min_len);
+                                         centroids, K1);
     rc.RecordSection("divide raw data into " + std::to_string(K1) +
                      " clusters done");
 
     hierarchical_clusters<DATAT, DISTT, HEAPT>(output_path, K1, avg_len,
-                                               block_size, max_len.data(), min_len.data());
+                                               block_size, codebook.data());
     rc.RecordSection("conquer each cluster into buckets done");
 
     build_graph(output_path, hnswM, hnswefC, metric_type);
@@ -586,18 +589,14 @@ void search_bbann(
     answer_ids = new uint32_t[(int64_t)nq * topk];
     bucket_labels = new uint32_t[(int64_t)nq * nprobe]; // 400K * nprobe
 
-
-    DATAT * max_in_dim = new DATAT[dq];
-    DATAT * min_in_dim = new DATAT[dq];
+    int64_t codebook_size = dq * 256;
+    float * codebook = new float[codebook_size];
     {
-        std::string meta_file = index_path + "meta";
-        IOReader meta_reader(meta_file);
-        meta_reader.read((char*)max_in_dim, sizeof(DATAT) * dq);
-        meta_reader.read((char*)min_in_dim, sizeof(DATAT) * dq);
+        std::string meta_file = index_path + SQ_CODEBOOK;
+        IOReader codebook_reader(meta_file);
+        codebook_reader.read((char*)codebook, sizeof(float)*codebook_size);
     }
-    for(int i =0; i< dq; i++) {
-        std::cout<<"dim: "<<i<<"max: "<<max_in_dim[i]<<", min: "<<min_in_dim[i]<<std::endl;
-    }
+
 
     // cid -> [bid -> [qid]]
     std::unordered_map<uint32_t,
@@ -652,7 +651,8 @@ void search_bbann(
                 // for (int d =0; d < dim; d++) {
                 //vec[d] = (DATAT)(code[d]);
                 // std::cout<< "code len "<< IP<uint8_t, uint8_t, double>(code + k * dim, code + k * dim, dim)<<" ";
-                decode_uint8(max_in_dim, min_in_dim, vec, code, 1, dim);
+
+                decode_uint8_kmeans(vec, code, codebook, 1, dim);
                 //std::cout<<"vec len"<<IP<DATAT, DATAT, double>(vec, vec, dim)<<" ";
                 //}
                 auto dis = dis_computer(vec, q_idx, dim);

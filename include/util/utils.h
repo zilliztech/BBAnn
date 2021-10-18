@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <algorithm>
 #include <sys/stat.h>
+#include <stdlib.h>
 
 #include "file_handler.h" 
 #include "distance.h"
@@ -30,7 +31,7 @@ Computer<T1, T2, R> select_computer(MetricType metric_type) {
             break;
     }
 }
-
+/*
 template<typename T>
 inline void encode_uint8(T* max_len, T* min_len, T* data, uint8_t* code, int64_t n, uint32_t dim)  {
 #pragma omp parallel for
@@ -53,7 +54,57 @@ inline void decode_uint8(T* max_len, T* min_len, T* data, uint8_t* code, int64_t
             x[d] = y[d] * (max_len[d] - min_len[d] + 1) / 256 + min_len[d];
         }
     }
+}*/
+
+template<typename T>
+inline void transform_data(T* data, T* tdata, int64_t n, uint32_t dim) {
+#pragma omp parallel for
+    for (auto i = 0; i < n; i++) {
+        for (auto j = 0; j < dim; j++) {
+            tdata[n * j + i] = data[i * dim + j];
+        }
+    }
 }
+
+// centroids : dim * 256
+template<typename T>
+inline void encode_uint8_kmeans(T* data, uint8_t* code, float * centroids, int64_t n, uint32_t dim) {
+    uint8_t c_id;
+    float c_dis;
+    float temp_dis;
+#pragma omp parallel for
+    for (int i = 0; i < n; i++) {
+        auto * __restrict x = data + i * dim;
+        for (int d = 0; d < dim; d++) {
+            auto * x_code = code + i * dim;
+            auto * cen = centroids + 256 * dim;
+            c_id = 0;
+            c_dis = std::abs(x[d] - cen[c_id]);
+            for (int k = 0; k < 256; k++) {
+                temp_dis = std::abs(x[d] - cen[k]);
+                if(temp_dis < c_dis) {
+                    c_dis = temp_dis;
+                    c_id = k;
+                }
+            }
+            x_code[d] = c_id;
+        }
+    }
+}
+
+template<typename T>
+inline void decode_uint8_kmeans(T* data, uint8_t* code, float * centroids, int64_t n, uint32_t dim) {
+#pragma omp parallel for
+    for (int i = 0; i < n; i++) {
+        auto * __restrict x = data + i * dim;
+        auto * __restrict x_code = code + i * dim;
+        for (int d = 0; d < dim; d++) {
+            auto * cent = centroids + d * 256;
+            x[d] = cent[x_code[d]];
+        }
+    }
+}
+
 
 inline void get_bin_metadata(const std::string& bin_file, uint32_t& nrows, uint32_t& ncols) {
     std::ifstream reader(bin_file, std::ios::binary);
