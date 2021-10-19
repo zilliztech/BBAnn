@@ -307,7 +307,7 @@ void build_graph(const std::string &index_path, const int hnswM,
   assert(nidsdim == 1);
 
   // write sample data
-  auto index_hnsw = std::make_shared<hnswlib::HierarchicalNSW<DISTT>>(space, nblocks, hnswM, hnswefC);
+  auto index_hnsw = std::make_shared<hnswlib::HierarchicalNSW<DISTT>>(space, 8 * nblocks, hnswM, hnswefC);
 
   const uint32_t vec_size = sizeof(DATAT) * ndim;
   const uint32_t entry_size = vec_size + sizeof(uint32_t);
@@ -315,17 +315,19 @@ void build_graph(const std::string &index_path, const int hnswM,
   // add sample data
   uint32_t cid0, bid0;
   parse_global_block_id(pids[0], cid0, bid0);
-  /*std::string cluster_file_path = index_path + CLUSTER + std::to_string(cid0) + "-" + RAWDATA + BIN;
+  std::string cluster_file_path = index_path + CLUSTER + std::to_string(cid0) + "-" + RAWDATA + BIN;
   auto fh = std::ifstream(cluster_file_path, std::ios::binary);
   assert(!fh.fail());
+
+  fh.seekg(bid0 * block_size);
   char * buf = new char[block_size];
   fh.read(buf, block_size);
   char *buf_begin = buf + sizeof(uint32_t);
-  for (int64_t j = 0; j < 1; j++) {
+  for (int64_t j = 0; j < 7; j++) {
     char *entry_begin = buf_begin + entry_size * j;
     index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin), gen_id(cid0, bid0, j + 1));
   }
-  delete buf;*/
+  delete buf;
 
   // add centroids
   index_hnsw->addPoint(pdata, gen_id(cid0, bid0, 0));
@@ -333,19 +335,18 @@ void build_graph(const std::string &index_path, const int hnswM,
   for (int64_t i = 1; i < nblocks; i++) {
      uint32_t cid, bid;
      parse_global_block_id(pids[i], cid, bid);
-     /*std::string cluster_file_path = index_path + CLUSTER + std::to_string(cid) + "-" + RAWDATA + BIN;
+     std::string cluster_file_path = index_path + CLUSTER + std::to_string(cid) + "-" + RAWDATA + BIN;
      auto fh = std::ifstream(cluster_file_path, std::ios::binary);
      assert(!fh.fail());
      char * buf = new char[block_size];
      fh.seekg(bid * block_size);
      fh.read(buf, block_size);
-
      char *buf_begin = buf + sizeof(uint32_t);
-     for (int64_t j = 0; j < 1; j++) {
+     for (int64_t j = 0; j < 7; j++) {
         char *entry_begin = buf_begin + entry_size * j;
         index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin), gen_id(cid, bid, j + 1));
      }
-     delete buf;*/
+     delete buf;
      index_hnsw->addPoint(pdata + i * ndim, gen_id(cid, bid, 0));
   }
 
