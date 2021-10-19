@@ -232,56 +232,117 @@ void hierarchical_clusters(const std::string &output_path, const int K1,
 
 void build_graph(const std::string &index_path, const int hnswM,
                  const int hnswefC, MetricType metric_type) {
-  TimeRecorder rc("create_graph_index");
-  std::cout << "build hnsw parameters:" << std::endl;
-  std::cout << " index_path: " << index_path << " hnsw.M: " << hnswM
-            << " hnsw.efConstruction: " << hnswefC
-            << " metric_type: " << (int)metric_type << std::endl;
+    TimeRecorder rc("create_graph_index");
+    std::cout << "build hnsw parameters:" << std::endl;
+    std::cout << " index_path: " << index_path << " hnsw.M: " << hnswM
+              << " hnsw.efConstruction: " << hnswefC
+              << " metric_type: " << (int)metric_type << std::endl;
 
-  float *pdata = nullptr;
-  uint32_t *pids = nullptr;
-  uint32_t npts, ndim, nids, nidsdim;
-
-  read_bin_file<float>(index_path + BUCKET + CENTROIDS + BIN, pdata, npts,
-                       ndim);
-  rc.RecordSection("load centroids of buckets done");
-  std::cout << "there are " << npts << " of dimension " << ndim
-            << " points of hnsw" << std::endl;
-  assert(pdata != nullptr);
-  hnswlib::SpaceInterface<float> *space;
-  if (MetricType::L2 == metric_type) {
-    space = new hnswlib::L2Space(ndim);
-  } else if (MetricType::IP == metric_type) {
-    space = new hnswlib::InnerProductSpace(ndim);
-  } else {
-    std::cout << "invalid metric_type = " << (int)metric_type << std::endl;
-    return;
-  }
-  read_bin_file<uint32_t>(index_path + CLUSTER + COMBINE_IDS + BIN, pids, nids,
-                          nidsdim);
-  rc.RecordSection("load combine ids of buckets done");
-  std::cout << "there are " << nids << " of dimension " << nidsdim
-            << " combine ids of hnsw" << std::endl;
-  assert(pids != nullptr);
-  assert(npts == nids);
-  assert(nidsdim == 1);
-
-  auto index_hnsw = std::make_shared<hnswlib::HierarchicalNSW<float>>(
-      space, npts, hnswM, hnswefC);
-  index_hnsw->addPoint(pdata, pids[0]);
+    float *pdata = nullptr;
+    uint32_t *pids = nullptr;
+    uint32_t npts, ndim, nids, nidsdim,npts2;
+    uint32_t total_n=0;
+    read_meta(index_path+BUCKET+CENTROIDS+BIN,total_n,ndim);
+    std::cout<<"after reading meta data"<<std::endl;
+    uint32_t half_dim=ndim/2;
+    pdata=new float[(uint64_t)total_n*(uint64_t)half_dim];
+    float *codes=new float[256*ndim];
+    auto *codebook=new uint8_t [(uint64_t)total_n*(uint64_t)ndim];
+    memset(codebook,0,sizeof(uint8_t)*(uint64_t)total_n*(uint64_t)ndim);
+    std::cout<<"start sq"<<std::endl;
+    read_bin_file_half_dimension(index_path+BUCKET+CENTROIDS+BIN,pdata,npts,ndim,0);
+    std::cout<<"first pdata  initialized"<<std::endl;
 #pragma omp parallel for
-  for (int64_t i = 1; i < npts; i++) {
-    index_hnsw->addPoint(pdata + i * ndim, pids[i]);
-  }
-  std::cout << "hnsw totally add " << npts << " points" << std::endl;
-  rc.RecordSection("create index hnsw done");
-  index_hnsw->saveIndex(index_path + HNSW + INDEX + BIN);
-  rc.RecordSection("hnsw save index done");
-  delete[] pdata;
-  pdata = nullptr;
-  delete[] pids;
-  pids = nullptr;
-  rc.ElapseFromBegin("create index hnsw totally done");
+    for (uint32_t i=0;i<half_dim;++i){
+        float *centers=new float[256];
+        kmeans(total_n,pdata+i*total_n,1,256,centers);
+        for (int j=0;j<256;j++){
+            codes[j*ndim+i]=centers[j];
+        }
+        for (uint32_t j=0;j<total_n;++j){
+            float min_dis=9999999;
+            for (uint32_t k=0;k<256;++k){
+                float diff=codes[k*ndim+i]-pdata[i*total_n+j];
+                float now_dis=diff*diff;
+                if (now_dis<min_dis){
+                    min_dis=now_dis;
+                    uint32_t* p32=&k;
+                    uint8_t* p8=(uint8_t*)p32;
+                    codebook[j*ndim+i]=(uint8_t)(*(p8));
+                }
+            }
+        }
+    }
+    std::cout<<"first part code computed"<<std::endl;
+
+    delete[] pdata;
+    pdata=nullptr;
+    read_bin_file_half_dimension(index_path+BUCKET+CENTROIDS+BIN,pdata,npts,ndim,half_dim);
+    std::cout<<"second pdata of second part initialized"<<std::endl;
+#pragma omp parallel for
+    for (uint32_t i=half_dim;i<ndim;++i){
+        float *centers=new float[256];
+        kmeans(total_n,pdata+(i-half_dim)*total_n,1,256,centers);
+        for (int j=0;j<256;j++){
+            codes[j*ndim+i]=centers[j];
+        }
+        for (uint32_t j=0;j<total_n;++j){
+            float min_dis=9999999;
+            for (uint32_t k=0;k<256;++k){
+                float diff=codes[k*ndim+i]-pdata[(i-half_dim)*total_n+j];
+                float now_dis=diff*diff;
+                if (now_dis<min_dis){
+                    min_dis=now_dis;
+                    uint32_t* p32=&k;
+                    uint8_t* p8=(uint8_t*)p32;
+                    codebook[j*ndim+i]=(uint8_t)(*(p8));
+                }
+            }
+        }
+    }
+    std::cout<<"second part code computed"<<std::endl;
+    delete[] pdata;
+    pdata= nullptr;
+
+    rc.RecordSection("load centroids of buckets and compute SQ done");
+//  std::string sq_path=index_path+SQ+BIN;
+//  std::ofstream sq_center_writer(sq_path,std::ios::out|std::ios::binary);
+//  uint32_t nn=256;
+//  sq_center_writer.write((char*)&nn,sizeof(uint32_t));
+//  sq_center_writer.write((char*)&ndim,sizeof(uint32_t));
+//  sq_center_writer.write((char*)codes,sizeof(float)*(uint64_t)nn*(uint64_t)ndim);
+//  sq_center_writer.close();
+
+    // rc.RecordSection("save sq codes done");
+
+    sq_hnswlib::SpaceInterface<float> *space= nullptr;
+    if (MetricType::L2==metric_type){
+        space=new sq_hnswlib::L2Space(ndim);
+    }
+    else if (MetricType::IP==metric_type){
+        space=new sq_hnswlib::InnerProductSpace(ndim);
+    }
+    else{
+        std::cout << "invalid metric_type = " << (int)metric_type << std::endl;
+        return;
+    }
+    read_bin_file<uint32_t>(index_path + CLUSTER + COMBINE_IDS + BIN, pids, nids,
+                            nidsdim);
+
+    auto index_hnsw = std::make_shared<sq_hnswlib::HierarchicalNSW<float>>(
+            space, total_n, hnswM, hnswefC,100,codes);
+    index_hnsw->addPoint(codebook, pids[0]);
+#pragma omp parallel for
+    for (int64_t i = 1; i < total_n; i++) {
+        index_hnsw->addPoint(codebook + i * ndim, pids[i]);
+    }
+    std::cout << "hnsw totally add " << npts << " points" << std::endl;
+    rc.RecordSection("create index hnsw done");
+    index_hnsw->saveIndex(index_path + HNSW + INDEX + BIN);
+    rc.RecordSection("hnsw save index done");
+    delete[] pids;
+    pids = nullptr;
+    rc.ElapseFromBegin("create index hnsw totally done");
 }
 
 void gather_buckets_stats(const ::std::string index_path, const int K1,
