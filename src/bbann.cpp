@@ -3,7 +3,7 @@
 template <typename DATAT>
 void train_cluster(const std::string &raw_data_bin_file,
                    const std::string &output_path, const int32_t K1,
-                   float **centroids, double &avg_len) {
+                   float **centroids, double &avg_len, std::vector<DATAT> &max_len, std::vector<DATAT> &min_len) {
     TimeRecorder rc("train cluster");
     std::cout << "train_cluster parameters:" << std::endl;
     std::cout << " raw_data_bin_file: " << raw_data_bin_file
@@ -33,6 +33,18 @@ void train_cluster(const std::string &raw_data_bin_file,
     rc.RecordSection("kmeans done");
     assert((*centroids) != nullptr);
 
+    max_len.assign(dim, std::numeric_limits<DATAT>::min());
+    min_len.assign(dim, std::numeric_limits<DATAT>::max());
+    train_code<DATAT>(max_len.data(), min_len.data(), sample_data, sample_num, dim);
+    std::string meta_file = output_path + "meta";
+    IOWriter meta_writer(meta_file);
+    meta_writer.write((char*)max_len.data(), sizeof(DATAT) * dim);
+    meta_writer.write((char*)min_len.data(), sizeof(DATAT) * dim);
+    for(int i =0; i< dim; i++) {
+        std::cout<<"dim: "<<i<<"max: "<<max_len[i]<<", min: "<<min_len[i]<<std::endl;
+    }
+
+
     delete[] sample_data;
     rc.ElapseFromBegin("train cluster done.");
 }
@@ -40,7 +52,7 @@ void train_cluster(const std::string &raw_data_bin_file,
 template <typename DATAT, typename DISTT, typename HEAPT>
 void divide_raw_data(const std::string &raw_data_bin_file,
                      const std::string &output_path, const float *centroids,
-                     const int32_t K1, std::vector<DATAT> &max_in_dim, std::vector<DATAT> &min_in_dim) {
+                     const int32_t K1) {
     TimeRecorder rc("divide raw data");
     std::cout << "divide_raw_data parameters:" << std::endl;
     std::cout << " raw_data_bin_file: " << raw_data_bin_file
@@ -55,9 +67,6 @@ void divide_raw_data(const std::string &raw_data_bin_file,
     std::vector<std::ofstream> cluster_dat_writer(K1);
     std::vector<std::ofstream> cluster_ids_writer(K1);
     std::cout<<"malloc max & min place"<<std::endl;
-
-    max_in_dim.assign(dim, std::numeric_limits<DATAT>::min());
-    min_in_dim.assign(dim, std::numeric_limits<DATAT>::max());
 
 
 
@@ -109,11 +118,7 @@ void divide_raw_data(const std::string &raw_data_bin_file,
                 std::cout << std::endl;
             }
             */
-            for (int d = 0; d < dim; d++) {
-                vec_d = block_buf[j * dim + d];
-                if(max_in_dim[d] < vec_d) max_in_dim[d] = vec_d;
-                if(min_in_dim[d] > vec_d) min_in_dim[d] = vec_d;
-            }
+
             cluster_dat_writer[cid].write((char *)(block_buf + j * dim),
                                           sizeof(DATAT) * dim);
             cluster_ids_writer[cid].write((char *)&uid, sizeof(uint32_t));
@@ -141,13 +146,6 @@ void divide_raw_data(const std::string &raw_data_bin_file,
     rc.RecordSection("rewrite header done");
     std::cout << "total points num: " << sump << std::endl;
 
-    std::string meta_file = output_path + "meta";
-    IOWriter meta_writer(meta_file);
-    meta_writer.write((char*)max_in_dim.data(), sizeof(DATAT) * dim);
-    meta_writer.write((char*)min_in_dim.data(), sizeof(DATAT) * dim);
-    for(int i =0; i< dim; i++) {
-        std::cout<<"dim: "<<i<<"max: "<<max_in_dim[i]<<", min: "<<min_in_dim[i]<<std::endl;
-    }
 
     delete[] block_buf;
     block_buf = nullptr;
@@ -363,13 +361,12 @@ void build_bbann(const std::string &raw_data_bin_file,
 
     double avg_len;
     // sampling and do K1-means to get the first round centroids
-    train_cluster<DATAT>(raw_data_bin_file, output_path, K1, &centroids, avg_len);
+    train_cluster<DATAT>(raw_data_bin_file, output_path, K1, &centroids, avg_len, max_len, min_len);
     assert(centroids != nullptr);
     rc.RecordSection("train cluster to get " + std::to_string(K1) +
                      " centroids done.");
 
-    divide_raw_data<DATAT, DISTT, HEAPT>(raw_data_bin_file, output_path,
-                                         centroids, K1, max_len, min_len);
+    divide_raw_data<DATAT, DISTT, HEAPT>(raw_data_bin_file, output_path, centroids, K1);
     rc.RecordSection("divide raw data into " + std::to_string(K1) +
                      " clusters done");
 
