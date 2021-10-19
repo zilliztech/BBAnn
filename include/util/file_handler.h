@@ -85,11 +85,16 @@ public:
     writer_.close();
   }
 
+  // returns current position in the output stream
+  int64_t get_position() { return cur_pos_; }
+
   uint64_t get_file_size() { return fsize_; }
 
   void write(char *buff, const uint64_t n_bytes) {
     assert(buff != nullptr);
-    if (n_bytes + cur_off_ <= cache_size_) {
+    cur_pos_ += n_bytes;
+
+      if (n_bytes + cur_off_ <= cache_size_) {
       memcpy(cache_buf_ + cur_off_, buff, n_bytes);
       cur_off_ += n_bytes;
     } else {
@@ -118,7 +123,8 @@ private:
   char *cache_buf_ = nullptr;
   // offset into cache_buf for cur_pos
   uint64_t cur_off_ = 0;
+  uint64_t cur_pos_ = 0;
 
-  // file size
+    // file size
   uint64_t fsize_ = 0;
 };
