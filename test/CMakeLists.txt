@@ -17,3 +17,7 @@ target_link_libraries(test_same_size_kmeans BBAnn)
 
 add_executable(test_hnsw_range test_hnsw_range.cpp)
 target_link_libraries(test_hnsw_range BBAnn)
+
+add_executable(test_aio_reader test_aio_reader.cpp)
+target_link_libraries(test_aio_reader aio TimeRecorder)
+

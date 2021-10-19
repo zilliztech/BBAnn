@@ -137,27 +137,33 @@ std::string getClusterGlobalIdsFileName(std::string prefix, int cluster_id) {
 
 class CachedBucketReader {
 public:
-  CachedBucketReader(std::string prefix) : prefix_(prefix), last_cid_(-1), last_bid_(-1) {}
+  CachedBucketReader(std::string prefix)
+      : prefix_(prefix), last_cid_(-1), last_bid_(-1), unique_reads_(0) {}
   void readToBuf(int bucketid, char *buf, int blockSize) {
     uint32_t cid, bid;
     util::parse_global_block_id(bucketid, cid, bid);
     if (last_cid_ != cid) {
-      fh_ = std::ifstream(getClusterRawDataFileName(prefix_, cid), std::ios::binary);
+      fh_ = std::ifstream(getClusterRawDataFileName(prefix_, cid),
+                          std::ios::binary);
       fh_.seekg(bid * blockSize);
       fh_.read(buf, blockSize);
       last_cid_ = cid;
       last_bid_ = bid;
+      unique_reads_++;
       return;
     }
     if (last_bid_ != bid) {
       last_bid_ = bid;
       fh_.seekg(bid * blockSize);
       fh_.read(buf, blockSize);
+      unique_reads_++;
     }
   }
-  std::string prefix_;
+
   int last_cid_, last_bid_;
+  int unique_reads_;
   std::ifstream fh_;
+  std::string prefix_;
 };
 
 } // namespace bbann

@@ -1179,6 +1179,7 @@ BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
         }
       }
     }
+    std::cout << "Query number:" << r-l <<"  read count:" << reader->unique_reads_ << std::endl;
     return ret;
   };
   std::cout << "Need to access bucket data for " << bucketToQuery.size()
