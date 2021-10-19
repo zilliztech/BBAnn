@@ -1,10 +1,19 @@
 #pragma once
+#include "aio_reader.h"
 #include "util/utils_inline.h"
+
+#include <unistd.h> // pread
+#include <fcntl.h>  // open
+#include <stdlib.h>
+#include <stdio.h>
 #include <cassert>
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <libaio.h>
+#include <mutex>
 #include <sstream>
+#include <thread>
 
 namespace ioreader {
 constexpr static uint64_t KILOBYTE = 1024;
@@ -69,6 +78,7 @@ private:
   uint64_t fsize_ = 0;
 };
 
+
 class IOWriter {
 public:
   IOWriter(const std::string &file_name,
@@ -127,14 +137,123 @@ private:
   uint64_t fsize_ = 0;
 };
 
+
 namespace bbann {
-std::string getClusterRawDataFileName(std::string prefix, int cluster_id) {
+inline std::string getClusterRawDataFileName(std::string prefix,
+                                             int cluster_id) {
   return prefix + "cluster-" + std::to_string(cluster_id) + "-raw_data.bin";
 }
-std::string getClusterGlobalIdsFileName(std::string prefix, int cluster_id) {
+inline std::string getClusterGlobalIdsFileName(std::string prefix,
+                                               int cluster_id) {
   return prefix + "cluster-" + std::to_string(cluster_id) + "-global_ids.bin";
 }
 
+constexpr int MAX_EVENTS_NUM = 1023;
+/*
+class CtxManager {
+public:
+  static CtxManager &GetInstance() {
+    std::call_once(flag_, &CtxManager::init);
+    return *ins_;
+  }
+
+  io_context_t get_ctx() { return ctx_; }
+
+private:
+  CtxManager() = default;
+  ~CtxManager() { io_destroy(ctx_); }
+  CtxManager(const CtxManager &) = delete;
+  CtxManager &operator=(const CtxManager &) = delete;
+
+  static void init() {
+    ins_ = new CtxManager();
+    ins_->ctx_ = 0;
+    auto r = io_setup(MAX_EVENTS_NUM, &ins_->ctx_);
+    if (r) {
+      std::cout << "io_setup() failed!"
+                << " r: " << r << std::endl;
+      exit(-1);
+    }
+  }
+
+  io_context_t ctx_ = 0;
+  static std::once_flag flag_;
+  static CtxManager *ins_;
+};
+*/
+//std::once_flag CtxManager::flag_;
+//CtxManager *CtxManager::ins_ = nullptr;
+
+class AIOBucketReader {
+public:
+  // returns a vector of bucketSize * q bytes, and a vector of res_id
+  // where q is the actual unique blocks fetched from file.
+  // the block at bucketSize*resid[i] is the result of the bucketIds[i];
+  AIOBucketReader(std::string prefix) : prefix_(prefix) {}
+  std::pair<std::vector<char>, std::vector<uint32_t>>
+  Read(std::vector<uint32_t> bucketIds, int blockSize) {
+
+    const std::lock_guard<std::mutex> lock(mutex_);
+    // only 1 thread is supposed to enter this.
+
+    int n = bucketIds.size();
+    std::vector<char> ans;
+    std::vector<AIORequest> req;
+    std::vector<uint32_t> resId(n);
+    cid_to_fd.clear();
+    for (int i = 0; i < n; i++) {
+      uint32_t cid, bid;
+      util::parse_global_block_id(bucketIds[i], cid, bid);
+      if (i)
+        if (bucketIds[i] == bucketIds[i - 1]) {
+          resId[i] = resId[i - 1];
+          continue;
+        }
+      resId[i] = req.size();
+      ans.resize((req.size() + 1) * blockSize);
+      AIORequest r;
+      r.fd = getFd(cid);
+      r.buf = &ans[req.size() * blockSize];
+      r.size = blockSize;
+      r.offset = bid * blockSize;
+      req.emplace_back(r);
+      std::cout << r.fd <<" offset " << r.offset << std::endl;
+    }
+    std::cout << req.size() <<" " << ans.size() << std::endl;
+    // io_context_t ctx = CtxManager::GetInstance().get_ctx();
+    
+    io_context_t ctx = 0;
+    auto max_events_num = 1023;
+    io_setup(max_events_num, &ctx);
+    AsyncRead(ctx, req, {}, 1023);
+    io_destroy(ctx);
+
+    
+    for (const auto [cid,fd]: cid_to_fd) {
+      close(fd);
+    }
+    cid_to_fd.clear();
+    for (int i = 0 ; i< n; i++) {
+      std::cout << resId[i] <<" ";
+    }
+    std::cout << std::endl;
+    std::cout << req.size() <<" <-- req.size" << std::endl;
+    std::cout << n << "<--" << std::endl;
+    return {ans, resId};
+  }
+
+  int getFd(uint32_t cid) {
+    if (!cid_to_fd.count(cid)) {
+      cid_to_fd[cid] =
+          open(getClusterRawDataFileName(prefix_, cid).c_str(), O_DIRECT | O_RDONLY);
+    }
+    return cid_to_fd[cid];
+  }
+
+  std::unordered_map<int, int> cid_to_fd;
+  std::mutex mutex_;
+  std::string prefix_;
+};
 class CachedBucketReader {
 public:
   CachedBucketReader(std::string prefix)
@@ -150,12 +269,14 @@ public:
       last_cid_ = cid;
       last_bid_ = bid;
       unique_reads_++;
+      std::cout <<"cached offset" << bid * blockSize << std::endl;
       return;
     }
     if (last_bid_ != bid) {
       last_bid_ = bid;
       fh_.seekg(bid * blockSize);
       fh_.read(buf, blockSize);
+      std::cout <<"cached offset" << bid * blockSize << std::endl;
       unique_reads_++;
     }
   }
