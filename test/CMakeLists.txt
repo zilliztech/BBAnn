@@ -24,8 +24,9 @@ target_link_libraries(test_dist BigAnn)
 add_executable(test_distance test_distance.cpp)
 target_link_libraries(test_distance BigAnn)
 
-add_executable(test_recursive_kmeans recursive_kmeans_test.cpp)
-target_link_libraries(test_recursive_kmeans BigAnn)
+
+#add_executable(test_recursive_kmeans recursive_kmeans_test.cpp)
+#target_link_libraries(test_recursive_kmeans BigAnn)
 
 add_executable(test_same_size_kmeans test_same_size_kmeans.cpp)
 target_link_libraries(test_same_size_kmeans BigAnn)
