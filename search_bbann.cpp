@@ -57,21 +57,18 @@ int main(int argc, char **argv) {
 
   uint32_t bucket_num, dim;
   get_bin_metadata(bucket_centroids_file, bucket_num, dim);
-  hnswlib::SpaceInterface<float> *space = nullptr;
-
-  if (MetricType::L2 == metric_type) {
-    space = new hnswlib::L2Space(dim);
-  } else if (MetricType::IP == metric_type) {
-    space = new hnswlib::InnerProductSpace(dim);
-  }
-  // load hnsw
-  auto index_hnsw =
-      std::make_shared<hnswlib::HierarchicalNSW<float>>(space, hnsw_index_file);
-  rc.RecordSection("load hnsw done.");
 
   if (argv[1] == std::string("float")) {
     Computer<float, float, float> dis_computer; // refine computer
+    hnswlib::SpaceInterface<float> *space = nullptr;
 
+    if (MetricType::L2 == metric_type) {
+        space = new hnswlib::L2Space<float, float>(dim);
+    } else if (MetricType::IP == metric_type) {
+        space = new hnswlib::InnerProductSpace(dim);
+    }
+    // load hnsw
+    auto index_hnsw =std::make_shared<hnswlib::HierarchicalNSW<float>>(space, hnsw_index_file);
     if (MetricType::L2 == metric_type) {
       dis_computer = L2sqr<const float, const float, float>;
       search_bbann<float, float, CMax<float, uint32_t>>(
@@ -88,35 +85,43 @@ int main(int argc, char **argv) {
                             false);
   } else if (argv[1] == std::string("uint8")) {
     Computer<uint8_t, uint8_t, uint32_t> dis_computer; // refine computer
+      hnswlib::SpaceInterface<uint32_t> *space = nullptr;
+      if (MetricType::L2 == metric_type) {
+          space = new hnswlib::L2Space<uint8_t, uint32_t>(dim);
+      } else if (MetricType::IP == metric_type) {
+          std::cout << "Not support metric IP with int8" << std::endl;
+          return - 1;
+      }
+      // load
+      std::shared_ptr<hnswlib::HierarchicalNSW<uint32_t>> index_hnsw = std::make_shared<hnswlib::HierarchicalNSW<uint32_t>>(space, hnsw_index_file);
+      rc.RecordSection("load hnsw done.");
 
-    if (MetricType::L2 == metric_type) {
       dis_computer = L2sqr<const uint8_t, const uint8_t, uint32_t>;
       search_bbann<uint8_t, uint32_t, CMax<uint32_t, uint32_t>>(
           index_path, query_file, answer_file, nprobe, hnsw_ef, topk,
           index_hnsw, K1, block_size, dis_computer);
-    } else if (MetricType::IP == metric_type) {
-      dis_computer = IP<const uint8_t, const uint8_t, uint32_t>;
-      search_bbann<uint8_t, uint32_t, CMin<uint32_t, uint32_t>>(
-          index_path, query_file, answer_file, nprobe, hnsw_ef, topk,
-          index_hnsw, K1, block_size, dis_computer);
-    }
+
     // calculate_recall<uint32_t>(ground_truth_file, answer_file, topk);
     recall<uint32_t, uint32_t>(ground_truth_file, answer_file, metric_type,
                                true, false);
   } else if (argv[1] == std::string("int8")) {
-    Computer<int8_t, int8_t, int32_t> dis_computer; // refine computer
+      hnswlib::SpaceInterface<int> *space = nullptr;
+      if (MetricType::L2 == metric_type) {
+          space = new hnswlib::L2Space<int8_t, int32_t>(dim);
+      } else if (MetricType::IP == metric_type) {
+          std::cout << "Not support metric IP with int8" << std::endl;
+          return - 1;
+      }
+      // load
+      std::shared_ptr<hnswlib::HierarchicalNSW<int32_t>> index_hnsw = std::make_shared<hnswlib::HierarchicalNSW<int32_t>>(space, hnsw_index_file);
+      rc.RecordSection("load hnsw done.");
+      Computer<int8_t, int8_t, int32_t> dis_computer; // refine computer
 
-    if (MetricType::L2 == metric_type) {
       dis_computer = L2sqr<const int8_t, const int8_t, int32_t>;
       search_bbann<int8_t, int32_t, CMax<int32_t, uint32_t>>(
           index_path, query_file, answer_file, nprobe, hnsw_ef, topk,
           index_hnsw, K1, block_size, dis_computer);
-    } else if (MetricType::IP == metric_type) {
-      dis_computer = IP<const int8_t, const int8_t, int32_t>;
-      search_bbann<int8_t, int32_t, CMin<int32_t, uint32_t>>(
-          index_path, query_file, answer_file, nprobe, hnsw_ef, topk,
-          index_hnsw, K1, block_size, dis_computer);
-    }
+
     // calculate_recall<uint32_t>(ground_truth_file, answer_file, topk);
     recall<int32_t, uint32_t>(ground_truth_file, answer_file, metric_type, true,
                               false);

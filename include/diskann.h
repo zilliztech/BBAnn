@@ -13,6 +13,7 @@
 #include "util/statistics.h"
 #include "util/heap.h"
 #include "hnswlib/hnswlib.h"
+#include "hnswlib/space_ui8_l2.h"
 #include "pq/pq.h"
 #include "pq/pq_residual.h"
 #include "flat/flat.h"
@@ -116,8 +117,8 @@ void load_meta(const std::string& index_path,
                std::vector<std::vector<uint32_t>>& meta,
                const int K1);
 
-template<typename DATAT>
-void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+template <typename DATAT, typename DISTT>
+void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,
                   const int nq,
                   const int dq,
                   const int nprobe,
@@ -170,7 +171,7 @@ void search_bigann(const std::string& index_path,
                    const int refine_nprobe,
                    const int topk,
                    const int refine_topk,
-                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,
                    PQResidualQuantizer<HEAPTT, DATAT, uint8_t>& pq_quantizer,
                    const int K1,
                    std::vector<std::vector<uint8_t>>& pq_codebook,
@@ -185,7 +186,7 @@ void search_bigann(const std::string& index_path,
                    const int refine_nprobe,
                    const int topk,
                    const int refine_topk,
-                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,
                    ProductQuantizer<HEAPTT, DATAT, uint8_t>& pq_quantizer,
                    const int K1,
                    std::vector<std::vector<uint8_t>>& pq_codebook,

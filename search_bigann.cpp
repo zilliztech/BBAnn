@@ -105,19 +105,17 @@ int main(int argc, char **argv) {
   rc.RecordSection("load meta done.");
   uint32_t bucket_num, dim;
   get_bin_metadata(bucket_centroids_file, bucket_num, dim);
-  hnswlib::SpaceInterface<float> *space = nullptr;
-
-  if (MetricType::L2 == metric_type) {
-    space = new hnswlib::L2Space(dim);
-  } else if (MetricType::IP == metric_type) {
-    space = new hnswlib::InnerProductSpace(dim);
-  }
-  // load hnsw
-  auto index_hnsw =
-      std::make_shared<hnswlib::HierarchicalNSW<float>>(space, hnsw_index_file);
-  rc.RecordSection("load hnsw done.");
 
   if (argv[1] == std::string("float")) {
+      hnswlib::SpaceInterface<float> *space = nullptr;
+      if (MetricType::L2 == metric_type) {
+          space = new hnswlib::L2Space<float, float>(dim);
+      } else if (MetricType::IP == metric_type) {
+          space = new hnswlib::InnerProductSpace(dim);
+      }
+      // load
+      std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw = std::make_shared<hnswlib::HierarchicalNSW<float>>(space, hnsw_index_file);
+      rc.RecordSection("load hnsw done.");
     Computer<float, float, float> dis_computer; // refine computer
 
     if (MetricType::L2 == metric_type) {
@@ -173,8 +171,17 @@ int main(int argc, char **argv) {
     recall<float, uint32_t>(ground_truth_file, answer_file, metric_type, true,
                             false);
   } else if (argv[1] == std::string("uint8")) {
+    hnswlib::SpaceInterface<uint32_t> *space = nullptr;
+    if (MetricType::L2 == metric_type) {
+          space = new hnswlib::L2Space<uint8_t, uint32_t>(dim);
+    } else if (MetricType::IP == metric_type) {
+          std::cout << "Not support metric IP with int8" << std::endl;
+          return - 1;
+    }
+    // load
+    std::shared_ptr<hnswlib::HierarchicalNSW<uint32_t>> index_hnsw = std::make_shared<hnswlib::HierarchicalNSW<uint32_t>>(space, hnsw_index_file);
+    rc.RecordSection("load hnsw done.");
     Computer<uint8_t, uint8_t, uint32_t> dis_computer; // refine computer
-
     if (MetricType::L2 == metric_type) {
       dis_computer = L2sqr<const uint8_t, const uint8_t, uint32_t>;
 
@@ -228,6 +235,16 @@ int main(int argc, char **argv) {
     recall<uint32_t, uint32_t>(ground_truth_file, answer_file, metric_type,
                                true, false);
   } else if (argv[1] == std::string("int8")) {
+    hnswlib::SpaceInterface<int> *space = nullptr;
+    if (MetricType::L2 == metric_type) {
+        space = new hnswlib::L2Space<int8_t, int32_t>(dim);
+    } else if (MetricType::IP == metric_type) {
+        std::cout << "Not support metric IP with int8" << std::endl;
+        return - 1;
+    }
+    // load
+    std::shared_ptr<hnswlib::HierarchicalNSW<int32_t>> index_hnsw = std::make_shared<hnswlib::HierarchicalNSW<int32_t>>(space, hnsw_index_file);
+    rc.RecordSection("load hnsw done.");
     Computer<int8_t, int8_t, int32_t> dis_computer; // refine computer
 
     if (MetricType::L2 == metric_type) {
