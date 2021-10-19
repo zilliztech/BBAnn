@@ -350,19 +350,11 @@ void BBAnnIndex2<dataT>::BuildWithParameter(const BBAnnParameters para) {
   rc.RecordSection("train cluster to get " + std::to_string(para.K1) +
                    " centroids done.");
 
-  std::function<void(const BBAnnParameters, const double)>
-      hierarchical_clusters_func;
-  std::function<void(const BBAnnParameters, const float *)>
-      divide_raw_data_func;
-
-  divide_raw_data_func = divide_raw_data<dataT, distanceT>;
-  hierarchical_clusters_func = hierarchical_clusters<dataT, distanceT>;
-
-  divide_raw_data_func(para, centroids);
+  divide_raw_data<dataT, distanceT>(para, centroids);
   rc.RecordSection("divide raw data into " + std::to_string(para.K1) +
                    " clusters done");
 
-  hierarchical_clusters_func(para, avg_len);
+  hierarchical_clusters<dataT, distanceT>(para, avg_len);
   rc.RecordSection("conquer each cluster into buckets done");
 
   build_graph(indexPrefix_, para.hnswM, para.hnswefC, para.metric);
