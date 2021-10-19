@@ -325,6 +325,10 @@ void build_graph(const std::string &index_path, const int hnswM,
   fh.seekg(bid0 * block_size);
   char * buf = new char[block_size];
   fh.read(buf, block_size);
+  const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
+  if (entry_num < 7) {
+      std::cout<<"Warning some of the bucket is less than 7"<<std::endl;
+  }
   char *buf_begin = buf + sizeof(uint32_t);
   for (int64_t j = 0; j < 3; j++) {
     char *entry_begin = buf_begin + entry_size * j;
@@ -345,6 +349,10 @@ void build_graph(const std::string &index_path, const int hnswM,
      char * buf = new char[block_size];
      fh.seekg(bid * block_size);
      fh.read(buf, block_size);
+      const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
+      if (entry_num < 7) {
+          std::cout<<"Warning some of the bucket is less than 7"<<std::endl;
+      }
      char *buf_begin = buf + sizeof(uint32_t);
      for (int64_t j = 0; j < 3; j++) {
         char *entry_begin = buf_begin + entry_size * j;
