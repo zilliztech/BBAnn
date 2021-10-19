@@ -204,11 +204,20 @@ namespace sq_hnswlib {
                 }
                 size_t size = getListCount((linklistsizeint*)data);
                 tableint *datal = (tableint *) (data + 1);
+#ifdef USE_SSE
+                _mm_prefetch((char *) (visited_array + *(data + 1)), _MM_HINT_T0);
+                _mm_prefetch((char *) (visited_array + *(data + 1) + 64), _MM_HINT_T0);
+                _mm_prefetch(getDataByInternalId(*datal), _MM_HINT_T0);
+                _mm_prefetch(getDataByInternalId(*(datal + 1)), _MM_HINT_T0);
+#endif
 
                 for (size_t j = 0; j < size; j++) {
                     tableint candidate_id = *(datal + j);
 //                    if (candidate_id == 0) continue;
-
+#ifdef USE_SSE
+                    _mm_prefetch((char *) (visited_array + *(datal + j + 1)), _MM_HINT_T0);
+                    _mm_prefetch(getDataByInternalId(*(datal + j + 1)), _MM_HINT_T0);
+#endif
                     if (visited_array[candidate_id] == visited_array_tag) continue;
                     visited_array[candidate_id] = visited_array_tag;
                     char *currObj1 = (getDataByInternalId(candidate_id));
@@ -216,7 +225,9 @@ namespace sq_hnswlib {
                     dist_t dist1 = fstdistfunc_(data_point, currObj1, dist_func_param_,codes_,both_codes);
                     if (top_candidates.size() < ef_construction_ || lowerBound > dist1) {
                         candidateSet.emplace(-dist1, candidate_id);
-
+#ifdef USE_SSE
+                        _mm_prefetch(getDataByInternalId(candidateSet.top().second), _MM_HINT_T0);
+#endif
                         if (!isMarkedDeleted(candidate_id))
                             top_candidates.emplace(dist1, candidate_id);
 
