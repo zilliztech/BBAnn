@@ -461,7 +461,9 @@ void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,
       auto reti = index_hnsw->searchKnn(pquery + i * dq, nprobe);
       auto p_labeli = buckets_label + i * nprobe;
       while (!reti.empty()) {
-          *p_labeli++ = reti.top().second;
+          uint32_t cid, bid, offset;
+          parse_id(reti.top().second, cid, bid, offset);
+          *p_labeli++ = gen_global_block_id(cid, bid);
           if(set_distance) {
               *queryi_dist++ = reti.top().first;
           }
