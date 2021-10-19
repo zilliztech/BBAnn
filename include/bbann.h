@@ -13,6 +13,8 @@
 #include "ivf/hierarchical_kmeans.h"
 #include "util/TimeRecorder.h"
 #include "flat/flat.h"
+#include <list>
+#include <thread>
 
 template <typename DATAT>
 void train_cluster(const std::string &raw_data_bin_file,
