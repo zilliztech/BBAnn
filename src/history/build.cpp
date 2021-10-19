@@ -216,7 +216,7 @@ void create_graph_index(const std::string& index_path,
     assert(pdata != nullptr);
     hnswlib::SpaceInterface<float>* space;
     if (MetricType::L2 == metric_type) {
-        space = new hnswlib::L2Space(ndim);
+        space = new hnswlib::L2Space<float, float>(ndim);
     } else if (MetricType::IP == metric_type) {
         space = new hnswlib::InnerProductSpace(ndim);
     } else {

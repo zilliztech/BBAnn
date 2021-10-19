@@ -306,7 +306,7 @@ void create_graph_index(const std::string &index_path, const int hnswM,
   assert(pdata != nullptr);
   hnswlib::SpaceInterface<float> *space;
   if (MetricType::L2 == metric_type) {
-    space = new hnswlib::L2Space(ndim);
+    space = new hnswlib::L2Space<float, float>(ndim);
   } else if (MetricType::IP == metric_type) {
     space = new hnswlib::InnerProductSpace(ndim);
   } else {
@@ -427,7 +427,7 @@ void search_disk_index_simple(const std::string &index_path,
   get_bin_metadata(query_bin_file, num_queries, dim_queries);
   hnswlib::SpaceInterface<float> *space;
   if (MetricType::L2 == metric_type) {
-    space = new hnswlib::L2Space(dim_queries);
+    space = new hnswlib::L2Space<float, float>(dim_queries);
   } else if (MetricType::IP == metric_type) {
     space = new hnswlib::InnerProductSpace(dim_queries);
   } else {

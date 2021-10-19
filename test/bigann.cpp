@@ -197,7 +197,7 @@ int main() {
     int M = 24;
     int EF_B = 128;
     int EF_Q = 96;
-    hnswlib::SpaceInterface<int> *space = new hnswlib::Ui8L2Space(dim);
+    hnswlib::SpaceInterface<int> *space = new hnswlib::L2Space<int8_t, int>(dim);
     hnswlib::HierarchicalNSW<int> *index = new hnswlib::HierarchicalNSW<int>(space, nb, M, EF_B);
 
     std::vector<std::vector<std::pair<int, size_t>>> rst;

@@ -236,7 +236,6 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
     int64_t bucket_offest;
     int entry_size = vector_size + id_size;
     uint32_t global_id;
-
     char* data_blk_buf = new char[blk_size];
     for(int i=0; i < k2; i++) {
         if (i == 0) {
@@ -251,8 +250,8 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
             //write a blk to file
             //std::cout << bucket_size<<std::endl;
             memset(data_blk_buf, 0, blk_size);
-            *reinterpret_cast<uint32_t*>(data_blk_buf) = bucket_size;
-            char* beg_address = data_blk_buf + sizeof(uint32_t);
+            *reinterpret_cast<uint32_t *>(data_blk_buf) = bucket_size;
+            char *beg_address = data_blk_buf + sizeof(uint32_t);
 
             for (int j = 0; j < bucket_size; j++) {
                 memcpy(beg_address + j * entry_size, data + dim * (bucket_offest + j), vector_size);
@@ -261,10 +260,19 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
             global_id = gen_global_block_id(k1_id, blk_num);
 
             data_writer.write((char *) data_blk_buf, blk_size);
-            centroids_writer.write((char *) (k2_centroids.data() + i * dim), sizeof(float) * dim);
+            // convert centroids to specified datatype
+            if (sizeof(T) != sizeof(float)) {
+                T* k2_centroids_T = new T[dim];
+                for (int j = 0; j < dim; j++) {
+                    k2_centroids_T[j] = (T) k2_centroids[i * dim + j];
+                }
+                centroids_writer.write((char *) k2_centroids_T, sizeof(T) * dim);
+                delete[] k2_centroids_T;
+            } else {
+                centroids_writer.write((char *) (k2_centroids.data() + i * dim), sizeof(float) * dim);
+            }
             centroids_id_writer.write((char *) (&global_id), sizeof(uint32_t));
             blk_num++;
-
         } else {
             recursive_kmeans(k1_id, bucket_size, data + bucket_offest * dim, ids + bucket_offest, dim, threshold, blk_size,
                              blk_num, data_writer, centroids_writer, centroids_id_writer, level + 1, kmpp, avg_len, niter, seed);
