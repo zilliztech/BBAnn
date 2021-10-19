@@ -121,12 +121,12 @@ inline float L2sqr<const float, const float, float>(const float *a, const float 
   return _mm_cvtsi128_si32(msum2);
 
 template<>
-inline int L2sqr<uint8_t, uint8_t, int>(uint8_t *a, uint8_t *b, size_t n) {
+inline uint32_t L2sqr<uint8_t, uint8_t, uint32_t>(uint8_t *a, uint8_t *b, size_t n) {
     L2SQR_UINT8_IMPL
 }
 
 template<>
-inline int L2sqr<const uint8_t, const uint8_t, int>(const uint8_t *a, const uint8_t *b, size_t n) {
+inline uint32_t L2sqr<const uint8_t, const uint8_t, uint32_t>(const uint8_t *a, const uint8_t *b, size_t n) {
     L2SQR_UINT8_IMPL
 }
 

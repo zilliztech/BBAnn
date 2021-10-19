@@ -154,8 +154,6 @@ template <typename T>
 void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* ids, int64_t dim, uint32_t threshold, const uint64_t blk_size,
                       uint32_t& blk_num, IOWriter& data_writer, IOWriter& centroids_writer, IOWriter& centroids_id_writer, int level,
                       bool kmpp = false, float avg_len = 0.0, int64_t niter = 10, int64_t seed = 1234) {
-    //std::cout<< "level" <<level<<" cluster_size"<<cluster_size<<std::endl;
-
     float weight = 0;
     int vector_size = sizeof(T) * dim;
     int id_size = sizeof(uint32_t);
@@ -169,6 +167,8 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
         k2 = k2 < MAX_CLUSTER_K2 ? k2 : MAX_CLUSTER_K2;
     }
 
+    std::cout<< "level" <<level<<" cluster_size "<<cluster_size<< "k2 " << k2 << "do same size kmeans " << do_same_size_kmeans <<std::endl;
+
     //float* k2_centroids = new float[k2 * dim];
     std::vector<float> k2_centroids(k2 * dim, 0.0);
     std::vector<int64_t> cluster_id(cluster_size, -1);
@@ -177,7 +177,6 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
         //use same size kmeans or graph partition
         k2 = std::max((cluster_size + threshold - 1) / threshold, 1L);
         same_size_kmeans<T>(cluster_size, data, dim, k2, k2_centroids.data(), cluster_id.data(), kmpp, avg_len, niter, seed);
-
     } else {
         int64_t train_size = cluster_size;
         T* train_data = nullptr;
@@ -210,7 +209,7 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
         //split_clusters_half(dim, k2, cluster_size, data, nullptr, cluster_id.data(), k2_centroids, avg_len);
     }
 
-    std::vector<float> bucket_pre_size(k2 + 1, 0);
+    std::vector<int64_t> bucket_pre_size(k2 + 1, 0);
 
     for (int i=0; i<cluster_size; i++) {
         bucket_pre_size[cluster_id[i]+1]++;
@@ -267,7 +266,7 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
             blk_num++;
 
         } else {
-            recursive_kmeans(k1_id, (uint32_t)bucket_size, data + bucket_offest * dim, ids + bucket_offest, dim, threshold, blk_size,
+            recursive_kmeans(k1_id, bucket_size, data + bucket_offest * dim, ids + bucket_offest, dim, threshold, blk_size,
                              blk_num, data_writer, centroids_writer, centroids_id_writer, level + 1, kmpp, avg_len, niter, seed);
         }
     }
