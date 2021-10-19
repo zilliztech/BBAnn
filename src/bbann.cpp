@@ -307,7 +307,7 @@ void build_graph(const std::string &index_path, const int hnswM,
   assert(nidsdim == 1);
 
   // write sample data
-  auto index_hnsw = std::make_shared<hnswlib::HierarchicalNSW<DISTT>>(space, 4 * nblocks, hnswM, hnswefC);
+  auto index_hnsw = std::make_shared<hnswlib::HierarchicalNSW<DISTT>>(space, 8 * nblocks, hnswM, hnswefC);
 
   const uint32_t vec_size = sizeof(DATAT) * ndim;
   const uint32_t entry_size = vec_size + sizeof(uint32_t);
@@ -326,11 +326,13 @@ void build_graph(const std::string &index_path, const int hnswM,
   char * buf = new char[block_size];
   fh.read(buf, block_size);
   const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
+  int sample = 7;
   if (entry_num < 7) {
       std::cout<<"Warning some of the bucket is less than 7"<<std::endl;
+      sample = entry_num;
   }
   char *buf_begin = buf + sizeof(uint32_t);
-  for (int64_t j = 0; j < 3; j++) {
+  for (int64_t j = 0; j < sample; j++) {
     char *entry_begin = buf_begin + entry_size * j;
     index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin), gen_id(cid0, bid0, j + 1));
   }
@@ -350,11 +352,13 @@ void build_graph(const std::string &index_path, const int hnswM,
      fh.seekg(bid * block_size);
      fh.read(buf, block_size);
       const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
+      int sample = 7;
       if (entry_num < 7) {
           std::cout<<"Warning some of the bucket is less than 7"<<std::endl;
+          sample = entry_num;
       }
      char *buf_begin = buf + sizeof(uint32_t);
-     for (int64_t j = 0; j < 3; j++) {
+     for (int64_t j = 0; j < sample; j++) {
         char *entry_begin = buf_begin + entry_size * j;
         index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin), gen_id(cid, bid, j + 1));
      }
