@@ -35,7 +35,7 @@ class BbANN(BaseANN):
         """
         File name for the index.
         """
-        return f"{self.identifier}"
+        return f"{self.identifier}_index"
 
     def create_index_dir(self, dataset):
         """
@@ -55,6 +55,17 @@ class BbANN(BaseANN):
         os.makedirs(index_dir, mode=0o777, exist_ok=True)
         index_dir = os.path.join(index_dir, self.index_name())
         os.makedirs(index_dir, mode=0o777, exist_ok=True)
+        return index_dir
+
+    def get_index_dir(self, dataset):
+        if "overrideIndexPath" in self.index_params:
+            print("Override index path:", self.index_params["overrideIndexPath"])
+            return self.index_params["overrideIndexPath"]
+        index_dir = os.path.join(os.getcwd(), "data", "indices")
+        index_dir = os.path.join(index_dir, "T2")
+        index_dir = os.path.join(index_dir, self.__str__())
+        index_dir = os.path.join(index_dir, dataset.short_name())
+        index_dir = os.path.join(index_dir, self.index_name())
         return index_dir
 
     def set_index_type(self, ds_distance, ds_dtype):
@@ -108,8 +119,8 @@ class BbANN(BaseANN):
         and the index build paramters passed during construction.
         """
         ds = DATASETS[dataset]()
-        index_dir = self.create_index_dir(ds)
-        if not (os.path.exists(index_dir)) and 'url' not in self._index_params:
+        index_dir = self.get_index_dir(ds)
+        if not (os.path.exists(index_dir)) and 'url' not in self.index_params:
             return False
         if not self.set_index_type(ds.distance(), ds.dtype):
             return False

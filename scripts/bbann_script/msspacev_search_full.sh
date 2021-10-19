@@ -13,7 +13,7 @@ QUERY_FILE=/data/datasets/msspacev/query100K.fbin
 RESULT_OUTPUT_PREFIX=/data/answers/BBANN-msspacev-32-500-128-1-32-500-128-1/
 TRUTH_SET_FILE=/data/datasets/msspacev/msspacev-1B-gt
 # NPROBE
-NPROBE_LIST=(25 50 100 200 300 400 500 600 700 800 900 1000)
+NPROBE_LIST=(50 100 200 300 400 500)
 # REFINE_NPROBE
 # K
 K1=128
@@ -26,7 +26,7 @@ PAGE_PER_BLOCK=1
 echo "Please run this script with root permission."
 echo "Copy this file as well as analyze_stat.py to release/ folder, where project is compiled."
 
-echo "Data Type: uint8 for BIGANN"
+echo "Data Type: int8 for MSSPACE"
 echo "Index Folder: " $INDEX_PATH
 echo "QUERY_FILE: " $QUERY_FILE
 echo "Result Answer Path Prefix: " $RESULT_OUTPUT_PREFIX

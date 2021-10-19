@@ -36,7 +36,6 @@ void search_bbann(const std::string& index_path,
                    const uint64_t block_size,
                    Computer<DATAT, DATAT, DISTT>& dis_computer);
 
-
 template <typename DATAT, typename DISTT, typename HEAPT>
 void search_bbann_queryonly(
     const std::string &index_path, const int nprobe, const int hnsw_ef,

@@ -142,7 +142,6 @@ void DataReaderBindWrapper(py::module_ &m, const char *readerName) {
 
 PYBIND11_MODULE(bbannpy, m) {
   m.doc() = "TBD"; // optional module docstring
-
   py::bind_vector<std::vector<unsigned>>(m, "VectorUnsigned");
   py::bind_vector<std::vector<float>>(m, "VectorFloat");
 

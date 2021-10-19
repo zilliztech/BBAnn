@@ -32,6 +32,9 @@ constexpr static int MIN_SAME_SIZE_THRESHOLD = 500;
 
 constexpr static int MAX_SAME_SIZE_THRESHOLD = 1500;
 
+// the prunning rate of dynamic search
+constexpr static float SEARCH_PRUNING_RATE = 0.9;
+
 
 // file prefix strings and suffix strings
 // file name rule: prefix + file_name + file_type + suffix
