@@ -65,6 +65,40 @@ class BbANN(BaseANN):
         index_dir = os.path.join(index_dir, self.index_name())
         return index_dir
 
+    def get_index_components(self, dataset):
+        index_components = [
+            'bucket-centroids.bin', 'hnsw-index.bin'
+        ]
+
+        K1 = self.index_params.get("K1")
+        for i in range(K1):
+            raw_data = 'cluster-' + str(i) + '-global_ids.bin'
+            global_ids = 'cluster-' + str(i) + '-raw_data.bin'
+            index_components = index_components + [raw_data, global_ids]
+
+        ds = DATASETS[dataset]()
+        if ds.distance() == "ip":
+            index_components = index_components + [
+                'meta' # SQ Codebook
+            ]
+        return index_components
+
+    def index_files_to_store(self, dataset):
+        """
+        Specify a triplet with the local directory path of index files,
+        the common prefix name of index component(s) and a list of
+        index components that need to be uploaded to (after build)
+        or downloaded from (for search) cloud storage.
+        For local directory path under docker environment, please use
+        a directory under
+        data/indices/track(T1 or T2)/algo.__str__()/DATASETS[dataset]().short_name()
+        """
+
+        return [self.create_index_dir(DATASETS[dataset]()) # local_dir
+                , ""                                       # index_prefix
+                , self.get_index_components(dataset)       # components
+                ]
+
     def set_index_type(self, ds_distance, ds_dtype):
         if ds_distance == "euclidean":
             self.para.metric = bbannpy.L2
