@@ -31,6 +31,9 @@ class BbANN(BaseANN):
     def done(self):
         pass
 
+    def track(self):
+        return "T2"
+
     def index_name(self):
         """
         File name for the index.
