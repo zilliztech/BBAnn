@@ -28,7 +28,7 @@ void ssk_compute_dist_tab(int64_t nx, const T *x_in, int64_t dim, int64_t k,
   }
 }
 
-void ssk_init_assign(int64_t nx, int64_t k, uint64_t max_target_size,
+inline void ssk_init_assign(int64_t nx, int64_t k, uint64_t max_target_size,
                      const float *dis_tab, int64_t *hassign, int64_t *assign) {
   uint64_t remain = nx;
   std::vector<float> min_max_dist_diff(nx);
@@ -88,7 +88,7 @@ void ssk_init_assign(int64_t nx, int64_t k, uint64_t max_target_size,
   }
 }
 
-void ssk_print_cluster_size_stats(int64_t k, const int64_t *hassign) {
+inline void ssk_print_cluster_size_stats(int64_t k, const int64_t *hassign) {
   float mini = std::numeric_limits<float>::max(), maxi = 0, avg = 0;
   for (int64_t i = 0; i < k; ++i) {
     avg += hassign[i];

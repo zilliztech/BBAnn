@@ -2,6 +2,7 @@
 #include "ann_interface.h"
 
 #include "hnswlib/hnswalg.h"
+#include "bbann.h"
 #include <iostream>
 #include <memory>
 #include <stdint.h>
@@ -9,22 +10,6 @@
 
 namespace bbann {
 
-namespace consts {
-// num of clusters in the first round k-means
-// constexpr static int K1 = 10;
-// sample rate of the first round k-means
-constexpr static float K1_SAMPLE_RATE = 0.01;
-// sample rate of the pq train set
-constexpr static float PQ_SAMPLE_RATE = 0.01;
-// the threshold of the second round k-means, if the size of cluster is larger
-// than this threshold, than do ((cluster size)/threshold)-means
-constexpr static int SPLIT_THRESHOLD = 500;
-// the max cluster number in hierarchical_cluster
-constexpr static int MAX_CLUSTER_K2 = 500;
-
-constexpr static int KMEANS_THRESHOLD = 2000;
-
-} // namespace consts
 struct BBAnnParameters {
   std::string dataFilePath;
   std::string indexPrefixPath;
@@ -76,14 +61,6 @@ public:
   std::string getHnswIndexFileName() { return indexPrefix_ + "hnsw-index.bin"; }
   std::string getBucketCentroidsFileName() {
     return indexPrefix_ + "bucket-centroids.bin";
-  }
-  std::string getClusterRawDataFileName(int cluster_id) {
-    return indexPrefix_ + "cluster-" + std::to_string(cluster_id) +
-           "-raw_data.bin";
-  }
-  std::string getClusterGlobalIdsFileName(int cluster_id) {
-    return indexPrefix_ + "cluster-" + std::to_string(cluster_id) +
-           "-global_ids.bin";
   }
 };
 

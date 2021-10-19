@@ -60,10 +60,3 @@ public:
                               std::vector<std::vector<float>> &dists,
                               std::vector<uint64_t> &lims) = 0;
 };
-namespace bbann {
-enum class MetricType {
-  None = 0,
-  L2 = 1,
-  IP = 2,
-};
-}
