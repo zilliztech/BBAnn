@@ -1095,12 +1095,10 @@ void BBAnnIndex2<dataT>::BuildWithParameter(const BBAnnParameters para) {
 }
 
 template <typename dataT>
-void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
-                                        uint64_t numQuery, double radius,
-                                        const BBAnnParameters para,
-                                        std::vector<std::vector<uint32_t>> &ids,
-                                        std::vector<std::vector<float>> &dists,
-                                        std::vector<uint64_t> &lims) {
+std::tuple<std::vector<uint32_t>, std::vector<float>, std::vector<uint64_t>>
+BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
+                                   uint64_t numQuery, double radius,
+                                   const BBAnnParameters para) {
   TimeRecorder rc("range search bbann");
 
   std::cout << "range search bigann parameters:" << std::endl;
@@ -1127,7 +1125,7 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
     query_float[i] = (float)pquery[i];
   }
   std::cout << " prepared query_float" << std::endl;
-  //std::vector<uint32_t> *bucket_labels = new std::vector<uint32_t>[numQuery];
+  // std::vector<uint32_t> *bucket_labels = new std::vector<uint32_t>[numQuery];
   std::vector<std::pair<uint32_t, uint32_t>> qid_bucketLabel;
 
   std::map<int, int> bucket_hit_cnt, hit_cnt_cnt, return_cnt;
@@ -1163,8 +1161,12 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
   const uint32_t entry_size = vec_size + sizeof(uint32_t);
 
   // -- a function that reads the file for bucketid/queryid in
-  // bucketToQuery[a..b], returns the total number of queries executed.
-  auto run_bucket_scan = [&, this, para, pquery](int l, int r) -> uint32_t {
+  // bucketToQuery[a..b]
+  //
+  auto run_bucket_scan =
+      [&, this, para, pquery](int l, int r) -> std::list<qidIdDistTupleType> {
+    /* return a list of tuple <queryid, id, dist>:*/
+    std::list<qidIdDistTupleType> ret;
     std::vector<char> buf_v(para.blockSize);
     char *buf = &buf_v[0];
     auto dis_computer = select_computer<dataT, dataT, distanceT>(para.metric);
@@ -1181,38 +1183,63 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
         auto dis =
             dis_computer(reinterpret_cast<dataT *>(entry_begin), q_idx, dim);
         if (dis < radius) {
-          dists[qid].push_back(dis);
-          ids[qid].push_back(
-              *reinterpret_cast<uint32_t *>(entry_begin + vec_size));
+          const uint32_t id =
+              *reinterpret_cast<uint32_t *>(entry_begin + vec_size);
+          ret.push_back(std::make_tuple(qid, id, dis));
         }
       }
     }
-    return r - l;
+    return ret;
   };
   std::cout << "Need to access bucket data for " << bucketToQuery.size()
             << " times, " << std::endl;
   uint32_t totQuery = 0;
+  uint32_t totReturn = 0;
   int nparts_block = 64;
+  std::vector<qidIdDistTupleType> ans_list;
 #pragma omp parallel for
-  for( uint64_t partID = 0; partID < nparts_block; partID++) {
+  for (uint64_t partID = 0; partID < nparts_block; partID++) {
     uint32_t low = partID * bucketToQuery.size() / nparts_block;
     uint32_t high = (partID + 1) * bucketToQuery.size() / nparts_block;
-    totQuery += run_bucket_scan(low, high);
-    std::cout << "finished " << totQuery << std::endl;
+    totQuery += (high - low);
+    auto qid_id_dist = run_bucket_scan(low, high);
+    totReturn += qid_id_dist.size();
+    std::move(qid_id_dist.begin(), qid_id_dist.end(),
+              std::back_inserter(ans_list));
+    std::cout << "finished " << totQuery << "queries, returned " << totReturn
+              << " answers" << std::endl;
   }
   rc.RecordSection("scan blocks done");
-
-  int64_t idx = 0;
-  for (int64_t i = 0; i < numQuery; ++i) {
-    lims[i] = idx;
-    idx += ids[i].size();
+  sort(ans_list.begin(), ans_list.end());
+  std::vector<uint32_t> ids;
+  std::vector<float> dists;
+  std::vector<uint64_t> lims(numQuery + 1);
+  int lims_index = 0;
+  for (auto const &[qid, ansid, dist] : ans_list) {
+    //std::cout << qid << " " << ansid << " " << dist << std::endl;
+    while (lims_index < qid) {
+      lims[lims_index] = ids.size();
+      // std::cout << "lims" << lims_index << "!" << lims[lims_index] << std::endl;
+      lims_index++;
+    }
+    if (lims[qid] == 0 && qid == lims_index) {
+      lims[qid] = ids.size();
+      // std::cout << "lims" << qid << " " << lims[qid] << std::endl;
+      lims_index++;
+    }
+    ids.push_back(ansid);
+    dists.push_back(dist);
+    // std::cout << "ansid " << ansid << " " << ids[lims[qid]] << std::endl;
   }
-  lims[numQuery] = idx;
+  while (lims_index <= numQuery) {
+    lims[lims_index] = ids.size();
+    lims_index++;
+  }
 
   rc.RecordSection("format answer done");
 
-  //delete[] bucket_labels;
   rc.ElapseFromBegin("range search bbann totally done");
+  return std::make_tuple(ids, dists, lims);
 }
 
 #define BBANNLIB_DECL(dataT)                                                   \
@@ -1223,10 +1250,11 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
       distanceT *answer_dists);                                                \
   template void BBAnnIndex2<dataT>::BuildIndexImpl(                            \
       const BBAnnParameters para);                                             \
-  template void BBAnnIndex2<dataT>::RangeSearchCpp(                            \
-      const dataT *pquery, uint64_t dim, uint64_t numQuery, double radius,     \
-      const BBAnnParameters para, std::vector<std::vector<uint32_t>> &ids,     \
-      std::vector<std::vector<float>> &dists, std::vector<uint64_t> &lims);
+  template std::tuple<std::vector<uint32_t>, std::vector<float>,               \
+                      std::vector<uint64_t>>                                   \
+  BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,        \
+                                     uint64_t numQuery, double radius,         \
+                                     const BBAnnParameters para);
 
 BBANNLIB_DECL(float);
 BBANNLIB_DECL(uint8_t);

@@ -52,13 +52,12 @@ public:
 
   // Range search with a radius, returns vectors's ids and distances within that
   // radius from each query, the lims array represents prefix sums of results'
-  // lengths
-  virtual void RangeSearchCpp(const dataT *pquery, uint64_t dim,
+  // lengths -- 
+  // TODO(!!!!! -- updatedoc)
+  virtual std::tuple<std::vector<uint32_t>, std::vector<float>, std::vector<uint64_t>>
+ RangeSearchCpp(const dataT *pquery, uint64_t dim,
                               uint64_t numQuery, double radius,
-                              const paraT para,
-                              std::vector<std::vector<uint32_t>> &ids,
-                              std::vector<std::vector<float>> &dists,
-                              std::vector<uint64_t> &lims) = 0;
+                              const paraT para) = 0;
 };
 namespace bbann {
 enum class MetricType {

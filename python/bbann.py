@@ -133,9 +133,9 @@ class BbANN(BaseANN):
         nq, dim = (np.shape(X))
         self.rangeres_lim, (self.rangeres_ids, self.rangeres_dists) = self.index.range_search(
             X, dim, nq, radius, self.para)
-        print(self.rangeres_lim[0:10])
-        print(self.rangeres_ids[self.rangeres_lim[0]:self.rangeres_lim[1]])
-        print(self.rangeres_dists[self.rangeres_lim[0]:self.rangeres_lim[1]])
+        print(self.rangeres_lim[-100:-1])
+        print(self.rangeres_ids)
+        print(self.rangeres_dists)
 
     def get_results(self):
         """
