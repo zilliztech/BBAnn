@@ -307,7 +307,7 @@ void build_graph(const std::string &index_path, const int hnswM,
   assert(nidsdim == 1);
 
   // write sample data
-  auto index_hnsw = std::make_shared<hnswlib::HierarchicalNSW<DISTT>>(space, 8 * nblocks, hnswM, hnswefC);
+  auto index_hnsw = std::make_shared<hnswlib::HierarchicalNSW<DISTT>>(space, 4 * nblocks, hnswM, hnswefC);
 
   const uint32_t vec_size = sizeof(DATAT) * ndim;
   const uint32_t entry_size = vec_size + sizeof(uint32_t);
@@ -317,13 +317,16 @@ void build_graph(const std::string &index_path, const int hnswM,
   parse_global_block_id(pids[0], cid0, bid0);
   std::string cluster_file_path = index_path + CLUSTER + std::to_string(cid0) + "-" + RAWDATA + BIN;
   auto fh = std::ifstream(cluster_file_path, std::ios::binary);
+
+  uint64_t file_size = fsize(cluster_file_path);
+
   assert(!fh.fail());
 
   fh.seekg(bid0 * block_size);
   char * buf = new char[block_size];
   fh.read(buf, block_size);
   char *buf_begin = buf + sizeof(uint32_t);
-  for (int64_t j = 0; j < 7; j++) {
+  for (int64_t j = 0; j < 3; j++) {
     char *entry_begin = buf_begin + entry_size * j;
     index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin), gen_id(cid0, bid0, j + 1));
   }
@@ -343,7 +346,7 @@ void build_graph(const std::string &index_path, const int hnswM,
      fh.seekg(bid * block_size);
      fh.read(buf, block_size);
      char *buf_begin = buf + sizeof(uint32_t);
-     for (int64_t j = 0; j < 7; j++) {
+     for (int64_t j = 0; j < 3; j++) {
         char *entry_begin = buf_begin + entry_size * j;
         index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin), gen_id(cid, bid, j + 1));
      }
