@@ -35,6 +35,8 @@ constexpr static int MAX_SAME_SIZE_THRESHOLD = 1500;
 // the prunning rate of dynamic search
 constexpr static float SEARCH_PRUNING_RATE = 0.9;
 
+// how many data will be feeded into HNSW from 1 block
+constexpr static int HNSW_SAMPLE_RATE = 4;
 
 // file prefix strings and suffix strings
 // file name rule: prefix + file_name + file_type + suffix
@@ -50,6 +52,7 @@ constexpr const char* PQ = "pq-";
 
 // file type
 constexpr const char* CENTROIDS = "centroids";
+constexpr const char* HNSWSAMPLE = "hnsw_sample";
 constexpr const char* PQ_CENTROIDS = "pq_centroids";
 constexpr const char* COMBINE_IDS = "combine_ids";
 constexpr const char* GLOBAL_IDS = "global_ids";

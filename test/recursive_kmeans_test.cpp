@@ -24,8 +24,10 @@ void  hierarchical_clusters() {
 
     std::string bucket_centroids_file = "centroids";
     std::string bucket_centroids_id_file = "centroids_id";
+    std::string sample_file = "sample_file";
     IOWriter centroids_writer(bucket_centroids_file);
     IOWriter centroids_id_writer(bucket_centroids_id_file);
+    IOWriter sample_writer(sample_file);
     uint32_t placeholder = 1;
     char* data_blk_buf = new char[blk_size];
     centroids_writer.write((char*)&placeholder, sizeof(uint32_t));
@@ -55,6 +57,7 @@ void  hierarchical_clusters() {
         uint8_t* datai = new uint8_t[cluster_size * cluster_dim];
         uint32_t* idi = new uint32_t[ids_size * ids_dim];
         uint32_t blk_num = 0;
+        uint32_t sample_num = 0;
         data_reader.read((char*)datai, cluster_size * cluster_dim * sizeof(uint8_t));
         for (int i=0;i<ids_size;i++)
         {
@@ -80,7 +83,7 @@ void  hierarchical_clusters() {
         threshold = blk_size / entry_size;
         cout<<"threshold"<<threshold<<endl;
 
-        recursive_kmeans<uint8_t>(i, 1000000, datai, idi, cluster_dim, threshold, blk_size, blk_num, data_writer, centroids_writer, centroids_id_writer, 0, false);
+        recursive_kmeans<uint8_t>(i, 1000000, datai, idi, cluster_dim, threshold, blk_size, blk_num,sample_num, data_writer, sample_writer, centroids_writer, centroids_id_writer, 0, false);
 
         global_centroids_number += blk_num;
 

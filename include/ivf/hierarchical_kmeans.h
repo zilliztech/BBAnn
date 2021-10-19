@@ -152,7 +152,7 @@ void merge_clusters(LevelType level, int64_t dim, int64_t nx, int64_t& k, const 
 
 template <typename T>
 void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* ids, int64_t dim, uint32_t threshold, const uint64_t blk_size,
-                      uint32_t& blk_num, IOWriter& data_writer, IOWriter& centroids_writer, IOWriter& centroids_id_writer, int level,
+                      uint32_t& blk_num, uint32_t& sample_number, IOWriter& data_writer, IOWriter& sample_writer, IOWriter& centroids_writer, IOWriter& centroids_id_writer, int level,
                       bool kmpp = false, float avg_len = 0.0, int64_t niter = 10, int64_t seed = 1234) {
     float weight = 0;
     int vector_size = sizeof(T) * dim;
@@ -237,6 +237,7 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
     int entry_size = vector_size + id_size;
     uint32_t global_id;
 
+    int sample = HNSW_SAMPLE_RATE <= sizeof(T) ? 1 : HNSW_SAMPLE_RATE/sizeof(T);
     char* data_blk_buf = new char[blk_size];
     for(int i=0; i < k2; i++) {
         if (i == 0) {
@@ -261,13 +262,17 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
             global_id = gen_global_block_id(k1_id, blk_num);
 
             data_writer.write((char *) data_blk_buf, blk_size);
+            //sample the first few element
+            for (int j = 0; j < sample; j++) {
+                sample_writer.write((char *)(data + dim * (bucket_offest + j)), vector_size);
+            }
             centroids_writer.write((char *) (k2_centroids.data() + i * dim), sizeof(float) * dim);
             centroids_id_writer.write((char *) (&global_id), sizeof(uint32_t));
             blk_num++;
-
+            sample_number += sample;
         } else {
             recursive_kmeans(k1_id, bucket_size, data + bucket_offest * dim, ids + bucket_offest, dim, threshold, blk_size,
-                             blk_num, data_writer, centroids_writer, centroids_id_writer, level + 1, kmpp, avg_len, niter, seed);
+                             blk_num, sample_number, data_writer, sample_writer, centroids_writer, centroids_id_writer, level + 1, kmpp, avg_len, niter, seed);
         }
     }
     delete [] data_blk_buf;

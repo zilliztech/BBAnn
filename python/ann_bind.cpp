@@ -62,7 +62,7 @@ template <typename dataT> struct BBAnnIndex {
 
     hnswlib::SpaceInterface<float> *space = nullptr;
     if (MetricType::L2 == metric_) {
-      space = new hnswlib::L2Space(dim);
+      space = new hnswlib::L2Space<float, float>(dim);
     } else if (MetricType::IP == metric_) {
       space = new hnswlib::InnerProductSpace(dim);
     }
