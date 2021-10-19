@@ -346,7 +346,6 @@ namespace hnswlib {
           vl_type visited_array_tag = vl->curV;
 
           std::queue<std::pair<dist_t, tableint>> radius_queue;
-          float half_radius = radius/2; 
           while (!top_candidates.empty()) {
             auto cand = top_candidates.top();
             top_candidates.pop();

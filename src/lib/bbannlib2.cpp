@@ -450,8 +450,7 @@ void kmeans(int64_t nx, const T *x_in, int64_t dim, int64_t k, float *centroids,
 
       if (fabs(cur_err - err) < err * 0.01) {
         // std::cout << "exit kmeans iteration after the " << i
-        //           << "th iteration, err = " << err << ", cur_err = " <<
-        //           cur_err
+        //           << "th iteration, err = " << err << ", cur_err = " << cur_err
         //           << std::endl;
         break;
       }
@@ -471,10 +470,6 @@ void kmeans(int64_t nx, const T *x_in, int64_t dim, int64_t k, float *centroids,
       mn = hassign[i];
     // std::cout<<hassign[i]<<std::endl;
   }
-  // std::cout << "after the kmeans with nx = " << nx << ", k = " << k << ", has
-  // "
-  //           << empty_cnt << " empty clusters,"
-  //           << " max cluster: " << mx << " min cluster: " << mn << std::endl;
 }
 
 template <typename DATAT>
@@ -942,11 +937,6 @@ void search_bbann_queryonly(
     delete[] queryi;
   }
   rc.ElapseFromBegin("search+graph+done.");
-  for (int i = 0; i < 10; i++) {
-    for (int j = 0; j < para.nProbe; j++)
-      std::cout << bucket_labels[i * para.nProbe + j] << " ";
-    std::cout << std::endl;
-  }
   rc.RecordSection("search buckets done.");
 
   uint32_t cid, bid;
