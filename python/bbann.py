@@ -10,6 +10,7 @@ import bbannpy
 
 class BbANN(BaseANN):
     def __init__(self, metric, index_params):
+        self.name = "BBANN"
         self.metric = metric
         self.index_params = index_params
         self.identifier = index_params.get("identifier")
@@ -180,7 +181,7 @@ class BbANN(BaseANN):
         return {}
 
     def __str__(self):
-        return "BBANN"
+        return self.name
 
     def get_memory_usage(self):
         """Return the current memory usage of this algorithm instance
