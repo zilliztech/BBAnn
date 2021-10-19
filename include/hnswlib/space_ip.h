@@ -64,6 +64,7 @@ namespace hnswlib {
         return 1.0f - sum;
 }
 
+
 #elif defined(USE_SSE)
 
     static float
