@@ -67,7 +67,7 @@ class BbANN(BaseANN):
 
     def get_index_components(self, dataset):
         index_components = [
-            'bucket-centroids.bin', 'hnsw-index.bin'
+            'bucket-centroids.bin', 'hnsw-index.bin', 'cluster-combine_ids.bin'
         ]
 
         K1 = self.index_params.get("K1")
@@ -79,7 +79,7 @@ class BbANN(BaseANN):
         ds = DATASETS[dataset]()
         if ds.distance() == "ip":
             index_components = index_components + [
-                'meta' # SQ Codebook
+                'meta' # SQ Codebook for TextToImage IP
             ]
         return index_components
 
