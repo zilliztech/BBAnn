@@ -279,92 +279,93 @@ hnswlib::SpaceInterface<uint32_t>* getDistanceSpace<uint8_t, uint32_t>(MetricTyp
 template <typename DATAT, typename DISTT>
 void build_graph(const std::string &index_path, const int hnswM,
                  const int hnswefC, MetricType metric_type, const uint64_t block_size) {
-  TimeRecorder rc("create_graph_index");
-  std::cout << "build hnsw parameters:" << std::endl;
-  std::cout << " index_path: " << index_path << " hnsw.M: " << hnswM
-            << " hnsw.efConstruction: " << hnswefC
-            << " metric_type: " << (int)metric_type << std::endl;
+    TimeRecorder rc("create_graph_index");
+    std::cout << "build hnsw parameters:" << std::endl;
+    std::cout << " index_path: " << index_path << " hnsw.M: " << hnswM
+              << " hnsw.efConstruction: " << hnswefC
+              << " metric_type: " << (int) metric_type << std::endl;
 
-  DATAT *pdata = nullptr;
-  uint32_t *pids = nullptr;
-  uint32_t nblocks, ndim, nids, nidsdim;
+    DATAT *pdata = nullptr;
+    uint32_t *pids = nullptr;
+    uint32_t nblocks, ndim, nids, nidsdim;
 
-  // read centroids
-  read_bin_file<DATAT>(index_path + BUCKET + CENTROIDS + BIN, pdata, nblocks, ndim);
+    // read centroids
+    read_bin_file<DATAT>(index_path + BUCKET + CENTROIDS + BIN, pdata, nblocks, ndim);
 
-  rc.RecordSection("load centroids of buckets done");
-  std::cout << "there are " << nblocks << " of dimension " << ndim
-            << " points of hnsw" << std::endl;
-  assert(pdata != nullptr);
-  hnswlib::SpaceInterface<DISTT> *space = getDistanceSpace<DATAT, DISTT>(metric_type, ndim);
+    rc.RecordSection("load centroids of buckets done");
+    std::cout << "there are " << nblocks << " of dimension " << ndim
+              << " points of hnsw" << std::endl;
+    assert(pdata != nullptr);
+    hnswlib::SpaceInterface<DISTT> *space = getDistanceSpace<DATAT, DISTT>(metric_type, ndim);
 
-  read_bin_file<uint32_t>(index_path + CLUSTER + COMBINE_IDS + BIN, pids, nids,nidsdim);
-  rc.RecordSection("load combine ids of buckets done");
-  std::cout << "there are " << nids << " of dimension " << nidsdim
-            << " combine ids of hnsw" << std::endl;
-  assert(pids != nullptr);
-  assert(nblocks == nids);
-  assert(nidsdim == 1);
+    read_bin_file<uint32_t>(index_path + CLUSTER + COMBINE_IDS + BIN, pids, nids, nidsdim);
+    rc.RecordSection("load combine ids of buckets done");
+    std::cout << "there are " << nids << " of dimension " << nidsdim
+              << " combine ids of hnsw" << std::endl;
+    assert(pids != nullptr);
+    assert(nblocks == nids);
+    assert(nidsdim == 1);
 
-  // write sample data
-  auto index_hnsw = std::make_shared<hnswlib::HierarchicalNSW<DISTT>>(space, 8 * nblocks, hnswM, hnswefC);
 
-  const uint32_t vec_size = sizeof(DATAT) * ndim;
-  const uint32_t entry_size = vec_size + sizeof(uint32_t);
+    int sample = HNSW_BUCKET_SAMPLE <= sizeof(DATAT) ? 1 : HNSW_BUCKET_SAMPLE / sizeof(DATAT);
+    // write sample data
+    auto index_hnsw = std::make_shared<hnswlib::HierarchicalNSW<DISTT>>(space, sample * nblocks, hnswM, hnswefC);
 
-  // add sample data
-  uint32_t cid0, bid0;
-  parse_global_block_id(pids[0], cid0, bid0);
-  std::string cluster_file_path = index_path + CLUSTER + std::to_string(cid0) + "-" + RAWDATA + BIN;
-  auto fh = std::ifstream(cluster_file_path, std::ios::binary);
+    const uint32_t vec_size = sizeof(DATAT) * ndim;
+    const uint32_t entry_size = vec_size + sizeof(uint32_t);
 
-  uint64_t file_size = fsize(cluster_file_path);
 
-  assert(!fh.fail());
-
-  fh.seekg(bid0 * block_size);
-  char * buf = new char[block_size];
-  fh.read(buf, block_size);
-  const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
-  int sample = 7;
-  if (entry_num < 7) {
-      std::cout<<"Warning some of the bucket is less than 7"<<std::endl;
-      sample = entry_num;
-  }
-  char *buf_begin = buf + sizeof(uint32_t);
-  for (int64_t j = 0; j < sample; j++) {
-    char *entry_begin = buf_begin + entry_size * j;
-    index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin), gen_id(cid0, bid0, j + 1));
-  }
-  delete[] buf;
-  fh.close();
-
-  // add centroids
-  index_hnsw->addPoint(pdata, gen_id(cid0, bid0, 0));
+    uint32_t cid0, bid0;
+    parse_global_block_id(pids[0], cid0, bid0);
+    // add centroids
+    index_hnsw->addPoint(pdata, gen_id(cid0, bid0, 0));
+    if (sample != 1) {
+        // add sample data
+        std::string cluster_file_path = index_path + CLUSTER + std::to_string(cid0) + "-" + RAWDATA + BIN;
+        auto fh = std::ifstream(cluster_file_path, std::ios::binary);
+        assert(!fh.fail());
+        char *buf = new char[block_size];
+        fh.seekg(bid0 * block_size);
+        fh.read(buf, block_size);
+        const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
+        int bucketSample = sample - 1;
+        if (bucketSample > entry_num) {
+            bucketSample = entry_num;
+        }
+        char *buf_begin = buf + sizeof(uint32_t);
+        for (int64_t j = 0; j < bucketSample; j++) {
+            char *entry_begin = buf_begin + entry_size * j;
+            index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin), gen_id(cid0, bid0, j + 1));
+        }
+        delete[] buf;
+        fh.close();
+    }
 #pragma omp parallel for
   for (int64_t i = 1; i < nblocks; i++) {
      uint32_t cid, bid;
      parse_global_block_id(pids[i], cid, bid);
-     std::string cluster_file_path = index_path + CLUSTER + std::to_string(cid) + "-" + RAWDATA + BIN;
-     auto fh = std::ifstream(cluster_file_path, std::ios::binary);
-     assert(!fh.fail());
-     char * buf = new char[block_size];
-     fh.seekg(bid * block_size);
-     fh.read(buf, block_size);
-      const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
-      int sample = 7;
-      if (entry_num < 7) {
-          std::cout<<"Warning some of the bucket is less than 7"<<std::endl;
-          sample = entry_num;
-      }
-     char *buf_begin = buf + sizeof(uint32_t);
-     for (int64_t j = 0; j < sample; j++) {
-        char *entry_begin = buf_begin + entry_size * j;
-        index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin), gen_id(cid, bid, j + 1));
-     }
-     delete[] buf;
-     fh.close();
      index_hnsw->addPoint(pdata + i * ndim, gen_id(cid, bid, 0));
+     if (sample != 1) {
+         // add sample data
+         std::string cluster_file_path = index_path + CLUSTER + std::to_string(cid) + "-" + RAWDATA + BIN;
+         auto fh = std::ifstream(cluster_file_path, std::ios::binary);
+         assert(!fh.fail());
+         char *buf = new char[block_size];
+         fh.seekg(bid * block_size);
+         fh.read(buf, block_size);
+         const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
+         int bucketSample = sample - 1;
+         if (bucketSample > entry_num) {
+             bucketSample = entry_num;
+         }
+         char *buf_begin = buf + sizeof(uint32_t);
+         for (int64_t j = 0; j < bucketSample; j++) {
+             char *entry_begin = buf_begin + entry_size * j;
+             index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin), gen_id(cid, bid, j + 1));
+         }
+         delete[] buf;
+         fh.close();
+     }
   }
 
   rc.RecordSection("create index hnsw done");
@@ -430,16 +431,16 @@ void build_bbann(const std::string &raw_data_bin_file,
   float *centroids = nullptr;
   double avg_len;
   // sampling and do K1-means to get the first round centroids
-  //train_cluster<DATAT>(raw_data_bin_file, output_path, K1, &centroids, avg_len);
+  train_cluster<DATAT>(raw_data_bin_file, output_path, K1, &centroids, avg_len);
   assert(centroids != nullptr);
   rc.RecordSection("train cluster to get " + std::to_string(K1) +
                    " centroids done.");
 
-  //divide_raw_data<DATAT, DISTT, HEAPT>(raw_data_bin_file, output_path,centroids, K1);
+  divide_raw_data<DATAT, DISTT, HEAPT>(raw_data_bin_file, output_path,centroids, K1);
   rc.RecordSection("divide raw data into " + std::to_string(K1) +
                    " clusters done");
 
-  //hierarchical_clusters<DATAT, DISTT, HEAPT>(output_path, K1, avg_len,block_size);
+  hierarchical_clusters<DATAT, DISTT, HEAPT>(output_path, K1, avg_len,block_size);
   rc.RecordSection("conquer each cluster into buckets done");
 
   build_graph<DATAT, DISTT>(output_path, hnswM, hnswefC, metric_type, block_size);
