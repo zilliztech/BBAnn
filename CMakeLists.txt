@@ -9,12 +9,6 @@ set (CMAKE_CXX_FLAGS "-g -O3 ${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 find_package(Threads REQUIRED)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
-# include(BundledGTest)
-# include(Gbenchmark)
-include(EnableAddressSanitizer)
-include(EnableUndefinedSanitizer)
-
 if (OPENMP_FOUND)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
@@ -46,19 +40,13 @@ include_directories(include)
 
 add_subdirectory(src)
 
-add_executable(build_bigann build_bigann.cpp)
-add_executable(search_bigann search_bigann.cpp)
 add_executable(build_bbann build_bbann.cpp)
 add_executable(search_bbann search_bbann.cpp)
 
 add_subdirectory(test)
-add_subdirectory(playground)
 add_subdirectory(scripts)
 
-target_link_libraries(build_bigann BigAnn)
-target_link_libraries(search_bigann BigAnn)
 target_link_libraries(build_bbann BBAnn)
 target_link_libraries(search_bbann BBAnn)
-
 
 add_compile_options(-march=native)
