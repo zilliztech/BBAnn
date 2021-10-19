@@ -17,7 +17,6 @@
 #include "lib/bbannlib2.h"
 using bbann::BBAnnIndex2;
 using bbann::BBAnnParameters;
-using bbann::MetricType;
 #endif
 
 namespace py = pybind11;

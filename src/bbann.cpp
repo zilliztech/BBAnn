@@ -1378,6 +1378,11 @@ void search_bbann_queryonly(
       const int K1, const uint64_t block_size,                                 \
       Computer<DATAT, DATAT, DISTT> &dis_computer);
 
+#define TRAIN_CLUSTER_DECL(DATAT)                                              \
+  template void train_cluster<DATAT>(                                          \
+      const std::string &raw_data_bin_file, const std::string &output_path,    \
+      const int32_t K1, float **centroids, double &avg_len);
+
 BUILD_BBANN_DECL(uint8_t, uint32_t, CMin)
 BUILD_BBANN_DECL(uint8_t, uint32_t, CMax)
 BUILD_BBANN_DECL(int8_t, int32_t, CMin)
@@ -1398,3 +1403,7 @@ SEARCH_BBANN_ONLY_DECL(int8_t, int32_t, CMin)
 SEARCH_BBANN_ONLY_DECL(int8_t, int32_t, CMax)
 SEARCH_BBANN_ONLY_DECL(float, float, CMin)
 SEARCH_BBANN_ONLY_DECL(float, float, CMax)
+
+TRAIN_CLUSTER_DECL(uint8_t);
+TRAIN_CLUSTER_DECL(int8_t);
+TRAIN_CLUSTER_DECL(float);
