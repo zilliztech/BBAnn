@@ -3,6 +3,7 @@
 #include "ivf/kmeans.h"
 #include "ivf/balanced_kmeans.h"
 #include "ivf/same_size_kmeans.h"
+#include <mutex>
 
 template<typename T>
 void find_nearest_large_bucket (
@@ -149,6 +150,194 @@ void merge_clusters(LevelType level, int64_t dim, int64_t nx, int64_t& k, const 
     return ;
 }
 
+struct ClusteringTask{
+    ClusteringTask(int64_t o, int64_t n, int64_t l)
+    : offset(o), num_elems(n), level(l) {}
+    int64_t offset;
+    int64_t num_elems;
+    int64_t level;
+};
+
+template <typename T>
+void non_recursive_multilevel_kmeans(uint32_t k1_id, // the index of k1 round k-means
+                                     int64_t cluster_size, // num vectors in this cluster
+                                     T* data, // buffer to place all vectors
+                                     uint32_t* ids, // buffer to place all ids
+                                     int64_t round_offset, // the offset of to clustering data in this round
+                                     int64_t dim, // the dimension of vector
+                                     uint32_t threshold, // determines when to stop recursive clustering
+                                     const uint64_t blk_size, // general 4096, determines how many vectors can be placed in a block
+                                     uint32_t& blk_num, // output variable, num block output in this round clustering
+                                     IOWriter& data_writer, // file writer 1: to output base vectors
+                                     IOWriter& centroids_writer, // file writer 2: to output centroid vectors
+                                     IOWriter& centroids_id_writer, // file writer 3: to output centroid ids
+                                     int64_t centroids_id_start_position, // the start position of all centroids id
+                                     int level, // n-th round recursive clustering, start with 0
+                                     std::mutex &mutex, // mutex to protect write out centroids
+                                     std::vector<ClusteringTask> &output_tasks, // output clustering tasks
+                                     bool kmpp = false, // k-means parameter
+                                     float avg_len = 0.0, // k-means parameter
+                                     int64_t niter = 10, // k-means parameter
+                                     int64_t seed = 1234 // k-means parameter
+                                     ) {
+    // move pointer to current round
+    data = data + round_offset * dim;
+    ids = ids + round_offset;
+
+    float weight = 0;
+    int64_t vector_size = sizeof(T) * dim;
+    int64_t id_size = sizeof(uint32_t);
+
+    // Step 0: set the num of cluster in this round clustering
+
+    int64_t k2 = -1; // num cluster in this round clustering
+    bool do_same_size_kmeans = (LevelType (level) >= LevelType ::BALANCE_LEVEL) ||
+                               +                               (LevelType (level) == LevelType ::THIRTH_LEVEL && cluster_size >= MIN_SAME_SIZE_THRESHOLD && cluster_size <= MAX_SAME_SIZE_THRESHOLD);
+    if (do_same_size_kmeans) {
+        k2 = std::max((cluster_size + threshold - 1) / threshold, 1L);
+    } else {
+        k2 = int64_t(sqrt(cluster_size/threshold)) + 1;
+        k2 = k2 < MAX_CLUSTER_K2 ? k2 : MAX_CLUSTER_K2;
+    }
+    assert(k2 != -1);
+    std::cout << "step 0: set k2: "
+              << "[level " << level << "] "
+              << "[cluster_size " << cluster_size << "] "
+              << "[k2 " << k2 << "] "
+              << "[do same size kmeans " << do_same_size_kmeans << "] "
+              << std::endl;
+
+    // Step 1: clustering
+
+    std::vector<float> k2_centroids(k2 * dim, 0.0);
+    std::vector<int64_t> cluster_id(cluster_size, -1);
+
+    if (do_same_size_kmeans) {
+        //use same size kmeans or graph partition
+        k2 = std::max((cluster_size + threshold - 1) / threshold, 1L);
+        same_size_kmeans<T>(cluster_size, data, dim, k2, k2_centroids.data(), cluster_id.data(), kmpp, avg_len, niter, seed);
+    } else {
+        int64_t train_size = cluster_size;
+        T* train_data = nullptr;
+        if (cluster_size > k2 * K2_MAX_POINTS_PER_CENTROID) {
+            train_size = k2 * K2_MAX_POINTS_PER_CENTROID;
+            train_data = new T [train_size * dim];
+            random_sampling_k2(data, cluster_size, dim, train_size, train_data, seed);
+        } else {
+            train_data = data;
+        }
+        kmeans<T>(train_size, train_data, dim, k2, k2_centroids.data(), kmpp, avg_len, niter, seed);
+        if(cluster_size > k2 * K2_MAX_POINTS_PER_CENTROID) {
+            delete [] train_data;
+        }
+
+        // Dynamic balance constraint K-means:
+        // balanced_kmeans<T>(cluster_size, data, dim, k2, k2_centroids, weight, kmpp, avg_len, niter, seed);
+        std::vector<float> dists(cluster_size, -1);
+        if ( weight != 0 && cluster_size <= KMEANS_THRESHOLD ) {
+            dynamic_assign<T, float, float>(data, k2_centroids.data(), dim, cluster_size, k2, weight, cluster_id.data(), dists.data());
+        } else {
+            elkan_L2_assign<T, float, float>(data, k2_centroids.data(), dim, cluster_size, k2, cluster_id.data(), dists.data());
+        }
+
+        //dists is useless, so delete first
+        std::vector<float>().swap(dists);
+
+        merge_clusters<T>((LevelType)level, dim, cluster_size, k2, data, cluster_id, k2_centroids, avg_len);
+
+        //split_clusters_half(dim, k2, cluster_size, data, nullptr, cluster_id.data(), k2_centroids, avg_len);
+    }
+    std::cout << "step 1: clustering: " << "cluster centroids be wrote into k2_centroids and cluster_id: "
+              << std::endl;
+
+
+    // Step 2: reorder data by cluster id
+
+    std::vector<int64_t> bucket_pre_size(k2 + 1, 0);
+    for (int i=0; i<cluster_size; i++) {
+        bucket_pre_size[cluster_id[i]+1]++;
+    }
+    for (int i=1; i <= k2; i++) {
+        bucket_pre_size[i] += bucket_pre_size[i-1];
+    }
+
+    // now, elems in bucket_pre_size is prefix sum
+
+    // reorder thr data and ids by their cluster id
+    T* x_temp = new T[cluster_size * dim];
+    uint32_t* ids_temp = new uint32_t[cluster_size];
+    int64_t offest;
+    memcpy(x_temp, data, cluster_size * vector_size);
+    memcpy(ids_temp, ids, cluster_size * id_size);
+    for(int i=0; i < cluster_size; i++) {
+        offest = (bucket_pre_size[cluster_id[i]]++);
+        ids[offest] = ids_temp[i];
+        memcpy(data + offest * dim, x_temp + i * dim, vector_size);
+    }
+    delete [] x_temp;
+    delete [] ids_temp;
+
+    std::cout << "step 2: reorder data by cluster id: "
+              << std::endl;
+
+    // Step 3: check all cluster, write out or generate new ClusteringTask
+
+    int64_t bucket_size;
+    int64_t bucket_offset;
+    int entry_size = vector_size + id_size;
+
+    char* data_blk_buf = new char[blk_size];
+    for(int i=0; i < k2; i++) {
+        if (i == 0) {
+            bucket_size = bucket_pre_size[i];
+            bucket_offset = 0;
+        } else {
+            bucket_size = bucket_pre_size[i] - bucket_pre_size[i - 1];
+            bucket_offset = bucket_pre_size[i - 1];
+        }
+        // std::cout<<"after kmeans : centroids i"<<i<<" has vectors "<<(int)bucket_size<<std::endl;
+        if (bucket_size <= threshold) {
+            //write a blk to file
+            //std::cout << bucket_size<<std::endl;
+            memset(data_blk_buf, 0, blk_size);
+            *reinterpret_cast<uint32_t*>(data_blk_buf) = bucket_size;
+            char* beg_address = data_blk_buf + sizeof(uint32_t);
+
+            for (int j = 0; j < bucket_size; j++) {
+                memcpy(beg_address + j * entry_size, data + dim * (bucket_offset + j), vector_size);
+                memcpy(beg_address + j * entry_size + vector_size, ids + bucket_offset + j, id_size);
+            }
+
+            // need a lock
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+
+                int64_t current_position = centroids_id_writer.get_position();
+                assert(current_position != -1);
+                // std::cout << "global_centroids_number: current_position: " << current_position << std::endl;
+
+                // centroid id is uint32_t type
+                int64_t blk_num = (current_position - centroids_id_start_position) / sizeof(uint32_t);
+
+                // make sure type cast safety
+                assert(blk_num >= 0);
+
+                uint32_t global_id = gen_global_block_id(k1_id, (uint32_t)blk_num);
+
+                // std::cout << "blk_size " << blk_size << std::endl;
+                data_writer.write((char *) data_blk_buf, blk_size);
+                centroids_writer.write((char *) (k2_centroids.data() + i * dim), sizeof(float) * dim);
+                centroids_id_writer.write((char *) (&global_id), sizeof(uint32_t));
+            }
+        } else {
+            output_tasks.emplace_back(ClusteringTask(round_offset + bucket_offset, bucket_size, level + 1));
+        }
+    }
+    delete [] data_blk_buf;
+    std::cout << "step 3: write out and generate new ClusteringTask: "
+              << "[output_tasks size " << output_tasks.size() << "]"
+              << std::endl;
+}
 
 template <typename T>
 void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* ids, int64_t dim, uint32_t threshold, const uint64_t blk_size,

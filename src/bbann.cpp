@@ -166,8 +166,17 @@ void hierarchical_clusters(const std::string &output_path, const int K1,
     centroids_id_writer.write((char *)&placeholder, sizeof(uint32_t));
     centroids_id_writer.write((char *)&placeholder, sizeof(uint32_t));
 
+    int64_t global_start_position = centroids_id_writer.get_position();
+    assert(global_start_position != -1);
+    std::cout << "global_centroids_number: global_start_position: " << global_start_position << std::endl;
+
     for (uint32_t i = 0; i < K1; i++) {
       TimeRecorder rci("train-cluster-" + std::to_string(i));
+
+      int64_t local_start_position = centroids_id_writer.get_position();
+      assert(local_start_position != -1);
+      std::cout << "global_centroids_number: local_start_position: " << local_start_position << std::endl;
+
       std::string data_file =
           output_path + CLUSTER + std::to_string(i) + "-" + RAWDATA + BIN;
       std::string ids_file =
@@ -198,16 +207,129 @@ void hierarchical_clusters(const std::string &output_path, const int K1,
       ids_reader.read((char *)idi, ids_size * ids_dim * sizeof(uint32_t));
 
       IOWriter data_writer(data_file, MEGABYTE * 100);
-      recursive_kmeans<DATAT>(i, data_size, datai, idi, cluster_dim,
-                              entry_num, blk_size, blk_num, data_writer,
-                              centroids_writer, centroids_id_writer, 0, false,
-                              avg_len);
 
-      global_centroids_number += blk_num;
+      // recursive style
+      // recursive_kmeans<DATAT>(i, data_size, datai, idi, cluster_dim,
+      //                         entry_num, blk_size, blk_num, data_writer,
+      //                         centroids_writer, centroids_id_writer, 0, false,
+      //                         avg_len);
+      
+      // non-recursive style
+      std::list<struct ClusteringTask> todo;
+      std::mutex todo_mutex;
+      ClusteringTask init{0, data_size, 0};
+      todo.push_back(init);
+      std::mutex mutex;
+
+      while (not todo.empty()) {
+          std::vector<ClusteringTask> output_tasks;
+
+          auto cur = todo.front();
+          todo.pop_front();
+
+          if (LevelType(cur.level) >= LevelType::BALANCE_LEVEL) {
+              std::cout << "non_recursive_multilevel_kmeans: "
+                        << "balance level, to parallel"
+                        << std::endl;
+              break;
+          }
+
+          std::cout << "non_recursive_multilevel_kmeans: "
+                    << " cur.offset:" << cur.offset
+                    << " cur.num_elems:" << cur.num_elems
+                    << " cur.level:" << cur.level
+                    << std::endl;
+          non_recursive_multilevel_kmeans<DATAT>(i,
+                                                 cur.num_elems,
+                                                 datai,
+                                                 idi,
+                                                 cur.offset,
+                                                 cluster_dim,
+                                                 entry_num,
+                                                 blk_size,
+                                                 blk_num,
+                                                 data_writer,
+                                                 centroids_writer,
+                                                 centroids_id_writer,
+                                                 local_start_position,
+                                                 cur.level,
+                                                 mutex,
+                                                 output_tasks,
+                                                 false,
+                                                 avg_len);
+
+          for (auto & output_task : output_tasks) {
+              todo.push_back(output_task);
+          }
+      }
+
+      auto func = [&]() {
+          while (true) {
+              // gurantee the access of todo list
+              std::unique_lock<std::mutex> lock(todo_mutex);
+              if (todo.empty()) {
+                  // finish
+                  std::cout << "kmeans worker finish" << std::endl;
+                  break;
+              }
+              auto cur = todo.front();
+              todo.pop_front();
+              lock.unlock();
+
+              std::cout << "non_recursive_multilevel_kmeans: "
+                        << " cur.offset:" << cur.offset
+                        << " cur.num_elems:" << cur.num_elems
+                        << " cur.level:" << cur.level
+                        << std::endl;
+              std::vector<ClusteringTask> output_tasks;
+              non_recursive_multilevel_kmeans<DATAT>(i,
+                                                     cur.num_elems,
+                                                     datai,
+                                                     idi,
+                                                     cur.offset,
+                                                     cluster_dim,
+                                                     entry_num,
+                                                     blk_size,
+                                                     blk_num,
+                                                     data_writer,
+                                                     centroids_writer,
+                                                     centroids_id_writer,
+                                                     local_start_position,
+                                                     cur.level,
+                                                     mutex,
+                                                     output_tasks,
+                                                     false,
+                                                     avg_len);
+              assert(output_tasks.empty());
+          }
+      };
+
+      size_t number_workers = 6;
+      std::vector<std::thread> workers;
+      for (size_t i = 0; i < number_workers; ++i) {
+          workers.push_back(std::thread(func));
+      }
+
+      for (size_t i = 0; i < number_workers; ++i) {
+          workers[i].join();
+      }
+
+      // global_centroids_number will update only once after all clustering
+      // global_centroids_number += blk_num;
 
       delete[] datai;
       delete[] idi;
     }
+
+    int64_t end_position = centroids_id_writer.get_position();
+    assert(end_position != -1);
+    std::cout << "global_centroids_number: end_position: " << end_position << std::endl;
+
+    // centroid id is uint32_t type
+    global_centroids_number += (end_position - global_start_position) / sizeof(uint32_t);
+    std::cout << "calculate global_centroids_number by centroids id file position: "
+              << "global_centroids_number " << global_centroids_number
+              << std::endl;
   }
 
   uint32_t centroids_id_dim = 1;
