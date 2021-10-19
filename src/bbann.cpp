@@ -327,7 +327,8 @@ void build_graph(const std::string &index_path, const int hnswM,
     char *entry_begin = buf_begin + entry_size * j;
     index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin), gen_id(cid0, bid0, j + 1));
   }
-  delete buf;
+  delete[] buf;
+  fh.close();
 
   // add centroids
   index_hnsw->addPoint(pdata, gen_id(cid0, bid0, 0));
@@ -346,7 +347,8 @@ void build_graph(const std::string &index_path, const int hnswM,
         char *entry_begin = buf_begin + entry_size * j;
         index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin), gen_id(cid, bid, j + 1));
      }
-     delete buf;
+     delete[] buf;
+     fh.close();
      index_hnsw->addPoint(pdata + i * ndim, gen_id(cid, bid, 0));
   }
 
