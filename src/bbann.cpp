@@ -334,6 +334,7 @@ void build_graph(const std::string &index_path, const int hnswM,
         }
         char *buf_begin = buf + sizeof(uint32_t);
         for (int64_t j = 0; j < bucketSample; j++) {
+            // TODO, pick vectors smarter?
             char *entry_begin = buf_begin + entry_size * j;
             index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin), gen_id(cid0, bid0, j + 1));
         }
@@ -360,6 +361,7 @@ void build_graph(const std::string &index_path, const int hnswM,
          }
          char *buf_begin = buf + sizeof(uint32_t);
          for (int64_t j = 0; j < bucketSample; j++) {
+             // TODO, pick vectors smarter?
              char *entry_begin = buf_begin + entry_size * j;
              index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin), gen_id(cid, bid, j + 1));
          }
@@ -694,6 +696,36 @@ void search_bbann(
 
   search_graph<DATAT>(index_hnsw, nq, dq, nprobe, hnsw_ef, pquery,
                       bucket_labels, nullptr);
+
+    std::string file = "/data/bucket";
+    std::ifstream myFile(file);
+    if (myFile.fail()) {
+        std::cout<<"File is not exist"<< file <<"write it"<<std::endl;
+        std::ofstream writer(file, std::ios::binary | std::ios::in);
+        for (int64_t i = 0; i < nq; ++i) {
+            const auto ii = i * nprobe;
+            for (int64_t j = 0; j < nprobe; ++j) {
+                auto label = bucket_labels[ii + j];
+                writer.write((char *)&label, sizeof(uint32_t));
+            }
+        }
+        writer.close();
+    } else {
+        int hit;
+        uint32_t dim;
+        for (int64_t i = 0; i < nq; ++i) {
+            const auto ii = i * nprobe;
+            for (int64_t j = 0; j < nprobe; ++j) {
+                auto label = bucket_labels[ii + j];
+                myFile.read((char *)&dim, sizeof(uint32_t));
+                if (dim == label) {
+                    hit++;
+                }
+            }
+        }
+        std::cout<<"dim same hit " << hit << "dim all" << nq * nprobe << std::endl;
+    }
+    myFile.close();
   // search_flat<DATAT>(index_path, pquery, nq, dq, nprobe, bucket_labels);
   rc.RecordSection("search buckets done.");
 
