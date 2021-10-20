@@ -481,7 +481,7 @@ void BBAnnIndex2<dataT>::BuildWithParameter(const BBAnnParameters para) {
   hierarchical_clusters<dataT, distanceT>(para, avg_len);
   rc.RecordSection("conquer each cluster into buckets done");
 
-  build_graph(indexPrefix_, para.hnswM, para.hnswefC, para.metric);
+  build_graph(indexPrefix_, para.hnswM, para.hnswefC, para.metric, para.use_hnsw_sq);
   rc.RecordSection("build hnsw done.");
 
   // TODO: disable statistics
