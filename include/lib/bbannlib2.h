@@ -7,7 +7,6 @@
 #include <memory>
 #include <stdint.h>
 #include <string>
-#include <tuple>
 
 namespace bbann {
 
@@ -24,7 +23,6 @@ struct BBAnnParameters {
   int blockSize = 1;
   int nProbe = 2;
   int efSearch = 250;
-  int rangeSearchProbeCount = 20;
 };
 
 template <typename dataT>
@@ -35,7 +33,6 @@ struct BBAnnIndex2
   using parameterType = BBAnnParameters;
   using dataType = dataT;
   using distanceT = typename TypeWrapper<dataT>::distanceT;
-  using qidIdDistTupleType = std::tuple<uint32_t, uint32_t, distanceT>;
 
 public:
   BBAnnIndex2(MetricType metric) : metric_(metric) {
@@ -49,9 +46,11 @@ public:
                       uint64_t knn, const BBAnnParameters para,
                       uint32_t *answer_ids, distanceT *answer_dists) override;
 
-  std::tuple<std::vector<uint32_t>, std::vector<float>, std::vector<uint64_t>>
- RangeSearchCpp(const dataT *pquery, uint64_t dim, uint64_t numQuery,
-                      double radius, const BBAnnParameters para) override;
+  void RangeSearchCpp(const dataT *pquery, uint64_t dim, uint64_t numQuery,
+                      double radius, const BBAnnParameters para,
+                      std::vector<std::vector<uint32_t>> &ids,
+                      std::vector<std::vector<float>> &dists,
+                      std::vector<uint64_t> &lims) override;
   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw_;
   std::string indexPrefix_;
   std::string dataFilePath_;

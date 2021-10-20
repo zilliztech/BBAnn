@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(OpenMP REQUIRED)
-set (CMAKE_CXX_FLAGS "-O3 ${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS} -fPIC")
+set (CMAKE_CXX_FLAGS "-g -O3 ${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 find_package(Threads REQUIRED)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 
@@ -35,7 +35,6 @@ if (DIRECTIO)
     add_compile_options(-DDIRECTIO=1)
     message(STATUS "Optional Flag DIRECTIO is ON: to do DIRECT IO: O_DIRECT")
 endif(DIRECTIO)
-add_compile_options(-march=native -O3)
 
 include_directories(include)
 

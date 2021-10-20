@@ -334,35 +334,38 @@ namespace hnswlib {
             return top_candidates;
         }
 
-        std::vector<std::pair<dist_t, labeltype>> getNeighboursWithinRadius(
-            std::priority_queue<std::pair<dist_t, tableint>,
-                                std::vector<std::pair<dist_t, tableint>>,
-                                CompareByFirst> &top_candidates,
-            const void *data_point, float radius) const {
+        void
+        getNeighboursWithinRadius (
+                std::priority_queue<std::pair<dist_t, tableint>,
+                                    std::vector<std::pair<dist_t, tableint>>,
+                                    CompareByFirst> &top_candidates,
+                const void *data_point,
+                float radius,
+                std::priority_queue<std::pair<dist_t, labeltype >> &result) const {
 
-          std::vector<std::pair<dist_t, labeltype>> result;
-          VisitedList *vl = visited_list_pool_->getFreeVisitedList();
-          vl_type *visited_array = vl->mass;
-          vl_type visited_array_tag = vl->curV;
+            VisitedList *vl = visited_list_pool_->getFreeVisitedList();
+            vl_type *visited_array = vl->mass;
+            vl_type visited_array_tag = vl->curV;
 
-          std::queue<std::pair<dist_t, tableint>> radius_queue;
-          while (!top_candidates.empty()) {
-            auto cand = top_candidates.top();
-            top_candidates.pop();
-            if (cand.first < radius) {
-              radius_queue.push(cand);
-              result.emplace_back(cand.first, getExternalLabel(cand.second));
+            std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst> radius_queue;
+
+            while (!top_candidates.empty()) {
+                auto cand = top_candidates.top();
+                top_candidates.pop();
+                if (cand.first < radius) {
+                    radius_queue.push(cand);
+                    result.emplace(cand.first, getExternalLabel(cand.second));
+                }
+                visited_array[cand.second] = visited_array_tag;
             }
-            visited_array[cand.second] = visited_array_tag;
-          }
 
-          while (!radius_queue.empty()) {
-            auto cur = radius_queue.front();
-            radius_queue.pop();
+            while (!radius_queue.empty()) {
+                auto cur = radius_queue.top();
+                radius_queue.pop();
 
-            tableint current_id = cur.second;
-            int *data = (int *)get_linklist0(current_id);
-            size_t size = getListCount((linklistsizeint *)data);
+                tableint current_id = cur.second;
+                int *data = (int *) get_linklist0(current_id);
+                size_t size = getListCount((linklistsizeint*)data);
 
 #ifdef USE_SSE
                 _mm_prefetch((char *) (visited_array + *(data + 1)), _MM_HINT_T0);
@@ -385,15 +388,14 @@ namespace hnswlib {
                         dist_t dist = fstdistfunc_(data_point, cand_obj, dist_func_param_);
 
                         if (dist < radius) {
-                            radius_queue.push({dist, candidate_id});
-                            result.emplace_back(dist, getExternalLabel(candidate_id));
+                            radius_queue.emplace(dist, candidate_id);
+                            result.emplace(dist, getExternalLabel(candidate_id));
                         }
                     }
                 }
             }
 
             visited_list_pool_->releaseVisitedList(vl);
-            return result;
         }
 
         /* deprecated */
@@ -1298,9 +1300,10 @@ namespace hnswlib {
             return result;
         };
 
-        std::vector<std::pair<dist_t, labeltype >>
+        std::priority_queue<std::pair<dist_t, labeltype >>
         searchRange(const void *query_data, size_t k, float radius) const {
-            if (cur_element_count == 0) return {};
+            std::priority_queue<std::pair<dist_t, labeltype >> result;
+            if (cur_element_count == 0) return result;
 
             tableint currObj = enterpoint_node_;
             dist_t curdist = fstdistfunc_(query_data, getDataByInternalId(enterpoint_node_), dist_func_param_);
@@ -1335,15 +1338,16 @@ namespace hnswlib {
             std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst> top_candidates;
             top_candidates=searchBaseLayerST<false,true>(
                     currObj, query_data, std::max(ef_, k));
-            // std::cout << top_candidates.size() << std::endl;
+
             while (top_candidates.size() > k) {
                 top_candidates.pop();
             }
-            
 
-            if (top_candidates.size() == 0) return {};
+            if (top_candidates.size() == 0) return result;
 
-            return getNeighboursWithinRadius(top_candidates, query_data, radius);
+            getNeighboursWithinRadius(top_candidates, query_data, radius, result);
+
+            return result;
         }
 
         void checkIntegrity(){

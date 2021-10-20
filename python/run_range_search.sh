@@ -15,12 +15,9 @@ make clean
 make BBAnnLib2_s
 popd
 
-
-sudo rm -rf build/
-sudo python3 setup.py install -f
-
 set -e
 pushd ../benchmark
+cp ../python/Dockerfile.bbann  install/
 cp ../python/bbann.py benchmark/algorithms/bbann.py
 
 python3 install.py --algorithm bbann
