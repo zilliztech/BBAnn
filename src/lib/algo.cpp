@@ -283,16 +283,16 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len) {
 
     int64_t global_start_position = centroids_id_writer.get_position();
     assert(global_start_position != -1);
-    std::cout << "global_centroids_number: global_start_position: "
-              << global_start_position << std::endl;
+    // std::cout << "global_centroids_number: global_start_position: "
+    //           << global_start_position << std::endl;
 
     for (uint32_t i = 0; i < K1; i++) {
       TimeRecorder rci("train-cluster-" + std::to_string(i));
 
       int64_t local_start_position = centroids_id_writer.get_position();
       assert(local_start_position != -1);
-      std::cout << "global_centroids_number: local_start_position: "
-                << local_start_position << std::endl;
+      // std::cout << "global_centroids_number: local_start_position: "
+      //           << local_start_position << std::endl;
 
       IOReader data_reader(getClusterRawDataFileName(para.indexPrefixPath, i));
       IOReader ids_reader(getClusterGlobalIdsFileName(para.indexPrefixPath, i));
@@ -341,15 +341,15 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len) {
         todo.pop_front();
 
         if (LevelType(cur.level) >= LevelType::BALANCE_LEVEL) {
-          std::cout << "non_recursive_multilevel_kmeans: "
-                    << "balance level, to parallel" << std::endl;
+          // std::cout << "non_recursive_multilevel_kmeans: "
+          //           << "balance level, to parallel" << std::endl;
           break;
         }
 
-        std::cout << "non_recursive_multilevel_kmeans: "
-                  << " cur.offset:" << cur.offset
-                  << " cur.num_elems:" << cur.num_elems
-                  << " cur.level:" << cur.level << std::endl;
+        // std::cout << "non_recursive_multilevel_kmeans: "
+        //           << " cur.offset:" << cur.offset
+        //           << " cur.num_elems:" << cur.num_elems
+        //           << " cur.level:" << cur.level << std::endl;
         non_recursive_multilevel_kmeans<DATAT>(
             i, cur.num_elems, datai, idi, cur.offset, cluster_dim, entry_num,
             para.blockSize, blk_num, data_writer, centroids_writer,
@@ -367,17 +367,17 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len) {
           std::unique_lock<std::mutex> lock(todo_mutex);
           if (todo.empty()) {
             // finish
-            std::cout << "kmeans worker finish" << std::endl;
+            // std::cout << "kmeans worker finish" << std::endl;
             break;
           }
           auto cur = todo.front();
           todo.pop_front();
           lock.unlock();
 
-          std::cout << "non_recursive_multilevel_kmeans: "
-                    << " cur.offset:" << cur.offset
-                    << " cur.num_elems:" << cur.num_elems
-                    << " cur.level:" << cur.level << std::endl;
+          // std::cout << "non_recursive_multilevel_kmeans: "
+          //           << " cur.offset:" << cur.offset
+          //           << " cur.num_elems:" << cur.num_elems
+          //           << " cur.level:" << cur.level << std::endl;
           std::vector<ClusteringTask> output_tasks;
           non_recursive_multilevel_kmeans<DATAT>(
               i, cur.num_elems, datai, idi, cur.offset, cluster_dim, entry_num,
@@ -407,15 +407,15 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len) {
 
     int64_t end_position = centroids_id_writer.get_position();
     assert(end_position != -1);
-    std::cout << "global_centroids_number: end_position: " << end_position
-              << std::endl;
+    // std::cout << "global_centroids_number: end_position: " << end_position
+    //           << std::endl;
 
     // centroid id is uint32_t type
     global_centroids_number +=
         (end_position - global_start_position) / sizeof(uint32_t);
-    std::cout
-        << "calculate global_centroids_number by centroids id file position: "
-        << "global_centroids_number " << global_centroids_number << std::endl;
+    // std::cout
+    //     << "calculate global_centroids_number by centroids id file position: "
+    //     << "global_centroids_number " << global_centroids_number << std::endl;
   }
 
   uint32_t centroids_id_dim = 1;
@@ -434,8 +434,8 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len) {
   centroids_meta_writer.close();
   centroids_ids_meta_writer.close();
 
-  std::cout << "hierarchical_clusters generate " << global_centroids_number
-            << " centroids" << std::endl;
+  // std::cout << "hierarchical_clusters generate " << global_centroids_number
+  //           << " centroids" << std::endl;
   return;
 }
 
