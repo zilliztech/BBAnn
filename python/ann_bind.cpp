@@ -145,6 +145,7 @@ PYBIND11_MODULE(bbannpy, m) {
       .def_readwrite("K", &BBAnnParameters::K)
       .def_readwrite("nProbe", &BBAnnParameters::nProbe)
       .def_readwrite("blockSize", &BBAnnParameters::blockSize);
+      .def_readwrite("use_hnsw_sq", &BBAnnParameters::use_hnsw_sq);
 #define CLASSWRAPPER_DECL(className, index)                                    \
   class className {                                                            \
   public:                                                                      \

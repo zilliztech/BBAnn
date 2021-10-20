@@ -23,6 +23,7 @@ struct BBAnnParameters {
   int blockSize = 1;
   int nProbe = 2;
   int efSearch = 250;
+  bool use_hnsw_sq = false;
 };
 
 template <typename dataT>
