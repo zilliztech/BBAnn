@@ -22,8 +22,9 @@ void train_cluster(const std::string &raw_data_bin_file,
                    const std::string &output_path, const int32_t K1,
                    float **centroids, double &avg_len);
 
+template <typename DATAT, typename DISTT>
 void build_graph(const std::string &index_path, const int hnswM,
-                 const int hnswefC, MetricType metric_type);
+                 const int hnswefC, MetricType metric_type, const uint64_t block_size);
 
 template<typename DATAT, typename DISTT, typename HEAPT>
 void build_bbann(const std::string& raw_data_bin_file,

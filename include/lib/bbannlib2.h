@@ -49,7 +49,7 @@ public:
   void RangeSearchCpp(const dataT *pquery, uint64_t dim, uint64_t numQuery,
                       double radius, const BBAnnParameters para,
                       std::vector<std::vector<uint32_t>> &ids,
-                      std::vector<std::vector<float>> &dists,
+                      std::vector<std::vector<distanceT>> &dists,
                       std::vector<uint64_t> &lims) override;
   std::shared_ptr<hnswlib::HierarchicalNSW<distanceT>> index_hnsw_;
   std::string indexPrefix_;

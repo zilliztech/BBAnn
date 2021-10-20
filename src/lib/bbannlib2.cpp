@@ -340,18 +340,12 @@ void search_bbann_queryonly(
   index_hnsw->setEf(para.efSearch);
 #pragma omp parallel for
   for (int64_t i = 0; i < num_query; i++) {
-    // auto queryi = pquery + i * dim;
-    // todo: hnsw need to support query data is not float
-    float *queryi = new float[dim];
-    for (int j = 0; j < dim; j++)
-      queryi[j] = (float)(*(pquery + i * dim + j));
-    auto reti = index_hnsw->searchKnn(queryi, para.nProbe);
+    auto reti = index_hnsw->searchKnn(query + i * dim, para.nProbe);
     auto p_labeli = bucket_labels + i * para.nProbe;
     while (!reti.empty()) {
       *p_labeli++ = reti.top().second;
       reti.pop();
     }
-    delete[] queryi;
   }
   // rc.ElapseFromBegin("search+graph+done.");
   // for (int i = 0; i < 10; i++) {
@@ -474,7 +468,7 @@ void BBAnnIndex2<dataT>::BuildWithParameter(const BBAnnParameters para) {
   hierarchical_clusters<dataT, distanceT>(para, avg_len);
   rc.RecordSection("conquer each cluster into buckets done");
 
-  build_graph(indexPrefix_, para.hnswM, para.hnswefC, para.metric);
+  build_graph<dataT, distanceT>(indexPrefix_, para.hnswM, para.hnswefC, para.metric, para.blockSize);
   rc.RecordSection("build hnsw done.");
 
   // TODO: disable statistics
@@ -490,7 +484,7 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
                                         uint64_t numQuery, double radius,
                                         const BBAnnParameters para,
                                         std::vector<std::vector<uint32_t>> &ids,
-                                        std::vector<std::vector<float>> &dists,
+                                        std::vector<std::vector<distanceT>> &dists,
                                         std::vector<uint64_t> &lims) {
   TimeRecorder rc("range search bbann");
 
@@ -516,16 +510,11 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
   index_hnsw_->setEf(para.hnswefC);
 #pragma omp parallel for
   for (int64_t i = 0; i < numQuery; i++) {
-    // todo: hnsw need to support query data is not float
-    float *queryi = new float[dim];
-    for (int j = 0; j < dim; j++)
-      queryi[j] = (float)(*(pquery + i * dim + j));
-    auto reti = index_hnsw_->searchRange(queryi, 20, radius);
+    auto reti = index_hnsw_->searchRange(pquery + i * dim , 20, radius);
     while (!reti.empty()) {
       bucket_labels[i].push_back(reti.top().second);
       reti.pop();
     }
-    delete[] queryi;
   }
   rc.RecordSection("search buckets done.");
 
@@ -623,7 +612,7 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
   template void BBAnnIndex2<dataT>::RangeSearchCpp(                            \
       const dataT *pquery, uint64_t dim, uint64_t numQuery, double radius,     \
       const BBAnnParameters para, std::vector<std::vector<uint32_t>> &ids,     \
-      std::vector<std::vector<float>> &dists, std::vector<uint64_t> &lims);
+      std::vector<std::vector<distanceT>> &dists, std::vector<uint64_t> &lims);
 
 BBANNLIB_DECL(float);
 BBANNLIB_DECL(uint8_t);

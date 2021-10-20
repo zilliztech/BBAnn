@@ -401,7 +401,7 @@ hnswlib::SpaceInterface<uint32_t>* getDistanceSpace<uint8_t, uint32_t>(MetricTyp
 
 template <typename DATAT, typename DISTT>
 void build_graph(const std::string &index_path, const int hnswM,
-                 const int hnswefC, MetricType metric_type, const uint64_t block_size) {
+                 const int hnswefC, MetricType metric_type, const uint64_t block_size, const uint64_t sample) {
     TimeRecorder rc("create_graph_index");
     std::cout << "build hnsw parameters:" << std::endl;
     std::cout << " index_path: " << index_path << " hnsw.M: " << hnswM
@@ -429,8 +429,6 @@ void build_graph(const std::string &index_path, const int hnswM,
     assert(nblocks == nids);
     assert(nidsdim == 1);
 
-
-    int sample = HNSW_BUCKET_SAMPLE <= sizeof(DATAT) ? 1 : HNSW_BUCKET_SAMPLE / sizeof(DATAT);
     // write sample data
     auto index_hnsw = std::make_shared<hnswlib::HierarchicalNSW<DISTT>>(space, sample * nblocks, hnswM, hnswefC);
 
@@ -566,7 +564,8 @@ void build_bbann(const std::string &raw_data_bin_file,
   hierarchical_clusters<DATAT, DISTT, HEAPT>(output_path, K1, avg_len,block_size);
   rc.RecordSection("conquer each cluster into buckets done");
 
-  build_graph<DATAT, DISTT>(output_path, hnswM, hnswefC, metric_type, block_size);
+  int sample = HNSW_BUCKET_SAMPLE <= sizeof(DATAT) ? 1 : HNSW_BUCKET_SAMPLE / sizeof(DATAT);
+  build_graph<DATAT, DISTT>(output_path, hnswM, hnswefC, metric_type, block_size, sample);
   rc.RecordSection("build hnsw done.");
 
   gather_buckets_stats(output_path, K1, block_size);
@@ -787,7 +786,7 @@ void range_search_bbann(
     Computer<DATAT, DATAT, DISTT> &dis_computer,
     const DATAT *pquery, 
     std::vector<std::vector<uint32_t>> &ids,
-    std::vector<std::vector<float>> &dists,
+    std::vector<std::vector<DISTT>> &dists,
     std::vector<uint64_t> &lims,
     uint32_t nq, uint32_t dq) {
     TimeRecorder rc("range search bbann");
@@ -804,17 +803,11 @@ void range_search_bbann(
   index_hnsw->setEf(hnsw_ef);
 #pragma omp parallel for
   for (int64_t i = 0; i < nq; i++) {
-    // auto queryi = pquery + i * dq;
-    // todo: hnsw need to support query data is not float
-    float *queryi = new float[dq];
-    for (int j = 0; j < dq; j++)
-      queryi[j] = (float)(*(pquery + i * dq + j));
-    auto reti = index_hnsw->searchRange(queryi, 20, radius);
+    auto reti = index_hnsw->searchRange(pquery + i * dq, 20, radius);
     while (!reti.empty()) {
       bucket_labels[i].push_back(reti.top().second);
       reti.pop();
     }
-    delete[] queryi;
   }
   rc.RecordSection("search buckets done.");
 

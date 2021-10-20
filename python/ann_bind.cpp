@@ -56,10 +56,10 @@ void IndexBindWrapper(py::module_ &m) {
               py::array_t<dataT, py::array::c_style | py::array::forcecast>
                   &query,
               uint64_t dim, uint64_t numQuery, double radius, const paraT para)
-               -> std::pair<py::array_t<unsigned>, std::pair<py::array_t<unsigned>, py::array_t<float>>> {
+               -> std::pair<py::array_t<unsigned>, std::pair<py::array_t<unsigned>, py::array_t<distanceT>>> {
               const dataT *pquery = query.data();
               std::vector<std::vector<uint32_t>> ids(numQuery);
-              std::vector<std::vector<float>> dists(numQuery);
+              std::vector<std::vector<distanceT>> dists(numQuery);
               std::vector<uint64_t> lims(numQuery+1);
               // returns a 
               self.RangeSearchCpp(pquery, dim, numQuery, radius, para, ids, dists, lims);

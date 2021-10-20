@@ -57,6 +57,6 @@ public:
                               uint64_t numQuery, double radius,
                               const paraT para,
                               std::vector<std::vector<uint32_t>> &ids,
-                              std::vector<std::vector<float>> &dists,
+                              std::vector<std::vector<distanceT>> &dists,
                               std::vector<uint64_t> &lims) = 0;
 };
