@@ -490,7 +490,7 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
                                         uint64_t numQuery, double radius,
                                         const BBAnnParameters para,
                                         std::vector<std::vector<uint32_t>> &ids,
-                                        std::vector<std::vector<float>> &dists,
+                                        std::vector<std::vector<distanceT>> &dists,
                                         std::vector<uint64_t> &lims) {
   TimeRecorder rc("range search bbann");
 
@@ -516,16 +516,11 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
   index_hnsw_->setEf(para.hnswefC);
 #pragma omp parallel for
   for (int64_t i = 0; i < numQuery; i++) {
-    // todo: hnsw need to support query data is not float
-    float *queryi = new float[dim];
-    for (int j = 0; j < dim; j++)
-      queryi[j] = (float)(*(pquery + i * dim + j));
-    auto reti = index_hnsw_->searchRange(queryi, 20, radius);
+    auto reti = index_hnsw_->searchRange(pquery + i * dim , 20, radius);
     while (!reti.empty()) {
       bucket_labels[i].push_back(reti.top().second);
       reti.pop();
     }
-    delete[] queryi;
   }
   rc.RecordSection("search buckets done.");
 
