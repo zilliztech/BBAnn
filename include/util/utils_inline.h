@@ -153,6 +153,9 @@ inline std::string getClusterRawDataFileName(std::string prefix, int cluster_id)
 inline std::string getClusterGlobalIdsFileName(std::string prefix, int cluster_id) {
   return prefix + "cluster-" + std::to_string(cluster_id) + "-global_ids.bin";
 }
+inline std::string getSQMetaFileName(std::string prefix) {
+    return prefix + "meta";
+}
 
 inline float rand_float() {
   static std::mt19937 generator(1234);
@@ -185,5 +188,161 @@ inline void random_sampling_k2(
     return ;
 }
 
+template<typename T>
+inline void transform_data(T* data, T* tdata, int64_t n, uint32_t dim) {
+    for (auto i = 0; i < n; i++) {
+        for (auto j = 0; j < dim; j++) {
+            tdata[n * j + i] = data[i * dim + j];
+        }
+    }
+}
+
+template<typename T>
+inline void train_code(T* max_len, T* min_len, T* data, int64_t n, uint32_t dim){
+    float rs_arg = 0.0;
+    int o;
+    T* min,max;
+    T* tdata = new T[n * dim];
+    transform_data(data, tdata, n, dim);
+    for (int d = 0; d < dim; d++) {
+        auto *__restrict tdata_d = tdata + n * d;
+        std::sort(tdata_d, tdata_d + n);
+        o = int(rs_arg * n);
+        if (o < 0)
+            o = 0;
+        if (o > n - o)
+            o = n / 2;
+        min_len[d] = tdata_d[o];
+        max_len[d] = tdata_d[n - 1 - o];
+    }
+    delete [] tdata;
+}
+
+// For RS_opt
+/*
+template<typename T>
+inline void train_code(T* max_len, T* min_len, T* data, int64_t n, uint32_t dim){
+    float rs_arg = 0;
+    int o;
+    T vmin,vmax;
+    T* tdata= new T[n * dim];
+    int k = 256;
+    transform_data(data, tdata, n, dim);
+    for (int d = 0; d < dim; d++) {
+        float a, b;
+        float sx = 0;
+        T* x = tdata + n * d;
+        {
+            vmin = std::numeric_limits<T>::max();
+            vmax = std::numeric_limits<T>::min();
+            for (auto i = 0; i < n; i++) {
+                if (x[i] < vmin)
+                    vmin = x[i];
+                if (x[i] > vmax)
+                    vmax = x[i];
+                sx += x[i];
+            }
+            b = vmin;
+            a = (vmax - vmin) / k;
+        }
+
+        int niter = 2000;
+        float last_err = -1;
+        int iter_last_err = 0;
+        for (int it = 0; it < niter; it++) {
+            float sn = 0, sn2 = 0, sxn = 0, err1 = 0;
+
+            for (auto i = 0; i < n; i++) {
+                float xi = x[i];
+                float ni = floor((xi - b) / a + 0.5);
+                if (ni < 0)
+                    ni = 0;
+                if (ni >= k)
+                    ni = k - 1;
+                err1 += std::sqrt(xi - (ni * a + b));
+                sn += ni;
+                sn2 += ni * ni;
+                sxn += ni * xi;
+            }
+
+            if (err1 == last_err) {
+                iter_last_err++;
+                if (iter_last_err == 16)
+                    break;
+            } else {
+                last_err = err1;
+                iter_last_err = 0;
+            }
+
+            float det = std::sqrt(sn) - sn2 * n;
+
+            b = (sn * sxn - sn2 * sx) / det;
+            a = (sn * sx - n * sxn) / det;
+        }
+        min_len[d] = vmin;
+        max_len[d] = vmax;
+    }
+    delete [] tdata;
+}
+*/
+
+template<typename T>
+inline void encode_uint8(T* max_len, T* min_len, T* data, uint8_t* code, int64_t n, uint32_t dim)  {
+    for (int64_t i = 0; i < n; i++) {
+        T x_temp;
+        T * __restrict x = data + i * dim;
+        uint8_t * __restrict y = code + i * dim;
+        for(int d = 0; d < dim; d++) {
+            x_temp = (x[d] - min_len[d]) / (max_len[d] - min_len[d]);
+            if(x_temp<0.0) x_temp = 0;
+            if(x_temp>1.0) x_temp = 1;
+            y[d] = (uint8_t)(x_temp * 255);
+        }
+    }
+}
+
+template<typename T>
+inline void decode_uint8(T* max_len, T* min_len, T* data, uint8_t* code, int64_t n, uint32_t dim)  {
+    for (int64_t i = 0; i < n; i++) {
+        auto * __restrict x = data + i * dim;
+        auto * __restrict y = code + i * dim;
+        for(int d = 0; d < dim; d++) {
+            x[d] =min_len[d]+(y[d] + 0.5f)/255.0f*(max_len[d] -min_len[d]);
+        }
+    }
+}
+
+
+template<typename T>
+inline void encode_uint8_2(T* max_len, T* min_len, T* data, uint8_t* code, int64_t n, uint32_t dim)  {
+    for (int64_t i = 0; i < n; i++) {
+        auto * __restrict x = data + i * dim;
+        auto * __restrict y = code + i * dim;
+        for(int d = 0; d < dim; d++) {
+            y[d] = (uint8_t)((x[d] - min_len[d])/(max_len[d] - min_len[d] + 1) * 256);
+        }
+    }
+}
+template<typename T>
+inline void decode_uint8_2(T* max_len, T* min_len, T* data, uint8_t* code, int64_t n, uint32_t dim)  {
+    for (int64_t i = 0; i < n; i++) {
+        auto * __restrict x = data + i * dim;
+        auto * __restrict y = code + i * dim;
+        for(int d = 0; d < dim; d++) {
+            x[d] = y[d] * (max_len[d] - min_len[d] + 1) / 256 + min_len[d];
+        }
+    }
+}
+
+template<typename T>
+inline void train_code_2(T* max_len, T* min_len, T* data, int64_t n, uint32_t dim){
+    std::vector<T> tdata(dim * n);
+    transform_data(data, tdata, n, dim);
+    for (auto i = 0; i < dim; i++) {
+        auto * __restrict tx = tdata + i * n;
+        min_len[i] = std::min((float *)tx, (float*)(tx + n));
+        max_len[i] = std::max((float *)tx, (float*)(tx + n));
+    }
+}
 
 } // namespace bbann

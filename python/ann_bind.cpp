@@ -156,7 +156,8 @@ PYBIND11_MODULE(bbannpy, m) {
       .def_readwrite("aio_EventsPerBatch", &BBAnnParameters::aio_EventsPerBatch)
       .def_readwrite("rangeSearchProbeCount",&BBAnnParameters::rangeSearchProbeCount)
       .def_readwrite("blockSize", &BBAnnParameters::blockSize)
-      .def_readwrite("sample", &BBAnnParameters::sample);
+      .def_readwrite("sample", &BBAnnParameters::sample)
+      .def_readwrite("vector_use_sq", &BBAnnParameters::vector_use_sq);
 #define CLASSWRAPPER_DECL(className, index)                                    \
   class className {                                                            \
   public:                                                                      \

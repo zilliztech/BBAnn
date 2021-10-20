@@ -50,6 +50,9 @@ void non_recursive_multilevel_kmeans(
     int level,         // n-th round recursive clustering, start with 0
     std::mutex &mutex, // mutex to protect write out centroids
     std::vector<ClusteringTask> &output_tasks, // output clustering tasks
+    bool vector_use_sq, // whether use scalar quantization on base vector
+    std::vector<T> &max_len, // the max value on each dimension
+    std::vector<T> &min_len, // the min value on each dimension
     bool kmpp = false,                         // k-means parameter
     float avg_len = 0.0,                       // k-means parameter
     int64_t niter = 10,                        // k-means parameter
