@@ -496,12 +496,12 @@ void kmeans(int64_t nx, const T *x_in, int64_t dim, int64_t k, float *centroids,
   start = clock();
   if (k > 1000)
     nx = k * 40;
-  std::cout << "new nx = " << nx << std::endl;
+  // std::cout << "new nx = " << nx << std::endl;
   const int64_t max_points_per_centroid = 256;
   const int64_t min_points_per_centroid = 39;
 
   if (nx < k) {
-    printf("trained points is not enough %ld given %ld\n", k, nx);
+    // printf("trained points is not enough %ld given %ld\n", k, nx);
     return;
   }
 
@@ -511,13 +511,13 @@ void kmeans(int64_t nx, const T *x_in, int64_t dim, int64_t k, float *centroids,
     return;
   }
 
-  if (nx < k * min_points_per_centroid) {
-    printf("Too little trained points need %ld given %ld\n",
-           k * min_points_per_centroid, nx);
-  } else if (nx > k * max_points_per_centroid) {
-    printf("Too many trained points need %ld given %ld\n",
-           k * max_points_per_centroid, nx);
-  }
+  // if (nx < k * min_points_per_centroid) {
+  //   printf("Too little trained points need %ld given %ld\n",
+  //          k * min_points_per_centroid, nx);
+  // } else if (nx > k * max_points_per_centroid) {
+  //   printf("Too many trained points need %ld given %ld\n",
+  //          k * max_points_per_centroid, nx);
+  // }
 
   std::unique_ptr<int64_t[]> hassign(new int64_t[k]);
 
@@ -551,7 +551,7 @@ void kmeans(int64_t nx, const T *x_in, int64_t dim, int64_t k, float *centroids,
     int64_t split = split_clusters_half(dim, k, nx, x_in, hassign.get(),
                                         assign.get(), centroids, avg_len);
     if (split != 0) {
-      printf("split %ld\n", split);
+      // printf("split %ld\n", split);
     } else {
       float cur_err = 0.0;
       for (auto j = 0; j < nx; j++)
@@ -579,11 +579,11 @@ void kmeans(int64_t nx, const T *x_in, int64_t dim, int64_t k, float *centroids,
     // std::cout<<hassign[i]<<std::endl;
   }
   end = clock();
-  std::cout << "after the kmeans with nx = " << nx << ", k = " << k << ", has "
-            << empty_cnt << " empty clusters,"
-            << " max cluster: " << mx << " min cluster: " << mn
-            << " time spent " << ((double)end - start) / CLOCKS_PER_SEC * 1000
-            << "ms" << std::endl;
+  // std::cout << "after the kmeans with nx = " << nx << ", k = " << k << ", has "
+  //           << empty_cnt << " empty clusters,"
+  //           << " max cluster: " << mx << " min cluster: " << mn
+  //           << " time spent " << ((double)end - start) / CLOCKS_PER_SEC * 1000
+  //           << "ms" << std::endl;
 }
 
 template <typename T>
