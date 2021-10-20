@@ -31,6 +31,6 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len);
 
 template <typename DATAT, typename DISTT>
 void build_graph(const std::string &index_path, const int hnswM,
-                 const int hnswefC, MetricType metric_type);
+                 const int hnswefC, MetricType metric_type, const int32_t sample);
 
 } // namespace bbann

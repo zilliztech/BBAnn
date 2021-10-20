@@ -401,22 +401,11 @@ void BBAnnIndex2<dataT, distanceT>::BuildWithParameter(const BBAnnParameters par
   rc.ElapseFromBegin("build bigann totally done.");
 }
 
-<<<<<<< HEAD
 template <typename dataT>
 std::tuple<std::vector<uint32_t>, std::vector<distanceT>, std::vector<uint64_t>>
 BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
                                    uint64_t numQuery, double radius,
                                    const BBAnnParameters para) {
-
-=======
-template <typename dataT, distanceT>
-void BBAnnIndex2<dataT, distanceT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
-                                        uint64_t numQuery, double radius,
-                                        const BBAnnParameters para,
-                                        std::vector<std::vector<uint32_t>> &ids,
-                                        std::vector<std::vector<distanceT>> &dists,
-                                        std::vector<uint64_t> &lims) {
->>>>>>> 3e1e906 (Fix compilation)
   TimeRecorder rc("range search bbann");
 
   std::cout << "range search bigann parameters:" << std::endl;
@@ -630,34 +619,24 @@ void BBAnnIndex2<dataT, distanceT>::RangeSearchCpp(const dataT *pquery, uint64_t
   return std::make_tuple(ids, dists, lims);
 }
 
-#define BBANNLIB_DECL(dataT, distanceT)                                         \
-  template bool BBAnnIndex2<dataT,distanceT>::LoadIndex(std::string &indexPathPrefix);   \
-  template void BBAnnIndex2<dataT,distanceT>::BatchSearchCpp(                            \
+#define BBANNLIB_DECL(dataT)                                         \
+  template bool BBAnnIndex2<dataT>::LoadIndex(std::string &indexPathPrefix);   \
+  template void BBAnnIndex2<dataT>::BatchSearchCpp(                            \
       const dataT *pquery, uint64_t dim, uint64_t numQuery, uint64_t knn,      \
       const BBAnnParameters para, uint32_t *answer_ids,                        \
       distanceT *answer_dists);                                                \
-  template void BBAnnIndex2<dataT,distanceT>::BuildIndexImpl(                            \
+  template void BBAnnIndex2<dataT>::BuildIndexImpl(                            \
       const BBAnnParameters para);                                             \
-<<<<<<< HEAD
-<<<<<<< HEAD
-  template std::tuple<std::vector<uint32_t>, std::vector<float>,               \
+  template std::tuple<std::vector<uint32_t>, std::vector<distanceT>,           \
                       std::vector<uint64_t>>                                   \
   BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,        \
                                      uint64_t numQuery, double radius,         \
                                      const BBAnnParameters para);
-=======
-  template void BBAnnIndex2<dataT>::RangeSearchCpp(                            \
-=======
-  template void BBAnnIndex2<dataT,distanceT>::RangeSearchCpp(                            \
->>>>>>> 3e1e906 (Fix compilation)
-      const dataT *pquery, uint64_t dim, uint64_t numQuery, double radius,     \
-      const BBAnnParameters para, std::vector<std::vector<uint32_t>> &ids,     \
-      std::vector<std::vector<distanceT>> &dists, std::vector<uint64_t> &lims);
->>>>>>> 2c4c8bb (Fix compilation)
 
-BBANNLIB_DECL(float, float);
-BBANNLIB_DECL(uint8_t, uint32_t);
-BBANNLIB_DECL(int8_t, int32_t);
+
+BBANNLIB_DECL(float);
+BBANNLIB_DECL(uint8_t);
+BBANNLIB_DECL(int8_t);
 
 #undef BBANNLIB_DECL
 
