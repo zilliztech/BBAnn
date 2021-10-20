@@ -65,7 +65,7 @@ hnswlib::SpaceInterface<uint32_t>* getDistanceSpace<uint8_t, uint32_t>(MetricTyp
     return space;
 }
 
-template <typename dataT, distanceT>
+template <typename dataT>
 bool BBAnnIndex2<dataT>::LoadIndex(std::string &indexPathPrefix) {
   indexPrefix_ = indexPathPrefix;
   std::cout << "Loading: " << indexPrefix_;
@@ -344,7 +344,7 @@ void search_bbann_queryonly(
   rc.ElapseFromBegin("search bigann totally done");
 }
 
-template <typename dataT, typename distanceT>
+template <typename dataT>
 void BBAnnIndex2<dataT, distanceT>::BatchSearchCpp(const dataT *pquery, uint64_t dim,
                                         uint64_t numQuery, uint64_t knn,
                                         const BBAnnParameters para,
