@@ -352,49 +352,6 @@ void hierarchical_clusters(const std::string &output_path, const int K1,
   return;
 }
 
-template<typename T>
-inline void read_bin_file_half_dimension(const std::string& file_name, T*& data,uint32_t& n,
-                                         uint32_t& dim,const uint32_t& begin_dim){
-    std::ifstream reader(file_name, std::ios::binary);
-
-    reader.read((char*)&n, sizeof(uint32_t));
-    reader.read((char*)&dim, sizeof(uint32_t));
-    if (begin_dim==0){
-        uint32_t new_dim=dim/2;
-        if (data== nullptr){
-            data=new T[(uint64_t)n*(uint64_t)new_dim];
-        }
-        T* buf=new T[(uint64_t)(dim-new_dim)];
-        for (uint32_t i=0;i<n;++i){
-            for (uint32_t j=0;j<new_dim;j++){
-                reader.read((char*)(data+j*n+i),sizeof(T));
-            }
-            reader.read((char*)buf,sizeof(T)*(dim-new_dim));
-        }
-        delete [] buf;
-        buf= nullptr;
-        std::cout << "read binary file from " << file_name << " done in ... seconds, n = "
-                  << n << ", dim = " << new_dim << std::endl;
-    }
-    else{
-        if (data== nullptr){
-            data=new T[(uint64_t)n*(uint64_t)(dim-begin_dim)];
-        }
-        T* buf=new T[(uint64_t)begin_dim];
-        uint32_t offset=dim-begin_dim;
-        for (uint32_t i=0;i<n;++i){
-            reader.read((char*)buf,sizeof(T)*begin_dim);
-            for (uint32_t j=0;j<offset;++j){
-                reader.read((char*)(data+j*n+i),sizeof(T));
-            }
-        }
-        delete [] buf;
-        buf= nullptr;
-        std::cout << "read binary file from " << file_name << " done in ... seconds, n = "
-                  << n << ", dim = " << offset << std::endl;
-    }
-}
-
 void build_hnsw(const std::string &index_path,
                 const int hnswM,
                 const int hnswefC,
@@ -452,6 +409,16 @@ void build_hnsw(const std::string &index_path,
     rc.ElapseFromBegin("create index hnsw totally done");
 }
 
+template<typename T>
+inline void transform_data(T* data, T* tdata, int64_t n, uint32_t dim) {
+#pragma omp parallel for
+    for (auto i = 0; i < n; i++) {
+        for (auto j = 0; j < dim; j++) {
+            tdata[n * j + i] = data[i * dim + j];
+        }
+    }
+}
+
 void build_hnsw_sq(const std::string &index_path,
                    const int hnswM,
                    const int hnswefC,
@@ -462,7 +429,6 @@ void build_hnsw_sq(const std::string &index_path,
               << " hnsw.efConstruction: " << hnswefC
               << " metric_type: " << (int)metric_type << std::endl;
 
-    float *pdata = nullptr;
     uint32_t *pids = nullptr;
     uint32_t npts, ndim, nids, nidsdim,npts2;
     uint32_t total_n=0;
@@ -473,68 +439,43 @@ void build_hnsw_sq(const std::string &index_path,
         reader.read((char*)&dim, sizeof(uint32_t));
         reader.close();
     };
+    get_bin_metadata(index_path+BUCKET+CENTROIDS+BIN,  total_n, ndim);
+    int64_t sample_num = total_n * K1_SAMPLE_RATE;
+    float *sample_data = new float[sample_num * ndim];
+    float *t_sample_data = new float[sample_num * ndim];
 
-    read_meta(index_path+BUCKET+CENTROIDS+BIN,total_n,ndim);
-    std::cout<<"after reading meta data"<<std::endl;
-    uint32_t half_dim=ndim/2;
-    pdata=new float[(uint64_t)total_n*(uint64_t)half_dim];
-    float *codes=new float[256*ndim];
+    reservoir_sampling(index_path+BUCKET+CENTROIDS+BIN, sample_num, sample_data);
+    transform_data(sample_data, t_sample_data, sample_num, ndim);
+    delete [] sample_data;
+
+
+    float *codes=new float[256 * ndim];
     auto *codebook=new uint8_t [(uint64_t)total_n*(uint64_t)ndim];
     memset(codebook,0,sizeof(uint8_t)*(uint64_t)total_n*(uint64_t)ndim);
     std::cout<<"start sq"<<std::endl;
-    read_bin_file_half_dimension(index_path+BUCKET+CENTROIDS+BIN,pdata,npts,ndim,0);
-    std::cout<<"first pdata  initialized"<<std::endl;
-#pragma omp parallel for
-    for (uint32_t i=0;i<half_dim;++i){
+  #pragma omp parallel for
+    for (uint32_t i = 0; i < ndim; ++i){
         float *centers=new float[256];
-        kmeans(total_n,pdata+i*total_n,1,256,centers);
+        kmeans(total_n,t_sample_data + i*total_n,1,256,centers);
         for (int j=0;j<256;j++){
             codes[j*ndim+i]=centers[j];
         }
         for (uint32_t j=0;j<total_n;++j){
             float min_dis = std::numeric_limits<float>::max();
-            for (uint32_t k=0;k<256;++k){
-                float diff=codes[k*ndim+i]-pdata[i*total_n+j];
-                float now_dis=diff*diff;
-                if (now_dis<min_dis){
-                    min_dis=now_dis;
-                    uint32_t* p32=&k;
-                    uint8_t* p8=(uint8_t*)p32;
-                    codebook[j*ndim+i]=(uint8_t)(*(p8));
+            for (uint8_t k = 0; k < 256; ++k){
+                float diff=codes[ndim * k + i]-t_sample_data[i * total_n + j];
+                float now_dis = diff*diff;
+                if (now_dis < min_dis){
+                    min_dis = now_dis;
+                    codebook[j*ndim+i] = k;
                 }
             }
         }
     }
     std::cout<<"first part code computed"<<std::endl;
 
-    delete[] pdata;
-    pdata=nullptr;
-    read_bin_file_half_dimension(index_path+BUCKET+CENTROIDS+BIN,pdata,npts,ndim,half_dim);
-    std::cout<<"second pdata of second part initialized"<<std::endl;
-#pragma omp parallel for
-    for (uint32_t i=half_dim;i<ndim;++i){
-        float *centers=new float[256];
-        kmeans(total_n,pdata+(i-half_dim)*total_n,1,256,centers);
-        for (int j=0;j<256;j++){
-            codes[j*ndim+i]=centers[j];
-        }
-        for (uint32_t j=0;j<total_n;++j){
-            float min_dis = std::numeric_limits<float>::max();
-            for (uint32_t k=0;k<256;++k){
-                float diff=codes[k*ndim+i]-pdata[(i-half_dim)*total_n+j];
-                float now_dis=diff*diff;
-                if (now_dis<min_dis){
-                    min_dis=now_dis;
-                    uint32_t* p32=&k;
-                    uint8_t* p8=(uint8_t*)p32;
-                    codebook[j*ndim+i]=(uint8_t)(*(p8));
-                }
-            }
-        }
-    }
-    std::cout<<"second part code computed"<<std::endl;
-    delete[] pdata;
-    pdata= nullptr;
+    delete[] t_sample_data;
+    t_sample_data=nullptr;
 
     rc.RecordSection("load centroids of buckets and compute SQ done");
 //  std::string sq_path=index_path+SQ+BIN;
@@ -576,6 +517,7 @@ void build_hnsw_sq(const std::string &index_path,
     pids = nullptr;
     rc.ElapseFromBegin("create index hnsw totally done");
 }
+
 
 void build_graph(const std::string &index_path,
                  const int hnswM,
