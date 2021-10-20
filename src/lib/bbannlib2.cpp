@@ -4,6 +4,7 @@
 #include "util/file_handler.h"
 #include "util/heap.h"
 #include "util/utils_inline.h"
+#include "sq_hnswlib/hnswalg.h"
 #include <iostream>
 #include <omp.h>
 #include <stdint.h>
@@ -301,7 +302,7 @@ void divide_raw_data(const BBAnnParameters para, const float *centroids) {
 }
 
 template <typename dataT>
-bool BBAnnIndex2<dataT>::LoadIndex(std::string &indexPathPrefix) {
+bool BBAnnIndex2<dataT>::LoadIndex(std::string &indexPathPrefix, const BBAnnParameters para) {
   indexPrefix_ = indexPathPrefix;
   std::cout << "Loading: " << indexPrefix_;
   uint32_t bucket_num, dim;
@@ -316,8 +317,19 @@ bool BBAnnIndex2<dataT>::LoadIndex(std::string &indexPathPrefix) {
     return false;
   }
   // load hnsw
-  index_hnsw_ = std::make_shared<hnswlib::HierarchicalNSW<float>>(
-      space, getHnswIndexFileName());
+  if(para.use_hnsw_sq ) {
+    //index_hnsw_ = nullptr;
+
+    index_sq_hnsw_ = std::make_shared<sq_hnswlib::HierarchicalNSW<float>>(
+            space, getHnswIndexFileName());
+
+  } else {
+    index_hnsw_ = std::make_shared<hnswlib::HierarchicalNSW<float>>(
+            space, getHnswIndexFileName());
+    //index_sq_hnsw_ = nullptr;
+
+  }
+
   indexPrefix_ = indexPathPrefix;
   return true;
 }
@@ -325,6 +337,7 @@ bool BBAnnIndex2<dataT>::LoadIndex(std::string &indexPathPrefix) {
 template <typename DATAT, typename DISTT>
 void search_bbann_queryonly(
     std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+    std::shared_ptr<sq_hnswlib::HierarchicalNSW<float>> index_sq_hnsw,
     const BBAnnParameters para, const int topk, const DATAT *pquery,
     uint32_t *answer_ids, DISTT *answer_dists, uint32_t num_query,
     uint32_t dim) {
@@ -344,7 +357,12 @@ void search_bbann_queryonly(
             << " pquery: " << static_cast<const void *>(pquery)
             << " bucket_labels: " << static_cast<void *>(bucket_labels)
             << std::endl;
-  index_hnsw->setEf(para.efSearch);
+  if(para.use_hnsw_sq ) {
+    index_sq_hnsw->setEf(para.efSearch);
+  } else {
+    index_hnsw->setEf(para.efSearch);
+  }
+
 #pragma omp parallel for
   for (int64_t i = 0; i < num_query; i++) {
     // auto queryi = pquery + i * dim;
@@ -352,7 +370,8 @@ void search_bbann_queryonly(
     float *queryi = new float[dim];
     for (int j = 0; j < dim; j++)
       queryi[j] = (float)(*(pquery + i * dim + j));
-    auto reti = index_hnsw->searchKnn(queryi, para.nProbe);
+    auto reti = para.use_hnsw_sq  ? index_sq_hnsw->searchKnn(queryi, para.nProbe) :
+                                   index_hnsw->searchKnn(queryi, para.nProbe);
     auto p_labeli = bucket_labels + i * para.nProbe;
     while (!reti.empty()) {
       *p_labeli++ = reti.top().second;
@@ -443,7 +462,7 @@ void BBAnnIndex2<dataT>::BatchSearchCpp(const dataT *pquery, uint64_t dim,
   std::cout << "Query: " << std::endl;
 
   search_bbann_queryonly<dataT, distanceT>(
-      index_hnsw_, para, knn, pquery, answer_ids, answer_dists, numQuery, dim);
+      index_hnsw_, index_sq_hnsw_,  para, knn, pquery, answer_ids, answer_dists, numQuery, dim);
 }
 
 template <typename dataT>
@@ -620,7 +639,8 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
 }
 
 #define BBANNLIB_DECL(dataT)                                                   \
-  template bool BBAnnIndex2<dataT>::LoadIndex(std::string &indexPathPrefix);   \
+  template bool BBAnnIndex2<dataT>::LoadIndex(                                 \
+      std::string &indexPathPrefix, const BBAnnParameters para);               \
   template void BBAnnIndex2<dataT>::BatchSearchCpp(                            \
       const dataT *pquery, uint64_t dim, uint64_t numQuery, uint64_t knn,      \
       const BBAnnParameters para, uint32_t *answer_ids,                        \

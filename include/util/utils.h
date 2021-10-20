@@ -96,6 +96,15 @@ inline void read_bin_file(const std::string& file_name, T*& data, uint32_t& n,
               << n << ", dim = " << dim << std::endl;
 }
 
+
+inline void read_meta(const std::string& file_name,uint32_t& n,uint32_t& dim){
+    std::ifstream reader(file_name, std::ios::binary);
+
+    reader.read((char*)&n, sizeof(uint32_t));
+    reader.read((char*)&dim, sizeof(uint32_t));
+    reader.close();
+}
+
 template<typename T>
 void reservoir_sampling(const std::string& data_file, const size_t sample_num, T* sample_data) {
     assert(sample_data != nullptr);

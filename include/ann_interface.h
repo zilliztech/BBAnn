@@ -28,7 +28,7 @@ public:
 
   // Load the in-mem part of the index into memory.
   // Returns true if load success.
-  virtual bool LoadIndex(std::string &indexPathPrefix) = 0;
+  virtual bool LoadIndex(std::string &indexPathPrefix, const paraT para) = 0;
 
   // To construct a index with parameters and settings given in *para*,
   // users shall call <>.BuildIndex().
