@@ -39,7 +39,7 @@ namespace sq_hnswlib {
             ef_construction_ = std::max(ef_construction,M_);
             ef_ = 10;
 
-            codes_=new float[256*(*s->get_dist_func_param())];
+            codes_=new float[256*(*(uint32_t*)s->get_dist_func_param())];
             memcpy(codes_,codes,sizeof(float)*256*(*(size_t*)dist_func_param_));
 
             level_generator_.seed(random_seed);

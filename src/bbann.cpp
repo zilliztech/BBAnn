@@ -640,6 +640,12 @@ void search_bbann(
                      std::unordered_map<uint32_t, std::unordered_set<uint32_t>>>
       mp;
 
+
+  std::string code_file=index_path+SQ+BIN;
+  float *codes= nullptr;
+  uint32_t nn,nndim;
+  read_bin_file<float>(code_file,codes,nn,nndim);
+
   search_graph<DATAT>(index_hnsw, nq, dq, nprobe, hnsw_ef, pquery,
                       bucket_labels, nullptr);
   // search_flat<DATAT>(index_path, pquery, nq, dq, nprobe, bucket_labels);
