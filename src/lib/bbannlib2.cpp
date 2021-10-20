@@ -394,7 +394,7 @@ BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
   // std::vector<uint32_t> *bucket_labels = new std::vector<uint32_t>[numQuery];
   std::vector<std::pair<uint32_t, uint32_t>> qid_bucketLabel;
 
-  std::map<int, int> bucket_hit_cnt, hit_cnt_cnt, return_cnt;
+  // std::map<int, int> bucket_hit_cnt, hit_cnt_cnt, return_cnt;
   index_hnsw_->setEf(para.efSearch);
   // -- a function that conducts queries[a..b] and returns a list of <bucketid,
   // queryid> pairs; note: 1 bucketid may map to multiple queryid.
@@ -403,7 +403,7 @@ BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
     std::vector<std::pair<int, int>> ret;
     for (int i = l; i < r; i++) {
       float *queryi = &query_float[i * dim];
-      const auto reti = index_hnsw_->searchRange(queryi, para.nProbe, radius);
+      const auto reti = index_hnsw_->searchRange(queryi, para.rangeSearchProbeCount, radius);
       for (auto const &[dist, bucket_label] : reti) {
         ret.emplace_back(std::make_pair(bucket_label, i));
       }
@@ -435,7 +435,7 @@ BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
     std::list<qidIdDistTupleType> ret;
     std::vector<char> buf_v(para.blockSize);
     char *buf = &buf_v[0];
-    auto dis_computer = select_computer<dataT, dataT, distanceT>(para.metric);
+    auto dis_computer = util::select_computer<dataT, dataT, distanceT>(para.metric);
     auto reader = std::make_unique<CachedBucketReader>(para.indexPrefixPath);
     for (int i = l; i < r; i++) {
       const auto [bucketid, qid] = bucketToQuery[i];

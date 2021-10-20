@@ -13,7 +13,7 @@ cd src/
 make TimeRecorder
 cd lib
 make clean
-make BBAnnLib2_s
+make -j
 popd
 
 
