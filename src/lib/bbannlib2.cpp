@@ -5,7 +5,6 @@
 #include "util/heap.h"
 #include "util/utils_inline.h"
 #include <iostream>
-#include <map>
 #include <omp.h>
 #include <stdint.h>
 #include <string>
@@ -222,43 +221,6 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len) {
   return;
 }
 
-template <typename DATAT>
-void train_cluster(const std::string &raw_data_bin_file,
-                   const std::string &output_path, const int32_t K1,
-                   float **centroids, double &avg_len) {
-  TimeRecorder rc("train cluster");
-  std::cout << "train_cluster parameters:" << std::endl;
-  std::cout << " raw_data_bin_file: " << raw_data_bin_file
-            << " output path: " << output_path << " K1: " << K1
-            << " centroids: " << *centroids << std::endl;
-  assert((*centroids) == nullptr);
-  DATAT *sample_data = nullptr;
-  uint32_t nb, dim;
-  util::get_bin_metadata(raw_data_bin_file, nb, dim);
-  int64_t sample_num = nb * consts::K1_SAMPLE_RATE;
-  std::cout << "nb = " << nb << ", dim = " << dim
-            << ", sample_num 4 K1: " << sample_num << std::endl;
-
-  *centroids = new float[K1 * dim];
-  sample_data = new DATAT[sample_num * dim];
-  reservoir_sampling(raw_data_bin_file, sample_num, sample_data);
-  rc.RecordSection("reservoir sample with sample rate: " +
-                   std::to_string(consts::K1_SAMPLE_RATE) + " done");
-  double mxl, mnl;
-  int64_t stat_n = std::min(static_cast<int64_t>(1000000), sample_num);
-  stat_length<DATAT>(sample_data, stat_n, dim, mxl, mnl, avg_len);
-  rc.RecordSection("calculate " + std::to_string(stat_n) +
-                   " vectors from sample_data done");
-  std::cout << "max len: " << mxl << ", min len: " << mnl
-            << ", average len: " << avg_len << std::endl;
-  kmeans<DATAT>(sample_num, sample_data, dim, K1, *centroids, avg_len);
-  rc.RecordSection("kmeans done");
-  assert((*centroids) != nullptr);
-
-  delete[] sample_data;
-  rc.ElapseFromBegin("train cluster done.");
-}
-
 template <typename DATAT, typename DISTT>
 void divide_raw_data(const BBAnnParameters para, const float *centroids) {
   TimeRecorder rc("divide raw data");
@@ -398,7 +360,12 @@ void search_bbann_queryonly(
     }
     delete[] queryi;
   }
-  rc.ElapseFromBegin("search+graph+done.");
+  // rc.ElapseFromBegin("search+graph+done.");
+  // for (int i = 0; i < 10; i++) {
+  //   for (int j = 0; j < para.nProbe; j++)
+  //     std::cout << bucket_labels[i * para.nProbe + j] << " ";
+  //   std::cout << std::endl;
+  // }
   rc.RecordSection("search buckets done.");
 
   uint32_t cid, bid;
@@ -526,10 +493,12 @@ void BBAnnIndex2<dataT>::BuildWithParameter(const BBAnnParameters para) {
 }
 
 template <typename dataT>
-std::tuple<std::vector<uint32_t>, std::vector<float>, std::vector<uint64_t>>
-BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
-                                   uint64_t numQuery, double radius,
-                                   const BBAnnParameters para) {
+void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
+                                        uint64_t numQuery, double radius,
+                                        const BBAnnParameters para,
+                                        std::vector<std::vector<uint32_t>> &ids,
+                                        std::vector<std::vector<float>> &dists,
+                                        std::vector<uint64_t> &lims) {
   TimeRecorder rc("range search bbann");
 
   std::cout << "range search bigann parameters:" << std::endl;
@@ -549,129 +518,105 @@ BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
   }
    */
 
-  std::vector<float> query_float;
-  query_float.resize(numQuery * dim);
-#pragma omp parallel for
-  for (int64_t i = 0; i < numQuery * dim; i++) {
-    query_float[i] = (float)pquery[i];
-  }
-  std::cout << " prepared query_float" << std::endl;
-  // std::vector<uint32_t> *bucket_labels = new std::vector<uint32_t>[numQuery];
-  std::vector<std::pair<uint32_t, uint32_t>> qid_bucketLabel;
+  std::vector<uint32_t> *bucket_labels = new std::vector<uint32_t>[numQuery];
 
-  std::map<int, int> bucket_hit_cnt, hit_cnt_cnt, return_cnt;
-  index_hnsw_->setEf(para.efSearch);
-  // -- a function that conducts queries[a..b] and returns a list of <bucketid,
-  // queryid> pairs; note: 1 bucketid may map to multiple queryid.
-  auto run_hnsw_search = [&, this](int l,
-                                   int r) -> std::vector<std::pair<int, int>> {
-    std::vector<std::pair<int, int>> ret;
-    for (int i = l; i < r; i++) {
-      float *queryi = &query_float[i * dim];
-      const auto reti = index_hnsw_->searchRange(queryi, para.nProbe, radius);
-      for (auto const &[dist, bucket_label] : reti) {
-        ret.emplace_back(std::make_pair(bucket_label, i));
-      }
+  index_hnsw_->setEf(para.hnswefC);
+#pragma omp parallel for
+  for (int64_t i = 0; i < numQuery; i++) {
+    // todo: hnsw need to support query data is not float
+    float *queryi = new float[dim];
+    for (int j = 0; j < dim; j++)
+      queryi[j] = (float)(*(pquery + i * dim + j));
+    auto reti = index_hnsw_->searchRange(queryi, 20, radius);
+    while (!reti.empty()) {
+      bucket_labels[i].push_back(reti.top().second);
+      reti.pop();
     }
-    return ret;
-  };
-  int nparts_hnsw = 128;
-  std::vector<std::pair<int, int>> bucketToQuery;
-#pragma omp parallel for
-  for (int partID = 0; partID < nparts_hnsw; partID++) {
-    int low = partID * numQuery / nparts_hnsw;
-    int high = (partID + 1) * numQuery / nparts_hnsw;
-    auto part = run_hnsw_search(low, high);
-    bucketToQuery.insert(bucketToQuery.end(), part.begin(), part.end());
+    delete[] queryi;
   }
-  rc.RecordSection(" query hnsw done");
-  sort(bucketToQuery.begin(), bucketToQuery.end());
-  rc.RecordSection("sort query results done");
+  rc.RecordSection("search buckets done.");
 
+  uint32_t cid, bid;
+  uint32_t gid;
   const uint32_t vec_size = sizeof(dataT) * dim;
   const uint32_t entry_size = vec_size + sizeof(uint32_t);
+  dataT *vec;
 
-  // -- a function that reads the file for bucketid/queryid in
-  // bucketToQuery[a..b]
-  //
-  auto run_bucket_scan =
-      [&, this, para, pquery](int l, int r) -> std::list<qidIdDistTupleType> {
-    /* return a list of tuple <queryid, id, dist>:*/
-    std::list<qidIdDistTupleType> ret;
-    std::vector<char> buf_v(para.blockSize);
-    char *buf = &buf_v[0];
-    auto dis_computer = select_computer<dataT, dataT, distanceT>(para.metric);
-    auto reader = std::make_unique<CachedBucketReader>(para.indexPrefixPath);
-    for (int i = l; i < r; i++) {
-      const auto [bucketid, qid] = bucketToQuery[i];
-      const dataT *q_idx = pquery + qid * dim;
-      reader->readToBuf(bucketid, buf, para.blockSize);
+  char *buf = new char[para.blockSize];
+  auto dis_computer = select_computer<dataT, dataT, distanceT>(para.metric);
+
+  uint64_t total_bucket_searched = 0;
+
+  // for (int i = 0; i < numQuery; i++) {
+  //   std::cout << bucket_labels[i].size() << " ";
+  // }
+  // std::cout << std::endl;
+  /* flat */
+  for (int64_t i = 0; i < numQuery; ++i) {
+    if (i % 10000 == 0) {
+      std::cout << i << "/" << numQuery << std::endl;
+    }
+
+    const dataT *q_idx = pquery + i * dim;
+
+    for (int64_t j = 0; j < bucket_labels[i].size(); ++j) {
+      util::parse_global_block_id(bucket_labels[i][j], cid, bid);
+      auto fh = std::ifstream(getClusterRawDataFileName(para.indexPrefixPath, cid), std::ios::binary);
+      assert(!fh.fail());
+
+      fh.seekg(bid * para.blockSize);
+      fh.read(buf, para.blockSize);
+
       const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
-      char *data_begin = buf + sizeof(uint32_t);
+      char *buf_begin = buf + sizeof(uint32_t);
 
       for (uint32_t k = 0; k < entry_num; ++k) {
-        char *entry_begin = data_begin + entry_size * k;
-        auto dis =
-            dis_computer(reinterpret_cast<dataT *>(entry_begin), q_idx, dim);
+        char *entry_begin = buf_begin + entry_size * k;
+        vec = reinterpret_cast<dataT *>(entry_begin);
+        auto dis = dis_computer(vec, q_idx, dim);
+        /*
+          for (int qq = 0; qq < dim; qq++) {
+            std::cout << q_idx[qq] << " ";
+          }
+          std::cout << std::endl;
+          for (int qq = 0; qq < dim; qq++) {
+            std::cout << vec[qq] << " ";
+          }
+          std::cout << "----" << dis << std::endl;
+
+          std::cout << " " << dis << " " << radius << std::endl;
+          */
         if (dis < radius) {
-          const uint32_t id =
-              *reinterpret_cast<uint32_t *>(entry_begin + vec_size);
-          ret.push_back(std::make_tuple(qid, id, dis));
+          dists[i].push_back(dis);
+          ids[i].push_back(
+              *reinterpret_cast<uint32_t *>(entry_begin + vec_size));
         }
       }
     }
-    std::cout << "Query number:" << r-l <<"  read count:" << reader->unique_reads_ << std::endl;
-    return ret;
-  };
-  std::cout << "Need to access bucket data for " << bucketToQuery.size()
-            << " times, " << std::endl;
-  uint32_t totQuery = 0;
-  uint32_t totReturn = 0;
-  int nparts_block = 64;
-  std::vector<qidIdDistTupleType> ans_list;
-#pragma omp parallel for
-  for (uint64_t partID = 0; partID < nparts_block; partID++) {
-    uint32_t low = partID * bucketToQuery.size() / nparts_block;
-    uint32_t high = (partID + 1) * bucketToQuery.size() / nparts_block;
-    totQuery += (high - low);
-    auto qid_id_dist = run_bucket_scan(low, high);
-    totReturn += qid_id_dist.size();
-    std::move(qid_id_dist.begin(), qid_id_dist.end(),
-              std::back_inserter(ans_list));
-    std::cout << "finished " << totQuery << "queries, returned " << totReturn
-              << " answers" << std::endl;
+    total_bucket_searched += bucket_labels[i].size();
   }
   rc.RecordSection("scan blocks done");
-  sort(ans_list.begin(), ans_list.end());
-  std::vector<uint32_t> ids;
-  std::vector<float> dists;
-  std::vector<uint64_t> lims(numQuery + 1);
-  int lims_index = 0;
-  for (auto const &[qid, ansid, dist] : ans_list) {
-    //std::cout << qid << " " << ansid << " " << dist << std::endl;
-    while (lims_index < qid) {
-      lims[lims_index] = ids.size();
-      // std::cout << "lims" << lims_index << "!" << lims[lims_index] << std::endl;
-      lims_index++;
-    }
-    if (lims[qid] == 0 && qid == lims_index) {
-      lims[qid] = ids.size();
-      // std::cout << "lims" << qid << " " << lims[qid] << std::endl;
-      lims_index++;
-    }
-    ids.push_back(ansid);
-    dists.push_back(dist);
-    // std::cout << "ansid " << ansid << " " << ids[lims[qid]] << std::endl;
+
+  int64_t idx = 0;
+  for (int64_t i = 0; i < numQuery; ++i) {
+    lims[i] = idx;
+    idx += ids[i].size();
+    // if (ids[i].size() > 0) {
+    //   for (int j = 0; j < ids[i].size(); j++) {
+    //     std::cout << dists[i][j] << " ";
+    //   }
+    //   std::cout << "---> " << i << std::endl;
+    // }
   }
-  while (lims_index <= numQuery) {
-    lims[lims_index] = ids.size();
-    lims_index++;
-  }
+  lims[numQuery] = idx;
 
   rc.RecordSection("format answer done");
 
+  std::cout << "Total bucket searched: " << total_bucket_searched << std::endl;
+
+  delete[] bucket_labels;
+  delete[] buf;
   rc.ElapseFromBegin("range search bbann totally done");
-  return std::make_tuple(ids, dists, lims);
 }
 
 #define BBANNLIB_DECL(dataT)                                                   \
@@ -682,11 +627,10 @@ BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
       distanceT *answer_dists);                                                \
   template void BBAnnIndex2<dataT>::BuildIndexImpl(                            \
       const BBAnnParameters para);                                             \
-  template std::tuple<std::vector<uint32_t>, std::vector<float>,               \
-                      std::vector<uint64_t>>                                   \
-  BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,        \
-                                     uint64_t numQuery, double radius,         \
-                                     const BBAnnParameters para);
+  template void BBAnnIndex2<dataT>::RangeSearchCpp(                            \
+      const dataT *pquery, uint64_t dim, uint64_t numQuery, double radius,     \
+      const BBAnnParameters para, std::vector<std::vector<uint32_t>> &ids,     \
+      std::vector<std::vector<float>> &dists, std::vector<uint64_t> &lims);
 
 BBANNLIB_DECL(float);
 BBANNLIB_DECL(uint8_t);

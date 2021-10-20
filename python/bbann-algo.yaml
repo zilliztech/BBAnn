@@ -56,55 +56,6 @@ random-range-xs:
             [{"hnswM":32, "hnswefC":200, "K1":20, "blockSize":4096, "identifier": "range"}]
           query-args: |
             [{"nProbe":2, "efSearch":100, "K1":20, "blockSize":4096, "identifier": "range"}]
-random-range-s:
-    faiss-t1:
-      docker-tag: billion-scale-benchmark-faissconda
-      module: benchmark.algorithms.faiss_t1
-      constructor: Faiss
-      base-args: ["@metric"]
-      run-groups:
-        base:
-          # the following args show all build arguments that can be provided to the t1 baseline.
-          args: |
-              [{"indexkey": "OPQ32_128,IVF1024_HNSW32,PQ32",
-                "buildthreads": -1,
-                "by_residual": -1,
-                "add_bs": 100000000,
-                "two_level_clustering": true,
-                "quantizer_add_efSearch": 80,
-                "quantizer_efConstruction": 200,
-                "maxtrain": 100000000,
-                "clustering_niter": 25
-                }]
-          query-args: |
-              ["nprobe=1,quantizer_efSearch=4",
-              "nprobe=2,quantizer_efSearch=4",
-              "nprobe=2,quantizer_efSearch=8",
-              "nprobe=4,quantizer_efSearch=4",
-              "nprobe=2,quantizer_efSearch=16"]
-    diskann-t2:
-      docker-tag: billion-scale-benchmark-diskann
-      module: benchmark.algorithms.diskann-t2
-      constructor: Diskann
-      base-args: ["@metric"]
-      run-groups:
-        base:
-          args: |
-              [{"R":32, "L":32, "B":0.0001, "M":1}]
-          query-args: |
-              [{"Ls":10, "BW":4, "T":16}]
-    bbann:
-      docker-tag: billion-scale-benchmark-bbann
-      module: benchmark.algorithms.bbann
-      constructor: BbANN
-      base-args: ["@metric"]
-      run-groups:
-        base:
-          args: |
-            [{"hnswM":32, "hnswefC":200, "K1":20, "blockSize":4096, "identifier": "range"}]
-          query-args: |
-            [{"nProbe":50, "efSearch":100, "K1":20, "blockSize":4096, "identifier": "range"}]
-
 random-xs:
     faiss-t1:
       docker-tag: billion-scale-benchmark-faissconda
@@ -522,9 +473,11 @@ ssnpp-1B:
       run-groups:
         base:
           args: |
-              [{"hnswM":32, "hnswefC":500, "K1":128, "blockSize":8192, "overrideIndexPath": "/data/BBANN-ssnpp-t-32-500-128-2"}]
+              [{"hnswM":32, "hnswefC":500, "K1":128, "blockSize":4096}]
           query-args: |
-              [{"nProbe":50, "efSearch":20, "K1":128, "blockSize":8192}]
+              [{"nProbe":50, "efSearch":250, "K1":128, "blockSize":4096},
+              {"nProbe":100, "efSearch":500, "K1":128, "blockSize":4096},
+              {"nProbe":200, "efSearch":1000, "K1":128, "blockSize":4096}]
 text2image-1B:
     faiss-t1:
       docker-tag: billion-scale-benchmark-faissconda
@@ -620,7 +573,7 @@ ssnpp-10M:
           args: |
               [{"hnswM":32, "hnswefC":500, "K1":10, "blockSize":4096}]
           query-args: |
-              [{"nProbe":50, "efSearch":50, "K1":10, "blockSize":4096}]
+              [{"nProbe":50, "efSearch":250, "K1":10, "blockSize":4096}]
 deep-10M:
    diskann-t2:
       docker-tag: billion-scale-benchmark-diskann

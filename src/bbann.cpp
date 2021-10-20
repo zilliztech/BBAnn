@@ -1485,16 +1485,6 @@ void search_bbann_queryonly(
       const DATAT *pquery, uint32_t *answer_ids, DISTT *answer_dists,          \
       uint32_t num_query, uint32_t dim);
 
-#define SEARCH_BBANN_ONLY_DECL(DATAT, DISTT, HEAPT)                            \
-  template void search_bbann_queryonly<DATAT, DISTT, HEAPT<DISTT, uint32_t>>(  \
-      const std::string &index_path, const int nprobe, const int hnsw_ef,      \
-      const int topk,                                                          \
-      std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,             \
-      const int K1, const uint64_t block_size,                                 \
-      Computer<DATAT, DATAT, DISTT> &dis_computer, /* for IO */                \
-      const DATAT *pquery, uint32_t *answer_ids, DISTT *answer_dists,          \
-      uint32_t num_query, uint32_t dim);
-
 #define BUILD_BBANN_DECL(DATAT, DISTT, HEAPT)                                  \
   template void build_bbann<DATAT, DISTT, HEAPT<DISTT, uint32_t>>(             \
       const std::string &raw_data_bin_file, const std::string &output_path,    \
