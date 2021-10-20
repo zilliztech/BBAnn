@@ -11,14 +11,14 @@
 
 namespace bbann {
 
-template <typename dataT>
+template <typename dataT, typename distanceT>
 struct BBAnnIndex2
-    : public BuildIndexFactory<BBAnnIndex2<dataT>, BBAnnParameters>,
+    : public BuildIndexFactory<BBAnnIndex2<dataT,distanceT>, BBAnnParameters>,
       public AnnIndexInterface<dataT, BBAnnParameters> {
 
   using parameterType = BBAnnParameters;
   using dataType = dataT;
-  using distanceT = typename TypeWrapper<dataT>::distanceT;
+  // using distanceT = typename TypeWrapper<dataT>::distanceT;
   using qidIdDistTupleType = std::tuple<uint32_t, uint32_t, distanceT>;
 
 public:
