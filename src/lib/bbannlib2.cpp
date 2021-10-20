@@ -311,7 +311,7 @@ bool BBAnnIndex2<dataT>::LoadIndex(std::string &indexPathPrefix, const BBAnnPara
 
   // load hnsw
   if(para.use_hnsw_sq ) {
-  //  index_hnsw_ = nullptr;
+    index_hnsw_ = nullptr;
     sq_hnswlib::SpaceInterface<float> *space = nullptr;
     if (MetricType::L2 == metric_) {
       space = new sq_hnswlib::L2Space(dim);
@@ -322,7 +322,6 @@ bool BBAnnIndex2<dataT>::LoadIndex(std::string &indexPathPrefix, const BBAnnPara
     }
 
     index_sq_hnsw_ = std::make_shared<sq_hnswlib::HierarchicalNSW<float>>(space, getHnswIndexFileName());
-
 
   } else {
     hnswlib::SpaceInterface<float> *space = nullptr;
@@ -335,7 +334,7 @@ bool BBAnnIndex2<dataT>::LoadIndex(std::string &indexPathPrefix, const BBAnnPara
     }
     index_hnsw_ = std::make_shared<hnswlib::HierarchicalNSW<float>>(
             space, getHnswIndexFileName());
-   // index_sq_hnsw_ = nullptr;
+    index_sq_hnsw_ = nullptr;
 
   }
 
