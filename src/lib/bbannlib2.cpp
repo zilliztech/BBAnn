@@ -4,6 +4,7 @@
 #include "util/file_handler.h"
 #include "util/heap.h"
 #include "util/utils_inline.h"
+#include "sq_hnswlib/hnswalg.h"
 #include <iostream>
 #include <omp.h>
 #include <stdint.h>
@@ -316,10 +317,12 @@ bool BBAnnIndex2<dataT>::LoadIndex(std::string &indexPathPrefix, const BBAnnPara
     return false;
   }
   // load hnsw
-  if(para.use_sq_hnsw) {
+  if(para.use_hnsw_sq ) {
     //index_hnsw_ = nullptr;
+
     index_sq_hnsw_ = std::make_shared<sq_hnswlib::HierarchicalNSW<float>>(
             space, getHnswIndexFileName());
+
   } else {
     index_hnsw_ = std::make_shared<hnswlib::HierarchicalNSW<float>>(
             space, getHnswIndexFileName());
@@ -354,7 +357,7 @@ void search_bbann_queryonly(
             << " pquery: " << static_cast<const void *>(pquery)
             << " bucket_labels: " << static_cast<void *>(bucket_labels)
             << std::endl;
-  if(para.use_sq_hnsw) {
+  if(para.use_hnsw_sq ) {
     index_sq_hnsw->setEf(para.efSearch);
   } else {
     index_hnsw->setEf(para.efSearch);
@@ -367,7 +370,7 @@ void search_bbann_queryonly(
     float *queryi = new float[dim];
     for (int j = 0; j < dim; j++)
       queryi[j] = (float)(*(pquery + i * dim + j));
-    auto reti = para.use_sq_hnsw ? index_sq_hnsw->searchKnn(queryi, para.nProbe) :
+    auto reti = para.use_hnsw_sq  ? index_sq_hnsw->searchKnn(queryi, para.nProbe) :
                                    index_hnsw->searchKnn(queryi, para.nProbe);
     auto p_labeli = bucket_labels + i * para.nProbe;
     while (!reti.empty()) {
@@ -497,7 +500,7 @@ void BBAnnIndex2<dataT>::BuildWithParameter(const BBAnnParameters para) {
   hierarchical_clusters<dataT, distanceT>(para, avg_len);
   rc.RecordSection("conquer each cluster into buckets done");
 
-  build_graph(indexPrefix_, para.hnswM, para.hnswefC, para.metric);
+  build_graph(indexPrefix_, para.hnswM, para.hnswefC, para.metric, para.use_hnsw_sq);
   rc.RecordSection("build hnsw done.");
 
   // TODO: disable statistics
