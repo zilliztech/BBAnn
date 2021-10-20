@@ -153,9 +153,9 @@ PYBIND11_MODULE(bbannpy, m) {
       .def_readwrite("K1", &BBAnnParameters::K1)
       .def_readwrite("K", &BBAnnParameters::K)
       .def_readwrite("nProbe", &BBAnnParameters::nProbe)
-      .def_readwrite("rangeSearchProbeCount",
-                     &BBAnnParameters::rangeSearchProbeCount)
-      .def_readwrite("blockSize", &BBAnnParameters::blockSize);
+      .def_readwrite("rangeSearchProbeCount",&BBAnnParameters::rangeSearchProbeCount)
+      .def_readwrite("blockSize", &BBAnnParameters::blockSize)
+      .def_readwrite("sample", &BBAnnParameters::sample);
 #define CLASSWRAPPER_DECL(className, index)                                    \
   class className {                                                            \
   public:                                                                      \

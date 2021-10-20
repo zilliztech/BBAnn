@@ -11,8 +11,9 @@
 namespace bbann {
 std::string Hello() { return "Hello!!!!"; }
 
-template <typename DATAT>
-void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+
+template <typename DATAT, typename DISTT>
+void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,
                   const int nq, const int dq, const int nprobe,
                   const int refine_nprobe, const DATAT *pquery,
                   uint32_t *buckets_label, float *centroids_dist) {
@@ -28,23 +29,20 @@ void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
   bool set_distance = centroids_dist != nullptr;
 #pragma omp parallel for
   for (int64_t i = 0; i < nq; i++) {
-    // auto queryi = pquery + i * dq;
-    // todo: hnsw need to support query data is not float
-    float *queryi = new float[dq];
-    float *queryi_dist = set_distance ? centroids_dist + i * nprobe : nullptr;
-
-    for (int j = 0; j < dq; j++)
-      queryi[j] = (float)(*(pquery + i * dq + j));
-    auto reti = index_hnsw->searchKnn(queryi, nprobe);
-    auto p_labeli = buckets_label + i * nprobe;
-    while (!reti.empty()) {
-      *p_labeli++ = reti.top().second;
-      if (set_distance) {
-        *queryi_dist++ = reti.top().first;
+      // move the duplicate logic into inner loop
+      // TODO optimize this
+      float *queryi_dist = set_distance ? centroids_dist + i * nprobe : nullptr;
+      auto reti = index_hnsw->searchKnn(pquery + i * dq, nprobe);
+      auto p_labeli = buckets_label + i * nprobe;
+      while (!reti.empty()) {
+          uint32_t cid, bid, offset;
+          bbann::util::parse_id(reti.top().second, cid, bid, offset);
+          *p_labeli++ = bbann::util::gen_global_block_id(cid, bid);
+          if(set_distance) {
+              *queryi_dist++ = reti.top().first;
+          }
+          reti.pop();
       }
-      reti.pop();
-    }
-    delete[] queryi;
   }
   rc.ElapseFromBegin("search graph done.");
 }
@@ -167,51 +165,142 @@ void divide_raw_data(const BBAnnParameters para, const float *centroids) {
   rc.ElapseFromBegin("split_raw_data totally done");
 }
 
+template<typename DATAT, typename DISTT>
+hnswlib::SpaceInterface<DISTT>* getDistanceSpace(MetricType metric_type, uint32_t ndim) {
+    hnswlib::SpaceInterface<DISTT> *space;
+    if (MetricType::L2 == metric_type) {
+        space = new hnswlib::L2Space<DATAT,DISTT>(ndim);
+    } else if (MetricType::IP == metric_type) {
+        space = new hnswlib::InnerProductSpace(ndim);
+    } else {
+        std::cout << "invalid metric_type = " << (int)metric_type << std::endl;
+    }
+    return space;
+}
+
+template<>
+hnswlib::SpaceInterface<float>* getDistanceSpace<float, float>(MetricType metric_type, uint32_t ndim) {
+    hnswlib::SpaceInterface<float> *space;
+    if (MetricType::L2 == metric_type) {
+        space = new hnswlib::L2Space<float, float>(ndim);
+    } else if (MetricType::IP == metric_type) {
+        space = new hnswlib::InnerProductSpace(ndim);
+    } else {
+        std::cout << "invalid metric_type = " << (int)metric_type << std::endl;
+    }
+    return space;
+}
+
+template<>
+hnswlib::SpaceInterface<int>* getDistanceSpace<int8_t, int>(MetricType metric_type, uint32_t ndim) {
+    hnswlib::SpaceInterface<int> *space;
+    if (MetricType::L2 == metric_type) {
+        space = new hnswlib::L2Space<int8_t, int32_t>(ndim);
+    } else {
+        std::cout << "invalid metric_type = " << (int)metric_type << std::endl;
+    }
+    return space;
+}
+
+template<>
+hnswlib::SpaceInterface<uint32_t>* getDistanceSpace<uint8_t, uint32_t>(MetricType metric_type, uint32_t ndim) {
+    hnswlib::SpaceInterface<uint32_t> *space;
+    if (MetricType::L2 == metric_type) {
+        space = new hnswlib::L2Space<uint8_t, uint32_t>(ndim);
+    } else {
+        std::cout << "invalid metric_type = " << (int)metric_type << std::endl;
+    }
+    return space;
+}
+
+
+template <typename DATAT, typename DISTT>
 void build_graph(const std::string &index_path, const int hnswM,
-                 const int hnswefC, MetricType metric_type) {
+                 const int hnswefC, MetricType metric_type, const uint64_t block_size, const int32_t sample) {
   TimeRecorder rc("create_graph_index");
   std::cout << "build hnsw parameters:" << std::endl;
   std::cout << " index_path: " << index_path << " hnsw.M: " << hnswM
             << " hnsw.efConstruction: " << hnswefC
             << " metric_type: " << (int)metric_type << std::endl;
 
-  float *pdata = nullptr;
+  DATAT *pdata = nullptr;
   uint32_t *pids = nullptr;
-  uint32_t npts, ndim, nids, nidsdim;
+  uint32_t nblocks, ndim, nids, nidsdim;
 
-  util::read_bin_file<float>(index_path + "bucket-centroids.bin", pdata, npts,
-                             ndim);
+  util::read_bin_file<float>(index_path + "bucket-centroids.bin", pdata, nblocks,ndim);
   rc.RecordSection("load centroids of buckets done");
-  std::cout << "there are " << npts << " of dimension " << ndim
+  std::cout << "there are " << nblocks << " of dimension " << ndim
             << " points of hnsw" << std::endl;
   assert(pdata != nullptr);
-  hnswlib::SpaceInterface<float> *space;
-  if (MetricType::L2 == metric_type) {
-    space = new hnswlib::L2Space(ndim);
-  } else if (MetricType::IP == metric_type) {
-    space = new hnswlib::InnerProductSpace(ndim);
-  } else {
-    std::cout << "invalid metric_type = " << (int)metric_type << std::endl;
-    return;
-  }
-
+  hnswlib::SpaceInterface<DISTT> *space = getDistanceSpace<DATAT, DISTT>(metric_type, ndim);
   util::read_bin_file<uint32_t>(index_path + "cluster-combine_ids.bin", pids,
                                 nids, nidsdim);
   rc.RecordSection("load combine ids of buckets done");
   std::cout << "there are " << nids << " of dimension " << nidsdim
             << " combine ids of hnsw" << std::endl;
   assert(pids != nullptr);
-  assert(npts == nids);
+  assert(nblocks == nids);
   assert(nidsdim == 1);
 
-  auto index_hnsw = std::make_shared<hnswlib::HierarchicalNSW<float>>(
-      space, npts, hnswM, hnswefC);
-  index_hnsw->addPoint(pdata, pids[0]);
+    const uint32_t vec_size = sizeof(DATAT) * ndim;
+    const uint32_t entry_size = vec_size + sizeof(uint32_t);
+
+    auto index_hnsw = std::make_shared<hnswlib::HierarchicalNSW<DISTT>>(space, sample * nblocks, hnswM, hnswefC);
+    uint32_t cid0, bid0;
+    bbann::util::parse_global_block_id(pids[0], cid0, bid0);
+    // add centroids
+    index_hnsw->addPoint(pdata, bbann::util::gen_id(cid0, bid0, 0));
+    if (sample != 1) {
+        // add sample data
+        std::string cluster_file_path = index_path + CLUSTER + std::to_string(cid0) + "-" + RAWDATA + BIN;
+        auto fh = std::ifstream(cluster_file_path, std::ios::binary);
+        assert(!fh.fail());
+        char *buf = new char[block_size];
+        fh.seekg(bid0 * block_size);
+        fh.read(buf, block_size);
+        const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
+        int bucketSample = sample - 1;
+        if (bucketSample > entry_num) {
+            bucketSample = entry_num;
+        }
+        char *buf_begin = buf + sizeof(uint32_t);
+        for (int64_t j = 0; j < bucketSample; j++) {
+            // TODO, pick vectors smarter?
+            char *entry_begin = buf_begin + entry_size * j;
+            index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin), bbann::util::gen_id(cid0, bid0, j + 1));
+        }
+        delete[] buf;
+        fh.close();
+    }
 #pragma omp parallel for
-  for (int64_t i = 1; i < npts; i++) {
-    index_hnsw->addPoint(pdata + i * ndim, pids[i]);
-  }
-  std::cout << "hnsw totally add " << npts << " points" << std::endl;
+    for (int64_t i = 1; i < nblocks; i++) {
+        uint32_t cid, bid;
+        bbann::util::parse_global_block_id(pids[i], cid, bid);
+        index_hnsw->addPoint(pdata + i * ndim, bbann::util::gen_id(cid, bid, 0));
+        if (sample != 1) {
+            // add sample data
+            std::string cluster_file_path = index_path + CLUSTER + std::to_string(cid) + "-" + RAWDATA + BIN;
+            auto fh = std::ifstream(cluster_file_path, std::ios::binary);
+            assert(!fh.fail());
+            char *buf = new char[block_size];
+            fh.seekg(bid * block_size);
+            fh.read(buf, block_size);
+            const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
+            int bucketSample = sample - 1;
+            if (bucketSample > entry_num) {
+                bucketSample = entry_num;
+            }
+            char *buf_begin = buf + sizeof(uint32_t);
+            for (int64_t j = 0; j < bucketSample; j++) {
+                // TODO, pick vectors smarter?
+                char *entry_begin = buf_begin + entry_size * j;
+                index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin), bbann::util::gen_id(cid, bid, j + 1));
+            }
+            delete[] buf;
+            fh.close();
+        }
+    }
+  std::cout << "hnsw totally add " << nblocks << " points" << std::endl;
   rc.RecordSection("create index hnsw done");
   index_hnsw->saveIndex(index_path + HNSW + INDEX + BIN);
   rc.RecordSection("hnsw save index done");
@@ -439,9 +528,9 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len) {
   return;
 }
 
-#define ALGO_LIB_DECL(DATAT)                                                   \
-  template void search_graph<DATAT>(                                           \
-      std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,             \
+#define ALGO_LIB_DECL(DATAT,DISTT)                                                   \
+  template void search_graph<DATAT, DISTT>(                                    \
+      std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,             \
       const int nq, const int dq, const int nprobe, const int refine_nprobe,   \
       const DATAT *pquery, uint32_t *buckets_label, float *centroids_dist);    \
   template void train_cluster<DATAT>(                                          \
@@ -457,9 +546,9 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len) {
   template void hierarchical_clusters<DATAT, DISTT>(                           \
       const BBAnnParameters para, const double avg_len);
 
-ALGO_LIB_DECL(float);
-ALGO_LIB_DECL(uint8_t);
-ALGO_LIB_DECL(int8_t);
+ALGO_LIB_DECL(float, float);
+ALGO_LIB_DECL(uint8_t, uint32_t);
+ALGO_LIB_DECL(int8_t, int32_t);
 
 ALGO_LIB_DECL_2(float, float);
 ALGO_LIB_DECL_2(uint8_t, uint32_t);

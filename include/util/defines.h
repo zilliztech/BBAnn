@@ -46,6 +46,7 @@ struct BBAnnParameters {
   int nProbe = 2;
   int efSearch = 250;
   int rangeSearchProbeCount = 20;
+  int sample = 1;
 };
 
 
