@@ -134,12 +134,19 @@ private:
 };
 
 namespace bbann {
+<<<<<<< HEAD
 inline std::string getClusterRawDataFileName(std::string prefix,
                                              int cluster_id) {
   return prefix + "cluster-" + std::to_string(cluster_id) + "-raw_data.bin";
 }
 inline std::string getClusterGlobalIdsFileName(std::string prefix,
                                                int cluster_id) {
+=======
+std::string getClusterRawDataFileName(std::string prefix, int cluster_id) {
+  return prefix + "cluster-" + std::to_string(cluster_id) + "-raw_data.bin";
+}
+std::string getClusterGlobalIdsFileName(std::string prefix, int cluster_id) {
+>>>>>>> 06f178b3a8038e7c49c2e1de9df5e32f11de8e51
   return prefix + "cluster-" + std::to_string(cluster_id) + "-global_ids.bin";
 }
 
