@@ -8,9 +8,26 @@
 #include <sys/stat.h>
 #include <unordered_map>
 #include <vector>
+#include "util/defines.h"
+#include "util/distance.h"
+
 
 namespace bbann {
 namespace util {
+
+inline int get_max_events_num_of_aio() {
+  auto file = "/proc/sys/fs/aio-max-nr";
+  auto f = std::ifstream(file);
+
+  if (!f.good()) {
+    return 1024;
+  }
+
+  int num;
+  f >> num;
+  f.close();
+  return num;
+}
 
 inline void get_bin_metadata(const std::string &bin_file, uint32_t &nrows,
                              uint32_t &ncols) {
@@ -93,5 +110,61 @@ inline void parse_global_block_id(uint32_t id, uint32_t &cid, uint32_t &bid) {
   cid = (id & 0xff);
   return;
 }
+
+template <typename T1, typename T2, typename R>
+using Computer = std::function<R(const T1 *, const T2 *, int n)>;
+
+template <typename T1, typename T2, typename R>
+inline Computer<T1, T2, R> select_computer(MetricType metric_type) {
+  switch (metric_type) {
+  case MetricType::L2:
+    return L2sqr<const T1, const T2, R>;
+    break;
+  case MetricType::IP:
+    return IP<const T1, const T2, R>;
+    break;
+  }
+}
+
 } // namespace util
+
+inline std::string getClusterRawDataFileName(std::string prefix, int cluster_id) {
+  return prefix + "cluster-" + std::to_string(cluster_id) + "-raw_data.bin";
+}
+inline std::string getClusterGlobalIdsFileName(std::string prefix, int cluster_id) {
+  return prefix + "cluster-" + std::to_string(cluster_id) + "-global_ids.bin";
+}
+
+inline float rand_float() {
+  static std::mt19937 generator(1234);
+  return generator() / (float)generator.max();
+}
+
+inline int rand_int() {
+  static std::mt19937 generator(3456);
+  return generator() & 0x7fffffff;
+}
+
+
+template<typename T>
+inline void random_sampling_k2(
+        const T* data,
+        const int64_t data_size,
+        const int64_t dim,
+        const int64_t sample_size,
+        T* sample_data,
+        int64_t seed = 1234
+) {
+    std::vector<int> perm(data_size);
+    for (int64_t i = 0; i < data_size; i++) {
+        perm[i] = i;
+    }
+    std::shuffle(perm.begin(), perm.end(), std::default_random_engine(seed));
+    for (int64_t i = 0; i < sample_size; i++) {
+        memcpy(sample_data + i * dim, data + perm[i] * dim,  dim * sizeof(T));
+    }
+    return ;
+}
+
+
 } // namespace bbann

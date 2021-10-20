@@ -14,7 +14,7 @@ struct refine_stat {
 };
 
 template<typename T>
-void stat_length(T *x, int64_t n, int64_t dim, double &max_len, double &min_len, double &avg_len) {
+inline void stat_length(T *x, int64_t n, int64_t dim, double &max_len, double &min_len, double &avg_len) {
     double sum_len = 0;
     max_len = 0;
     min_len = std::numeric_limits<double>::max();
