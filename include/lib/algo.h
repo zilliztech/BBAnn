@@ -31,6 +31,10 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len);
 
 template <typename DATAT, typename DISTT>
 void build_graph(const std::string &index_path, const int hnswM,
-                 const int hnswefC, MetricType metric_type, const int32_t sample);
+                 const int hnswefC, MetricType metric_type,
+                 const uint64_t block_size, const int32_t sample);
+template <typename DATAT, typename DISTT>
+hnswlib::SpaceInterface<DISTT> *getDistanceSpace(MetricType metric_type,
+                                                 uint32_t ndim);
 
 } // namespace bbann
