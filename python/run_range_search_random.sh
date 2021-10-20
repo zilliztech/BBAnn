@@ -18,6 +18,8 @@ popd
 
 
 sudo rm -rf build/
+sudo rm -rf dist/
+sudo rm -rf bbannpy.egg-info
 sudo python3 setup.py install -f
 
 set -e
