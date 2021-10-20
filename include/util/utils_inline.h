@@ -166,5 +166,54 @@ inline void random_sampling_k2(
     return ;
 }
 
+template<typename T>
+inline void train_code(T* max_len, T* min_len, T* data, int64_t n, uint32_t dim){
+    float rs_arg = 0.02;
+    int o;
+    T* min,max;
+    T* tdata = new T[n * dim];
+    transform_data(data, tdata, n, dim);
+    for (int d = 0; d < dim; d++) {
+        auto *__restrict tdata_d = tdata + n * d;
+        std::sort(tdata_d, tdata_d + n);
+        o = int(rs_arg * n);
+        if (o < 0)
+            o = 0;
+        if (o > n - o)
+            o = n / 2;
+        min_len[d] = tdata_d[o];
+        max_len[d] = tdata_d[n - 1 - o];
+    }
+    delete [] tdata;
+}
+
+template<typename T>
+inline void encode_uint8(T* max_len, T* min_len, T* data, uint8_t* code, int64_t n, uint32_t dim)  {
+#pragma omp parallel for
+    for (int64_t i = 0; i < n; i++) {
+        T x_temp;
+        auto * __restrict x = data + i * dim;
+        auto * __restrict y = code + i * dim;
+        for(int d = 0; d < dim; d++) {
+            x_temp = (x[d] - min_len[d])/(max_len[d] - min_len[d]);
+            if(x_temp<0.0) x_temp = 0;
+            if(x_temp>1.0) x_temp = 1;
+            y[d] = (uint8_t)(x_temp * 255);
+        }
+    }
+}
+
+template<typename T>
+inline void decode_uint8(T* max_len, T* min_len, T* data, uint8_t* code, int64_t n, uint32_t dim)  {
+#pragma omp parallel for
+    for (int64_t i = 0; i < n; i++) {
+        auto * __restrict x = data + i * dim;
+        auto * __restrict y = code + i * dim;
+        for(int d = 0; d < dim; d++) {
+            x[d] =min_len[d]+(y[d] + 0.5f)/255.0f*(max_len[d] -min_len[d]);
+        }
+    }
+}
+
 
 } // namespace bbann
