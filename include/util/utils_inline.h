@@ -128,6 +128,7 @@ inline Computer<T1, T2, R> select_computer(MetricType metric_type) {
 
 } // namespace util
 
+
 inline std::string getClusterRawDataFileName(std::string prefix, int cluster_id) {
   return prefix + "cluster-" + std::to_string(cluster_id) + "-raw_data.bin";
 }
