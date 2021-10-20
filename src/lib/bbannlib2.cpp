@@ -345,7 +345,7 @@ void search_bbann_queryonly(
 }
 
 template <typename dataT>
-void BBAnnIndex2<dataT, distanceT>::BatchSearchCpp(const dataT *pquery, uint64_t dim,
+void BBAnnIndex2<dataT>::BatchSearchCpp(const dataT *pquery, uint64_t dim,
                                         uint64_t numQuery, uint64_t knn,
                                         const BBAnnParameters para,
                                         uint32_t *answer_ids,
@@ -362,8 +362,8 @@ void BBAnnIndex2<dataT,distanceT>::BuildIndexImpl(const BBAnnParameters para) {
   index->BuildWithParameter(para);
 }
 
-template <typename dataT, distanceT>
-void BBAnnIndex2<dataT, distanceT>::BuildWithParameter(const BBAnnParameters para) {
+template <typename dataT>
+void BBAnnIndex2<dataT>::BuildWithParameter(const BBAnnParameters para) {
   std::cout << "Build start+ " << std::endl;
   TimeRecorder rc("build bigann");
   using distanceT = typename TypeWrapper<dataT>::distanceT;
@@ -402,7 +402,7 @@ void BBAnnIndex2<dataT, distanceT>::BuildWithParameter(const BBAnnParameters par
 }
 
 template <typename dataT>
-std::tuple<std::vector<uint32_t>, std::vector<distanceT>, std::vector<uint64_t>>
+std::tuple<std::vector<uint32_t>, std::vector<BBAnnIndex2<dataT>::distanceT>, std::vector<uint64_t>>
 BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
                                    uint64_t numQuery, double radius,
                                    const BBAnnParameters para) {
