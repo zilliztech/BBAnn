@@ -187,6 +187,74 @@ inline void train_code(T* max_len, T* min_len, T* data, int64_t n, uint32_t dim)
     delete [] tdata;
 }
 
+// For RS_opt
+/*
+template<typename T>
+inline void train_code(T* max_len, T* min_len, T* data, int64_t n, uint32_t dim){
+    float rs_arg = 0;
+    int o;
+    T vmin,vmax;
+    T* tdata= new T[n * dim];
+    int k = 256;
+    transform_data(data, tdata, n, dim);
+    for (int d = 0; d < dim; d++) {
+        float a, b;
+        float sx = 0;
+        T* x = tdata + n * d;
+        {
+            vmin = std::numeric_limits<T>::max();
+            vmax = std::numeric_limits<T>::min();
+            for (auto i = 0; i < n; i++) {
+                if (x[i] < vmin)
+                    vmin = x[i];
+                if (x[i] > vmax)
+                    vmax = x[i];
+                sx += x[i];
+            }
+            b = vmin;
+            a = (vmax - vmin) / k;
+        }
+
+        int niter = 2000;
+        float last_err = -1;
+        int iter_last_err = 0;
+        for (int it = 0; it < niter; it++) {
+            float sn = 0, sn2 = 0, sxn = 0, err1 = 0;
+
+            for (auto i = 0; i < n; i++) {
+                float xi = x[i];
+                float ni = floor((xi - b) / a + 0.5);
+                if (ni < 0)
+                    ni = 0;
+                if (ni >= k)
+                    ni = k - 1;
+                err1 += std::sqrt(xi - (ni * a + b));
+                sn += ni;
+                sn2 += ni * ni;
+                sxn += ni * xi;
+            }
+
+            if (err1 == last_err) {
+                iter_last_err++;
+                if (iter_last_err == 16)
+                    break;
+            } else {
+                last_err = err1;
+                iter_last_err = 0;
+            }
+
+            float det = std::sqrt(sn) - sn2 * n;
+
+            b = (sn * sxn - sn2 * sx) / det;
+            a = (sn * sx - n * sxn) / det;
+        }
+        min_len[d] = vmin;
+        max_len[d] = vmax;
+    }
+    delete [] tdata;
+}
+*/
+
 template<typename T>
 inline void encode_uint8(T* max_len, T* min_len, T* data, uint8_t* code, int64_t n, uint32_t dim)  {
 #pragma omp parallel for
