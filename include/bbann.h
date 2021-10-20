@@ -8,6 +8,7 @@
 #include "util/constants.h"
 #include "util/utils.h"
 #include "hnswlib/hnswlib.h"
+#include "hnswlib/space_ui8_l2.h"
 #include "util/statistics.h"
 #include "util/heap.h"
 #include "ivf/hierarchical_kmeans.h"
@@ -41,7 +42,7 @@ void search_bbann(const std::string& index_path,
                    const int nprobe,
                    const int hnsw_ef,
                    const int topk,
-                   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+                   std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,
                    const int K1,
                    const uint64_t block_size,
                    Computer<DATAT, DATAT, DISTT>& dis_computer);
@@ -49,7 +50,7 @@ void search_bbann(const std::string& index_path,
 template <typename DATAT, typename DISTT, typename HEAPT>
 void search_bbann_queryonly(
     const std::string &index_path, const int nprobe, const int hnsw_ef,
-    const int topk, std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+    const int topk, std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,
     const int K1, const uint64_t block_size,
     Computer<DATAT, DATAT, DISTT> &dis_computer,
     /* for IO */
@@ -61,7 +62,7 @@ template <typename DATAT, typename DISTT>
 void range_search_bbann(
     const std::string &index_path,
     const int hnsw_ef,
-    const float radius, std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+    const float radius, std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,
     const int K1, const uint64_t block_size,
     Computer<DATAT, DATAT, DISTT> &dis_computer,
     /* for IO */
@@ -70,3 +71,6 @@ void range_search_bbann(
     std::vector<std::vector<float>> &dists,
     std::vector<uint64_t> &lims,
     uint32_t nq, uint32_t dim);
+
+template<typename DATAT, typename DISTT>
+hnswlib::SpaceInterface<DISTT>* getDistanceSpace(MetricType metric_type, uint32_t ndim);

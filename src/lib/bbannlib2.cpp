@@ -307,16 +307,9 @@ bool BBAnnIndex2<dataT>::LoadIndex(std::string &indexPathPrefix) {
   uint32_t bucket_num, dim;
   util::get_bin_metadata(getBucketCentroidsFileName(), bucket_num, dim);
 
-  hnswlib::SpaceInterface<float> *space = nullptr;
-  if (MetricType::L2 == metric_) {
-    space = new hnswlib::L2Space(dim);
-  } else if (MetricType::IP == metric_) {
-    space = new hnswlib::InnerProductSpace(dim);
-  } else {
-    return false;
-  }
-  // load hnsw
-  index_hnsw_ = std::make_shared<hnswlib::HierarchicalNSW<float>>(
+  auto space = getDistanceSpace<dataT, distanceT>(metric_, dim);
+
+  index_hnsw_ = std::make_shared<hnswlib::HierarchicalNSW<distanceT>>(
       space, getHnswIndexFileName());
   indexPrefix_ = indexPathPrefix;
   return true;
@@ -324,7 +317,7 @@ bool BBAnnIndex2<dataT>::LoadIndex(std::string &indexPathPrefix) {
 
 template <typename DATAT, typename DISTT>
 void search_bbann_queryonly(
-    std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+    std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,
     const BBAnnParameters para, const int topk, const DATAT *pquery,
     uint32_t *answer_ids, DISTT *answer_dists, uint32_t num_query,
     uint32_t dim) {

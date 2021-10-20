@@ -51,7 +51,7 @@ public:
                       std::vector<std::vector<uint32_t>> &ids,
                       std::vector<std::vector<float>> &dists,
                       std::vector<uint64_t> &lims) override;
-  std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw_;
+  std::shared_ptr<hnswlib::HierarchicalNSW<distanceT>> index_hnsw_;
   std::string indexPrefix_;
   std::string dataFilePath_;
 

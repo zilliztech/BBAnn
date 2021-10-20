@@ -38,7 +38,7 @@ int main() {
         ids[i] = i;
     }
 
-    hnswlib::SpaceInterface<float> *space = new hnswlib::L2Space(dim);
+    hnswlib::SpaceInterface<float> *space = new hnswlib::L2Space<float, float>(dim);
 
     auto index_hnsw = std::make_shared<hnswlib::HierarchicalNSW<float>>(
         space, nb, hnswM, hnswefC);
