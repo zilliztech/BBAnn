@@ -83,6 +83,17 @@ void train_cluster(const std::string &raw_data_bin_file,
   rc.RecordSection("kmeans done");
   assert((*centroids) != nullptr);
 
+  max_len.assign(dim, std::numeric_limits<DATAT>::min());
+  min_len.assign(dim, std::numeric_limits<DATAT>::max());
+  train_code<DATAT>(max_len.data(), min_len.data(), sample_data, sample_num, dim);
+  std::string meta_file = output_path + "meta";
+  IOWriter meta_writer(meta_file);
+  meta_writer.write((char*)max_len.data(), sizeof(DATAT) * dim);
+  meta_writer.write((char*)min_len.data(), sizeof(DATAT) * dim);
+  for(int i =0; i< dim; i++) {
+      std::cout<<"dim: "<<i<<"max: "<<max_len[i]<<", min: "<<min_len[i]<<std::endl;
+  }
+
   delete[] sample_data;
   rc.ElapseFromBegin("train cluster done.");
 }
