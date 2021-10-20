@@ -618,7 +618,7 @@ void BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
   template void BBAnnIndex2<dataT>::RangeSearchCpp(                            \
       const dataT *pquery, uint64_t dim, uint64_t numQuery, double radius,     \
       const BBAnnParameters para, std::vector<std::vector<uint32_t>> &ids,     \
-      std::vector<std::vector<float>> &dists, std::vector<uint64_t> &lims);
+      std::vector<std::vector<distanceT>> &dists, std::vector<uint64_t> &lims);
 
 BBANNLIB_DECL(float);
 BBANNLIB_DECL(uint8_t);
