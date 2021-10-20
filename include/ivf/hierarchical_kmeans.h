@@ -241,7 +241,7 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
     uint32_t global_id;
 
     char* data_blk_buf = new char[blk_size];
-    uint8_t* code = new uint8_t[blk_size * dim];
+    uint8_t* code = new uint8_t[threshold * dim];
     for(int i=0; i < k2; i++) {
         if (i == 0) {
             bucket_size = bucket_pre_size[i];
@@ -278,5 +278,6 @@ void recursive_kmeans(uint32_t k1_id, int64_t cluster_size, T* data, uint32_t* i
                              blk_num, data_writer, centroids_writer, centroids_id_writer, level + 1, max_len, min_len, kmpp, avg_len, niter, seed);
         }
     }
+    delete [] code;
     delete [] data_blk_buf;
 }
