@@ -97,6 +97,57 @@ inline void read_bin_file(const std::string& file_name, T*& data, uint32_t& n,
 }
 
 template<typename T>
+inline void read_bin_file_half_dimension(const std::string& file_name, T*& data,uint32_t& n,
+                                         uint32_t& dim,const uint32_t& begin_dim){
+    std::ifstream reader(file_name, std::ios::binary);
+
+    reader.read((char*)&n, sizeof(uint32_t));
+    reader.read((char*)&dim, sizeof(uint32_t));
+    if (begin_dim==0){
+        uint32_t new_dim=dim/2;
+        if (data== nullptr){
+            data=new T[(uint64_t)n*(uint64_t)new_dim];
+        }
+        T* buf=new T[(uint64_t)(dim-new_dim)];
+        for (uint32_t i=0;i<n;++i){
+            for (uint32_t j=0;j<new_dim;j++){
+                reader.read((char*)(data+j*n+i),sizeof(T));
+            }
+            reader.read((char*)buf,sizeof(T)*(dim-new_dim));
+        }
+        delete [] buf;
+        buf= nullptr;
+        std::cout << "read binary file from " << file_name << " done in ... seconds, n = "
+                  << n << ", dim = " << new_dim << std::endl;
+    }
+    else{
+        if (data== nullptr){
+            data=new T[(uint64_t)n*(uint64_t)(dim-begin_dim)];
+        }
+        T* buf=new T[(uint64_t)begin_dim];
+        uint32_t offset=dim-begin_dim;
+        for (uint32_t i=0;i<n;++i){
+            reader.read((char*)buf,sizeof(T)*begin_dim);
+            for (uint32_t j=0;j<offset;++j){
+                reader.read((char*)(data+j*n+i),sizeof(T));
+            }
+        }
+        delete [] buf;
+        buf= nullptr;
+        std::cout << "read binary file from " << file_name << " done in ... seconds, n = "
+                  << n << ", dim = " << offset << std::endl;
+    }
+}
+
+inline void read_meta(const std::string& file_name,uint32_t& n,uint32_t& dim){
+    std::ifstream reader(file_name, std::ios::binary);
+
+    reader.read((char*)&n, sizeof(uint32_t));
+    reader.read((char*)&dim, sizeof(uint32_t));
+    reader.close();
+}
+
+template<typename T>
 void reservoir_sampling(const std::string& data_file, const size_t sample_num, T* sample_data) {
     assert(sample_data != nullptr);
     std::random_device rd;

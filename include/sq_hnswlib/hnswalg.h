@@ -1125,7 +1125,7 @@ namespace sq_hnswlib {
                     for (int i = 0; i < size; i++) {
                         tableint cand = datal[i];
                         if (cand < 0 || cand > max_elements_)
-                            throw std::runtime_error("cand error");
+                             throw std::runtime_error("cand error");
                         dist_t d = fstdistfunc_(query_data, getDataByInternalId(cand), dist_func_param_,codes_,false);
 
                         if (d < curdist) {

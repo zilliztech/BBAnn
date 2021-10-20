@@ -34,7 +34,7 @@ void IndexBindWrapper(py::module_ &m) {
       .def(py::init([](MetricType metric) {
         return std::unique_ptr<indexT>(new indexT(metric));
       }))
-      .def("load_index", &indexT::LoadIndex, py::arg("index_path_prefix"))
+      .def("load_index", &indexT::LoadIndex, py::arg("index_path_prefix"), py::arg("para"))
       .def("build",
            [](indexT &self, paraT para) {
              std::cout << "Build" << TypeNameWrapper::Get() << std::endl;

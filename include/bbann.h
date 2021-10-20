@@ -8,6 +8,7 @@
 #include "util/constants.h"
 #include "util/utils.h"
 #include "hnswlib/hnswlib.h"
+#include "sq_hnswlib/hnswlib.h"
 #include "util/statistics.h"
 #include "util/heap.h"
 #include "ivf/hierarchical_kmeans.h"

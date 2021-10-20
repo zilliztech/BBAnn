@@ -2,6 +2,7 @@
 #include "ann_interface.h"
 
 #include "hnswlib/hnswalg.h"
+#include "sq_hnswlib/hnswalg.h"
 #include "bbann.h"
 #include <iostream>
 #include <memory>
@@ -23,6 +24,7 @@ struct BBAnnParameters {
   int blockSize = 1;
   int nProbe = 2;
   int efSearch = 250;
+  bool use_sq_hnsw = false;
 };
 
 template <typename dataT>
@@ -40,7 +42,7 @@ public:
   }
   MetricType metric_;
 
-  bool LoadIndex(std::string &indexPathPrefix);
+  bool LoadIndex(std::string &indexPathPrefix, const BBAnnParameters para);
 
   void BatchSearchCpp(const dataT *pquery, uint64_t dim, uint64_t numQuery,
                       uint64_t knn, const BBAnnParameters para,
@@ -52,6 +54,7 @@ public:
                       std::vector<std::vector<float>> &dists,
                       std::vector<uint64_t> &lims) override;
   std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw_;
+  std::shared_ptr<sq_hnswlib::HierarchicalNSW<float>> index_sq_hnsw_;
   std::string indexPrefix_;
   std::string dataFilePath_;
 
