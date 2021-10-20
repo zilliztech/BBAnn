@@ -787,7 +787,7 @@ void range_search_bbann(
     Computer<DATAT, DATAT, DISTT> &dis_computer,
     const DATAT *pquery, 
     std::vector<std::vector<uint32_t>> &ids,
-    std::vector<std::vector<float>> &dists,
+    std::vector<std::vector<DISTT>> &dists,
     std::vector<uint64_t> &lims,
     uint32_t nq, uint32_t dq) {
     TimeRecorder rc("range search bbann");
@@ -804,17 +804,11 @@ void range_search_bbann(
   index_hnsw->setEf(hnsw_ef);
 #pragma omp parallel for
   for (int64_t i = 0; i < nq; i++) {
-    // auto queryi = pquery + i * dq;
-    // todo: hnsw need to support query data is not float
-    float *queryi = new float[dq];
-    for (int j = 0; j < dq; j++)
-      queryi[j] = (float)(*(pquery + i * dq + j));
-    auto reti = index_hnsw->searchRange(queryi, 20, radius);
+    auto reti = index_hnsw->searchRange(pquery + i * dq, 20, radius);
     while (!reti.empty()) {
       bucket_labels[i].push_back(reti.top().second);
       reti.pop();
     }
-    delete[] queryi;
   }
   rc.RecordSection("search buckets done.");
 
