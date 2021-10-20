@@ -7,5 +7,4 @@ add_library(ivf_s STATIC ivf.cpp)
 
 add_executable(include_test test.cpp)
 target_link_libraries(algo_s ivf_s)
-target_link_libraries(BBAnnLib2_s aio)
 target_link_libraries(include_test BBAnnLib2_s algo_s ivf_s aio TimeRecorder)
