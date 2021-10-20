@@ -67,7 +67,10 @@ ext_modules = [
         language='c++',
         extra_objects=[
         '../build/src/lib/libBBAnnLib2_s.a',
-        '../build/src/libTimeRecorder.a'],
+        '../build/src/libTimeRecorder.a',
+        '../build/src/lib/libalgo_s.a',
+        '../build/src/lib/libivf_s.a'
+        ],
     )
 ]
 
