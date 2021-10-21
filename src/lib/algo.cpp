@@ -11,6 +11,40 @@
 namespace bbann {
 std::string Hello() { return "Hello!!!!"; }
 
+
+void search_graph_hnsw_sq(std::shared_ptr<sq_hnswlib::HierarchicalNSW<DISTT>> index_hnsw_sq,
+                          const int nq, const int dq, const int nprobe,
+                          const int refine_nprobe, const float *pquery,
+                          uint32_t *buckets_label, float *centroids_dist) {
+  TimeRecorder rc("search graph");
+  std::cout << "search graph parameters:" << std::endl;
+  std::cout << " index_hnsw_sq: " << index_hnsw_sq << " nq: " << nq << " dq: " << dq
+            << " nprobe: " << nprobe << " refine_nprobe: " << refine_nprobe
+            << " pquery: " << static_cast<const void *>(pquery)
+            << " buckets_label: " << static_cast<void *>(buckets_label)
+            << std::endl;
+  index_hnsw_sq->setEf(refine_nprobe);
+  bool set_distance = centroids_dist != nullptr;
+#pragma omp parallel for
+  for (int64_t i = 0; i < nq; i++) {
+    // move the duplicate logic into inner loop
+    // TODO optimize this
+    float *queryi_dist = set_distance ? centroids_dist + i * nprobe : nullptr;
+    auto reti = index_hnsw_sq->searchKnn(pquery + i * dq, nprobe);
+    auto p_labeli = buckets_label + i * nprobe;
+    while (!reti.empty()) {
+      uint32_t cid, bid, offset;
+      bbann::util::parse_id(reti.top().second, cid, bid, offset);
+      *p_labeli++ = bbann::util::gen_global_block_id(cid, bid);
+      if (set_distance) {
+        *queryi_dist++ = reti.top().first;
+      }
+      reti.pop();
+    }
+  }
+  rc.ElapseFromBegin("search graph done.");
+}
+
 template <typename DATAT, typename DISTT>
 void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,
                   const int nq, const int dq, const int nprobe,
@@ -213,6 +247,105 @@ getDistanceSpace<uint8_t, uint32_t>(MetricType metric_type, uint32_t ndim) {
     std::cout << "invalid metric_type = " << (int)metric_type << std::endl;
   }
   return space;
+}
+
+void build_hnsw_sq(const std::string &index_path,
+                   const int hnswM,
+                   const int hnswefC,
+                   MetricType metric_type) {
+  TimeRecorder rc("create_graph_index");
+  std::cout << "build hnsw parameters:" << std::endl;
+  std::cout << " index_path: " << index_path << " hnsw.M: " << hnswM
+            << " hnsw.efConstruction: " << hnswefC
+            << " metric_type: " << (int)metric_type << std::endl;
+
+  uint32_t *pids = nullptr;
+  uint32_t npts, ndim, nids, nidsdim,npts2;
+  uint32_t total_n=0;
+
+  auto read_meta = [](const std::string& file_name, uint32_t& n, uint32_t& dim) {
+      std::ifstream reader(file_name, std::ios::binary);
+      reader.read((char*)&n, sizeof(uint32_t));
+      reader.read((char*)&dim, sizeof(uint32_t));
+      reader.close();
+  };
+  get_bin_metadata(index_path+BUCKET+CENTROIDS+BIN,  total_n, ndim);
+  int64_t sample_num = total_n * K1_SAMPLE_RATE;
+  float *sample_data = new float[sample_num * ndim];
+  float *t_sample_data = new float[sample_num * ndim];
+
+  reservoir_sampling(index_path+BUCKET+CENTROIDS+BIN, sample_num, sample_data);
+  transform_data(sample_data, t_sample_data, sample_num, ndim);
+  delete [] sample_data;
+
+
+  float *codes=new float[256 * ndim];
+  auto *codebook=new uint8_t [(uint64_t)total_n*(uint64_t)ndim];
+  memset(codebook,0,sizeof(uint8_t)*(uint64_t)total_n*(uint64_t)ndim);
+  std::cout<<"start sq"<<std::endl;
+#pragma omp parallel for
+  for (uint32_t i = 0; i < ndim; ++i){
+    float *centers=new float[256];
+    kmeans(total_n,t_sample_data + i*total_n,1,256,centers);
+    for (int j=0;j<256;j++){
+      codes[j*ndim+i]=centers[j];
+    }
+    for (uint32_t j=0;j<total_n;++j){
+      float min_dis = std::numeric_limits<float>::max();
+      for (uint8_t k = 0; k < 256; ++k){
+        float diff=codes[ndim * k + i]-t_sample_data[i * total_n + j];
+        float now_dis = diff*diff;
+        if (now_dis < min_dis){
+          min_dis = now_dis;
+          codebook[j*ndim+i] = k;
+        }
+      }
+    }
+  }
+  std::cout<<"first part code computed"<<std::endl;
+
+  delete[] t_sample_data;
+  t_sample_data=nullptr;
+
+  rc.RecordSection("load centroids of buckets and compute SQ done");
+//  std::string sq_path=index_path+SQ+BIN;
+//  std::ofstream sq_center_writer(sq_path,std::ios::out|std::ios::binary);
+//  uint32_t nn=256;
+//  sq_center_writer.write((char*)&nn,sizeof(uint32_t));
+//  sq_center_writer.write((char*)&ndim,sizeof(uint32_t));
+//  sq_center_writer.write((char*)codes,sizeof(float)*(uint64_t)nn*(uint64_t)ndim);
+//  sq_center_writer.close();
+
+  // rc.RecordSection("save sq codes done");
+
+  sq_hnswlib::SpaceInterface<float> *space= nullptr;
+  if (MetricType::L2==metric_type){
+    space=new sq_hnswlib::L2Space(ndim);
+  }
+  else if (MetricType::IP==metric_type){
+    space=new sq_hnswlib::InnerProductSpace(ndim);
+  }
+  else{
+    std::cout << "invalid metric_type = " << (int)metric_type << std::endl;
+    return;
+  }
+  read_bin_file<uint32_t>(index_path + CLUSTER + COMBINE_IDS + BIN, pids, nids,
+                          nidsdim);
+
+  auto index_hnsw = std::make_shared<sq_hnswlib::HierarchicalNSW<float>>(
+          space, total_n, hnswM, hnswefC,100,codes);
+  index_hnsw->addPoint(codebook, pids[0]);
+#pragma omp parallel for
+  for (int64_t i = 1; i < total_n; i++) {
+    index_hnsw->addPoint(codebook + i * ndim, pids[i]);
+  }
+  std::cout << "hnsw totally add " << npts << " points" << std::endl;
+  rc.RecordSection("create index hnsw done");
+  index_hnsw->saveIndex(index_path + HNSW + INDEX + BIN);
+  rc.RecordSection("hnsw save index done");
+  delete[] pids;
+  pids = nullptr;
+  rc.ElapseFromBegin("create index hnsw totally done");
 }
 
 template <typename DATAT, typename DISTT>

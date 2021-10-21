@@ -26,7 +26,7 @@ void IndexBindWrapper(py::module_ &m) {
       .def(py::init([](MetricType metric) {
         return std::unique_ptr<indexT>(new indexT(metric));
       }))
-      .def("load_index", &indexT::LoadIndex, py::arg("index_path_prefix"))
+      .def("load_index", &indexT::LoadIndex, py::arg("index_path_prefix"), py::arg("para"))
       .def("build",
            [](indexT &self, paraT para) {
              std::cout << "Build" << TypeNameWrapper::Get() << std::endl;
@@ -156,7 +156,8 @@ PYBIND11_MODULE(bbannpy, m) {
       .def_readwrite("aio_EventsPerBatch", &BBAnnParameters::aio_EventsPerBatch)
       .def_readwrite("rangeSearchProbeCount",&BBAnnParameters::rangeSearchProbeCount)
       .def_readwrite("blockSize", &BBAnnParameters::blockSize)
-      .def_readwrite("sample", &BBAnnParameters::sample);
+      .def_readwrite("sample", &BBAnnParameters::sample)
+      .def_readwrite("use_hnsw_sq", &BBAnnParameters::use_hnsw_sq);
 #define CLASSWRAPPER_DECL(className, index)                                    \
   class className {                                                            \
   public:                                                                      \

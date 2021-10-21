@@ -126,7 +126,7 @@ class BbANN(BaseANN):
             return False
         self.para.indexPrefixPath = index_dir + "/"
         print(f"Loading index from {self.para.indexPrefixPath}")
-        self.index.load_index(self.para.indexPrefixPath)
+        self.index.load_index(self.para.indexPrefixPath, self.para)
         return True
 
     def query(self, X, k):

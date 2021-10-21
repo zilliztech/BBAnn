@@ -27,7 +27,7 @@ public:
   }
   MetricType metric_;
 
-  bool LoadIndex(std::string &indexPathPrefix);
+  bool LoadIndex(std::string &indexPathPrefix, const BBAnnParameters para);
 
   void BatchSearchCpp(const dataT *pquery, uint64_t dim, uint64_t numQuery,
                       uint64_t knn, const BBAnnParameters para,
@@ -37,6 +37,7 @@ public:
   RangeSearchCpp(const dataT *pquery, uint64_t dim, uint64_t numQuery,
                       double radius, const BBAnnParameters para) override;
   std::shared_ptr<hnswlib::HierarchicalNSW<distanceT>> index_hnsw_;
+    std::shared_ptr<sq_hnswlib::HierarchicalNSW<float>> index_sq_hnsw_;
 
   std::string indexPrefix_;
   std::string dataFilePath_;

@@ -1,10 +1,20 @@
 #pragma once
-#include "hnswlib/hnswlib.h"
-#include "util/TimeRecorder.h"
-#include "util/defines.h"
+
+#include <iostream>
+#include <algorithm>
+#include <string>
+#include <list>
+#include <thread>
+#include <limits>
 #include <chrono>
 #include <memory>
 #include <string>
+
+#include "hnswlib/hnswlib.h"
+#include "util/TimeRecorder.h"
+#include "util/defines.h"
+#include "sq_hnswlib/hnswlib.h"
+
 namespace bbann {
 std::string Hello();
 
@@ -32,7 +42,8 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len);
 template <typename DATAT, typename DISTT>
 void build_graph(const std::string &index_path, const int hnswM,
                  const int hnswefC, MetricType metric_type,
-                 const uint64_t block_size, const int32_t sample);
+                 const uint64_t block_size, const int32_t sample,
+                 bool use_hnsw_sq);
 template <typename DATAT, typename DISTT>
 hnswlib::SpaceInterface<DISTT> *getDistanceSpace(MetricType metric_type,
                                                  uint32_t ndim);
