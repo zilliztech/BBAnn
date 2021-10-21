@@ -390,7 +390,11 @@ BBAnnIndex2<dataT, distanceT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
       const auto reti = index_hnsw_->searchRange(
           pquery + i * dim, para.rangeSearchProbeCount, radius);
       for (auto const &[dist, bucket_label] : reti) {
-        ret.emplace_back(std::make_pair(bucket_label, i));
+          // convert the bucket label from 64bit to 32 bit
+          uint32_t cid, bid, offset;
+          bbann::util::parse_id(bucket_label, cid, bid, offset);
+          auto bucket_label32 = bbann::util::gen_global_block_id(cid, bid);
+          ret.emplace_back(std::make_pair(bucket_label32, i));
       }
     }
     return ret;
