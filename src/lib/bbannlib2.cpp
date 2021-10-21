@@ -221,11 +221,11 @@ void search_bbann_queryonly(
         (num + io_wait_threads_num - 1) / io_wait_threads_num;
 
 #pragma omp parallel for
-    DATAT *vec;
     for (auto th = 0; th < io_wait_threads_num; th++) {
       auto begin_th = begin + wait_num_per_batch * th;
       auto end_th = std::min(int(begin_th + wait_num_per_batch), end);
       auto num_th = end_th - begin_th;
+      DATAT *vec;
 
       std::vector<struct io_event> events(num_th);
 
