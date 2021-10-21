@@ -15,6 +15,7 @@ pushd ../benchmark
 cp ../python/bbann.py benchmark/algorithms/bbann.py
 # rm -rf results/random-xs/*
 
+# cp ../python/Dockerfile.bbann benchmark/install/
 # python3 install.py --algorithm bbann
 
 python3 run.py --definitions ../python/bbann-algo.yaml --dataset random-xs --algorithm $ALGORITHM # --force --rebuild
