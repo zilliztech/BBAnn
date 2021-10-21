@@ -32,7 +32,6 @@ void IndexBindWrapper(py::module_ &m) {
              std::cout << "Build" << TypeNameWrapper::Get() << std::endl;
              return indexT::BuildIndex(para);
            },
-           py::arg("vector_use_sq"),
            py::arg("para"))
       .def("batch_search",
            [](indexT &self,
