@@ -16,23 +16,17 @@
 #include <stdlib.h> // posix_memalign
 namespace bbann {
 
-template <typename dataT>
-bool BBAnnIndex2<dataT>::LoadIndex(std::string &indexPathPrefix) {
+template <typename dataT, typename distanceT>
+bool BBAnnIndex2<dataT, distanceT>::LoadIndex(std::string &indexPathPrefix) {
   indexPrefix_ = indexPathPrefix;
   std::cout << "Loading: " << indexPrefix_;
   uint32_t bucket_num, dim;
   util::get_bin_metadata(getBucketCentroidsFileName(), bucket_num, dim);
 
-  hnswlib::SpaceInterface<float> *space = nullptr;
-  if (MetricType::L2 == metric_) {
-    space = new hnswlib::L2Space(dim);
-  } else if (MetricType::IP == metric_) {
-    space = new hnswlib::InnerProductSpace(dim);
-  } else {
-    return false;
-  }
+  // hnswlib::SpaceInterface<distanceT> *space =
+  auto *space = getDistanceSpace<dataT, distanceT>(metric_, dim);
   // load hnsw
-  index_hnsw_ = std::make_shared<hnswlib::HierarchicalNSW<float>>(
+  index_hnsw_ = std::make_shared<hnswlib::HierarchicalNSW<distanceT>>(
       space, getHnswIndexFileName());
   indexPrefix_ = indexPathPrefix;
   return true;
@@ -40,7 +34,7 @@ bool BBAnnIndex2<dataT>::LoadIndex(std::string &indexPathPrefix) {
 
 template <typename DATAT, typename DISTT>
 void search_bbann_queryonly(
-    std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw,
+    std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,
     const BBAnnParameters para, const int topk, const DATAT *pquery,
     uint32_t *answer_ids, DISTT *answer_dists, uint32_t nq, uint32_t dim) {
   TimeRecorder rc("search bigann");
@@ -302,29 +296,27 @@ void search_bbann_queryonly(
   rc.ElapseFromBegin("search bigann totally done");
 }
 
-template <typename dataT>
-void BBAnnIndex2<dataT>::BatchSearchCpp(const dataT *pquery, uint64_t dim,
-                                        uint64_t numQuery, uint64_t knn,
-                                        const BBAnnParameters para,
-                                        uint32_t *answer_ids,
-                                        distanceT *answer_dists) {
+template <typename dataT, typename distanceT>
+void BBAnnIndex2<dataT, distanceT>::BatchSearchCpp(
+    const dataT *pquery, uint64_t dim, uint64_t numQuery, uint64_t knn,
+    const BBAnnParameters para, uint32_t *answer_ids, distanceT *answer_dists) {
   std::cout << "Query: " << std::endl;
 
   search_bbann_queryonly<dataT, distanceT>(
       index_hnsw_, para, knn, pquery, answer_ids, answer_dists, numQuery, dim);
 }
 
-template <typename dataT>
-void BBAnnIndex2<dataT>::BuildIndexImpl(const BBAnnParameters para) {
-  auto index = std::make_unique<BBAnnIndex2<dataT>>(para.metric);
+template <typename dataT, typename distanceT>
+void BBAnnIndex2<dataT, distanceT>::BuildIndexImpl(const BBAnnParameters para) {
+  auto index = std::make_unique<BBAnnIndex2<dataT, distanceT>>(para.metric);
   index->BuildWithParameter(para);
 }
 
-template <typename dataT>
-void BBAnnIndex2<dataT>::BuildWithParameter(const BBAnnParameters para) {
+template <typename dataT, typename distanceT>
+void BBAnnIndex2<dataT, distanceT>::BuildWithParameter(
+    const BBAnnParameters para) {
   std::cout << "Build start+ " << std::endl;
   TimeRecorder rc("build bigann");
-  using distanceT = typename TypeWrapper<dataT>::distanceT;
   dataFilePath_ = para.dataFilePath;
   indexPrefix_ = para.indexPrefixPath;
   std::cout << "build bigann parameters:" << std::endl;
@@ -349,7 +341,8 @@ void BBAnnIndex2<dataT>::BuildWithParameter(const BBAnnParameters para) {
   hierarchical_clusters<dataT, distanceT>(para, avg_len);
   rc.RecordSection("conquer each cluster into buckets done");
 
-  build_graph(indexPrefix_, para.hnswM, para.hnswefC, para.metric);
+  build_graph<dataT, distanceT>(indexPrefix_, para.hnswM, para.hnswefC,
+                                para.metric, para.blockSize, para.sample);
   rc.RecordSection("build hnsw done.");
 
   // TODO()!!!!!!!!!!!!!!!)
@@ -360,11 +353,11 @@ void BBAnnIndex2<dataT>::BuildWithParameter(const BBAnnParameters para) {
   rc.ElapseFromBegin("build bigann totally done.");
 }
 
-template <typename dataT>
-std::tuple<std::vector<uint32_t>, std::vector<float>, std::vector<uint64_t>>
-BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
-                                   uint64_t numQuery, double radius,
-                                   const BBAnnParameters para) {
+template <typename dataT, typename distanceT>
+std::tuple<std::vector<uint32_t>, std::vector<distanceT>, std::vector<uint64_t>>
+BBAnnIndex2<dataT, distanceT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
+                                              uint64_t numQuery, double radius,
+                                              const BBAnnParameters para) {
   TimeRecorder rc("range search bbann");
 
   std::cout << "range search bigann parameters:" << std::endl;
@@ -383,14 +376,6 @@ BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
     std::cout << std::endl;
   }
    */
-
-  std::vector<float> query_float;
-  query_float.resize(numQuery * dim);
-#pragma omp parallel for
-  for (int64_t i = 0; i < numQuery * dim; i++) {
-    query_float[i] = (float)pquery[i];
-  }
-  std::cout << " prepared query_float" << std::endl;
   // std::vector<uint32_t> *bucket_labels = new std::vector<uint32_t>[numQuery];
   std::vector<std::pair<uint32_t, uint32_t>> qid_bucketLabel;
 
@@ -402,10 +387,14 @@ BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
                                    int r) -> std::vector<std::pair<int, int>> {
     std::vector<std::pair<int, int>> ret;
     for (int i = l; i < r; i++) {
-      float *queryi = &query_float[i * dim];
-      const auto reti = index_hnsw_->searchRange(queryi, para.rangeSearchProbeCount, radius);
+      const auto reti = index_hnsw_->searchRange(
+          pquery + i * dim, para.rangeSearchProbeCount, radius);
       for (auto const &[dist, bucket_label] : reti) {
-        ret.emplace_back(std::make_pair(bucket_label, i));
+          // convert the bucket label from 64bit to 32 bit
+          uint32_t cid, bid, offset;
+          bbann::util::parse_id(bucket_label, cid, bid, offset);
+          auto bucket_label32 = bbann::util::gen_global_block_id(cid, bid);
+          ret.emplace_back(std::make_pair(bucket_label32, i));
       }
     }
     return ret;
@@ -439,6 +428,7 @@ BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
     // char *buf = &buf_v[0];
 
     std::list<qidIdDistTupleType> ret;
+
     auto dis_computer = util::select_computer<dataT, dataT, distanceT>(para.metric);
     // auto reader = std::make_unique<CachedBucketReader>(para.indexPrefixPath);
     std::vector<uint32_t> bucketIds;
@@ -530,6 +520,7 @@ BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
         }
       }
     }
+
     std::cout << "Finished query number:" << thisQuerySize << std::endl;
     free(big_read_buf);
     std::cout << " relleased big_read_buf" << std::endl;
@@ -557,14 +548,15 @@ BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
   rc.RecordSection("scan blocks done");
   sort(ans_list.begin(), ans_list.end());
   std::vector<uint32_t> ids;
-  std::vector<float> dists;
+  std::vector<distanceT> dists;
   std::vector<uint64_t> lims(numQuery + 1);
   int lims_index = 0;
   for (auto const &[qid, ansid, dist] : ans_list) {
-    //std::cout << qid << " " << ansid << " " << dist << std::endl;
+    // std::cout << qid << " " << ansid << " " << dist << std::endl;
     while (lims_index < qid) {
       lims[lims_index] = ids.size();
-      // std::cout << "lims" << lims_index << "!" << lims[lims_index] << std::endl;
+      // std::cout << "lims" << lims_index << "!" << lims[lims_index] <<
+      // std::endl;
       lims_index++;
     }
     if (lims[qid] == 0 && qid == lims_index) {
@@ -587,23 +579,24 @@ BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
   return std::make_tuple(ids, dists, lims);
 }
 
-#define BBANNLIB_DECL(dataT)                                                   \
-  template bool BBAnnIndex2<dataT>::LoadIndex(std::string &indexPathPrefix);   \
-  template void BBAnnIndex2<dataT>::BatchSearchCpp(                            \
+#define BBANNLIB_DECL(dataT, distanceT)                                        \
+  template bool BBAnnIndex2<dataT, distanceT>::LoadIndex(                      \
+      std::string &indexPathPrefix);                                           \
+  template void BBAnnIndex2<dataT, distanceT>::BatchSearchCpp(                 \
       const dataT *pquery, uint64_t dim, uint64_t numQuery, uint64_t knn,      \
       const BBAnnParameters para, uint32_t *answer_ids,                        \
       distanceT *answer_dists);                                                \
-  template void BBAnnIndex2<dataT>::BuildIndexImpl(                            \
+  template void BBAnnIndex2<dataT, distanceT>::BuildIndexImpl(                 \
       const BBAnnParameters para);                                             \
-  template std::tuple<std::vector<uint32_t>, std::vector<float>,               \
+  template std::tuple<std::vector<uint32_t>, std::vector<distanceT>,           \
                       std::vector<uint64_t>>                                   \
-  BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,        \
-                                     uint64_t numQuery, double radius,         \
-                                     const BBAnnParameters para);
+  BBAnnIndex2<dataT, distanceT>::RangeSearchCpp(                               \
+      const dataT *pquery, uint64_t dim, uint64_t numQuery, double radius,     \
+      const BBAnnParameters para);
 
-BBANNLIB_DECL(float);
-BBANNLIB_DECL(uint8_t);
-BBANNLIB_DECL(int8_t);
+BBANNLIB_DECL(float, float);
+BBANNLIB_DECL(uint8_t, uint32_t);
+BBANNLIB_DECL(int8_t, int32_t);
 
 #undef BBANNLIB_DECL
 

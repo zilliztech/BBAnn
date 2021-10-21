@@ -90,7 +90,7 @@ void IndexBindWrapper(py::module_ &m) {
              }
              res_lims_mutable(numQuery) = lims[numQuery];
              for (size_t i = 0; i < total; i++) {
-               res_ids_mutable(i) = (unsigned) ids[i];
+               res_ids_mutable(i) = (unsigned)ids[i];
                res_dists_mutable(i) = dists[i];
              }
              return std::make_pair(res_lims,
@@ -153,10 +153,10 @@ PYBIND11_MODULE(bbannpy, m) {
       .def_readwrite("K1", &BBAnnParameters::K1)
       .def_readwrite("K", &BBAnnParameters::K)
       .def_readwrite("nProbe", &BBAnnParameters::nProbe)
-      .def_readwrite("rangeSearchProbeCount",
-                     &BBAnnParameters::rangeSearchProbeCount)
       .def_readwrite("aio_EventsPerBatch", &BBAnnParameters::aio_EventsPerBatch)
-      .def_readwrite("blockSize", &BBAnnParameters::blockSize);
+      .def_readwrite("rangeSearchProbeCount",&BBAnnParameters::rangeSearchProbeCount)
+      .def_readwrite("blockSize", &BBAnnParameters::blockSize)
+      .def_readwrite("sample", &BBAnnParameters::sample);
 #define CLASSWRAPPER_DECL(className, index)                                    \
   class className {                                                            \
   public:                                                                      \
@@ -167,9 +167,9 @@ PYBIND11_MODULE(bbannpy, m) {
   CLASSWRAPPER_DECL(Int8Wrapper, "Int8Index");
 #undef CLASSWRAPPER_DECL
 
-  IndexBindWrapper<BBAnnIndex2<float>, FloatWrapper>(m);
-  IndexBindWrapper<BBAnnIndex2<uint8_t>, UInt8Wrapper>(m);
-  IndexBindWrapper<BBAnnIndex2<int8_t>, Int8Wrapper>(m);
+  IndexBindWrapper<BBAnnIndex2<float, float>, FloatWrapper>(m);
+  IndexBindWrapper<BBAnnIndex2<uint8_t, uint32_t>, UInt8Wrapper>(m);
+  IndexBindWrapper<BBAnnIndex2<int8_t, int32_t>, Int8Wrapper>(m);
 
   DataReaderBindWrapper<float>(m, "read_bin_float");
   DataReaderBindWrapper<int8_t>(m, "read_bin_int8");

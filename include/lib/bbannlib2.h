@@ -11,14 +11,14 @@
 
 namespace bbann {
 
-template <typename dataT>
+template <typename dataT, typename distanceT>
 struct BBAnnIndex2
-    : public BuildIndexFactory<BBAnnIndex2<dataT>, BBAnnParameters>,
+    : public BuildIndexFactory<BBAnnIndex2<dataT,distanceT>, BBAnnParameters>,
       public AnnIndexInterface<dataT, BBAnnParameters> {
 
   using parameterType = BBAnnParameters;
   using dataType = dataT;
-  using distanceT = typename TypeWrapper<dataT>::distanceT;
+  // using distanceT = typename TypeWrapper<dataT>::distanceT;
   using qidIdDistTupleType = std::tuple<uint32_t, uint32_t, distanceT>;
 
 public:
@@ -33,10 +33,11 @@ public:
                       uint64_t knn, const BBAnnParameters para,
                       uint32_t *answer_ids, distanceT *answer_dists) override;
 
-  std::tuple<std::vector<uint32_t>, std::vector<float>, std::vector<uint64_t>>
- RangeSearchCpp(const dataT *pquery, uint64_t dim, uint64_t numQuery,
+  std::tuple<std::vector<uint32_t>, std::vector<distanceT>, std::vector<uint64_t>>
+  RangeSearchCpp(const dataT *pquery, uint64_t dim, uint64_t numQuery,
                       double radius, const BBAnnParameters para) override;
-  std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw_;
+  std::shared_ptr<hnswlib::HierarchicalNSW<distanceT>> index_hnsw_;
+
   std::string indexPrefix_;
   std::string dataFilePath_;
 

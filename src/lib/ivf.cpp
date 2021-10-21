@@ -775,8 +775,17 @@ void non_recursive_multilevel_kmeans(
 
         // std::cout << "blk_size " << blk_size << std::endl;
         data_writer.write((char *)data_blk_buf, blk_size);
-        centroids_writer.write((char *)(k2_centroids.data() + i * dim),
-                               sizeof(float) * dim);
+        // convert centroids to specified datatype
+        if (sizeof(T) != sizeof(float)) {
+          T* k2_centroids_T = new T[dim];
+          for (int j = 0; j < dim; j++) {
+              k2_centroids_T[j] = (T) k2_centroids[i * dim + j];
+          }
+          centroids_writer.write((char *) k2_centroids_T, sizeof(T) * dim);
+          delete[] k2_centroids_T;
+        } else {
+          centroids_writer.write((char *) (k2_centroids.data() + i * dim), sizeof(float) * dim);
+        }
         centroids_id_writer.write((char *)(&global_id), sizeof(uint32_t));
       }
     } else {
