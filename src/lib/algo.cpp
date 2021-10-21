@@ -35,7 +35,6 @@ void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,
     while (!reti.empty()) {
       uint32_t cid, bid, offset;
       bbann::util::parse_id(reti.top().second, cid, bid, offset);
-      std::cout<< "cid"<<cid << "bid"<<bid<<"offset"<<offset<<std::endl;
       *p_labeli++ = bbann::util::gen_global_block_id(cid, bid);
       if (set_distance) {
         *queryi_dist++ = reti.top().first;
