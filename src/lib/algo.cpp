@@ -21,9 +21,8 @@ void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,
   std::cout << "search graph parameters:" << std::endl;
   std::cout << " index_hnsw: " << index_hnsw << " nq: " << nq << " dq: " << dq
             << " nprobe: " << nprobe << " refine_nprobe: " << refine_nprobe
-            << " pquery: " << static_cast<const void *>(pquery)
-            << " buckets_label: " << static_cast<void *>(buckets_label)
             << std::endl;
+
   index_hnsw->setEf(refine_nprobe);
   bool set_distance = centroids_dist != nullptr;
 #pragma omp parallel for
@@ -36,6 +35,7 @@ void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,
     while (!reti.empty()) {
       uint32_t cid, bid, offset;
       bbann::util::parse_id(reti.top().second, cid, bid, offset);
+      std::cout<< "cid"<<cid << "bid"<<bid<<"offset"<<offset<<std::endl;
       *p_labeli++ = bbann::util::gen_global_block_id(cid, bid);
       if (set_distance) {
         *queryi_dist++ = reti.top().first;
