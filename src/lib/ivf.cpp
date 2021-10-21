@@ -634,12 +634,12 @@ void non_recursive_multilevel_kmeans(
     k2 = k2 < MAX_CLUSTER_K2 ? k2 : MAX_CLUSTER_K2;
   }
   assert(k2 != -1);
-  std::cout << "step 0: set k2: "
-            << "[level " << level << "] "
-            << "[cluster_size " << cluster_size << "] "
-            << "[k2 " << k2 << "] "
-            << "[do same size kmeans " << do_same_size_kmeans << "] "
-            << std::endl;
+  // std::cout << "step 0: set k2: "
+  //           << "[level " << level << "] "
+  //           << "[cluster_size " << cluster_size << "] "
+  //           << "[k2 " << k2 << "] "
+  //           << "[do same size kmeans " << do_same_size_kmeans << "] "
+  //           << std::endl;
 
   // Step 1: clustering
 
@@ -691,9 +691,9 @@ void non_recursive_multilevel_kmeans(
     // split_clusters_half(dim, k2, cluster_size, data, nullptr,
     // cluster_id.data(), k2_centroids, avg_len);
   }
-  std::cout << "step 1: clustering: "
-            << "cluster centroids be wrote into k2_centroids and cluster_id: "
-            << std::endl;
+  // std::cout << "step 1: clustering: "
+  //           << "cluster centroids be wrote into k2_centroids and cluster_id: "
+  //           << std::endl;
 
   // Step 2: reorder data by cluster id
 
@@ -721,7 +721,7 @@ void non_recursive_multilevel_kmeans(
   delete[] x_temp;
   delete[] ids_temp;
 
-  std::cout << "step 2: reorder data by cluster id: " << std::endl;
+  // std::cout << "step 2: reorder data by cluster id: " << std::endl;
 
   // Step 3: check all cluster, write out or generate new ClusteringTask
 
@@ -794,8 +794,8 @@ void non_recursive_multilevel_kmeans(
     }
   }
   delete[] data_blk_buf;
-  std::cout << "step 3: write out and generate new ClusteringTask: "
-            << "[output_tasks size " << output_tasks.size() << "]" << std::endl;
+  // std::cout << "step 3: write out and generate new ClusteringTask: "
+  //           << "[output_tasks size " << output_tasks.size() << "]" << std::endl;
 }
 
 template <typename T>
