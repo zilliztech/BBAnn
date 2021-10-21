@@ -11,6 +11,40 @@
 namespace bbann {
 std::string Hello() { return "Hello!!!!"; }
 
+
+void search_graph_hnsw_sq(std::shared_ptr<sq_hnswlib::HierarchicalNSW<float>> index_hnsw_sq,
+                          const int nq, const int dq, const int nprobe,
+                          const int refine_nprobe, const float *pquery,
+                          uint32_t *buckets_label, float *centroids_dist) {
+  TimeRecorder rc("search graph");
+  std::cout << "search graph parameters:" << std::endl;
+  std::cout << " index_hnsw_sq: " << index_hnsw_sq << " nq: " << nq << " dq: " << dq
+            << " nprobe: " << nprobe << " refine_nprobe: " << refine_nprobe
+            << " pquery: " << static_cast<const void *>(pquery)
+            << " buckets_label: " << static_cast<void *>(buckets_label)
+            << std::endl;
+  index_hnsw_sq->setEf(refine_nprobe);
+  bool set_distance = centroids_dist != nullptr;
+#pragma omp parallel for
+  for (int64_t i = 0; i < nq; i++) {
+    // move the duplicate logic into inner loop
+    // TODO optimize this
+    float *queryi_dist = set_distance ? centroids_dist + i * nprobe : nullptr;
+    auto reti = index_hnsw_sq->searchKnn(pquery + i * dq, nprobe);
+    auto p_labeli = buckets_label + i * nprobe;
+    while (!reti.empty()) {
+      uint32_t cid, bid, offset;
+      bbann::util::parse_id(reti.top().second, cid, bid, offset);
+      *p_labeli++ = bbann::util::gen_global_block_id(cid, bid);
+      if (set_distance) {
+        *queryi_dist++ = reti.top().first;
+      }
+      reti.pop();
+    }
+  }
+  rc.ElapseFromBegin("search graph done.");
+}
+
 template <typename DATAT, typename DISTT>
 void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,
                   const int nq, const int dq, const int nprobe,
@@ -168,6 +202,16 @@ void divide_raw_data(const BBAnnParameters para, const float *centroids) {
   rc.ElapseFromBegin("split_raw_data totally done");
 }
 
+template<typename T>
+inline void transform_data(T* data, T* tdata, int64_t n, uint32_t dim) {
+#pragma omp parallel for
+  for (auto i = 0; i < n; i++) {
+    for (auto j = 0; j < dim; j++) {
+      tdata[n * j + i] = data[i * dim + j];
+    }
+  }
+}
+
 template <typename DATAT, typename DISTT>
 hnswlib::SpaceInterface<DISTT> *getDistanceSpace(MetricType metric_type,
                                                  uint32_t ndim) {
@@ -218,6 +262,164 @@ getDistanceSpace<uint8_t, uint32_t>(MetricType metric_type, uint32_t ndim) {
     std::cout << "invalid metric_type = " << (int)metric_type << std::endl;
   }
   return space;
+}
+
+
+template<typename T>
+inline void read_bin_file_half_dimension(const std::string& file_name, T*& data,uint32_t& n,
+                                             uint32_t& dim,const uint32_t& begin_dim){
+  std::ifstream reader(file_name, std::ios::binary);
+
+  reader.read((char*)&n, sizeof(uint32_t));
+  reader.read((char*)&dim, sizeof(uint32_t));
+  if (begin_dim==0){
+    uint32_t new_dim=dim/2;
+    if (data== nullptr) {
+      data = new T[(uint64_t) n * (uint64_t) new_dim];
+    }
+    T* buf=new T[(uint64_t)(dim-new_dim)];
+    for (uint32_t i=0;i<n;++i){
+      for (uint32_t j=0;j<new_dim;j++){
+        reader.read((char*)(data+j*n+i),sizeof(T));
+      }
+      reader.read((char*)buf,sizeof(T)*(dim-new_dim));
+    }
+    delete [] buf;
+    buf= nullptr;
+    std::cout << "read binary file from " << file_name << " done in ... seconds, n = "
+                  << n << ", dim = " << new_dim << std::endl;
+  } else{
+    if (data== nullptr){
+      data=new T[(uint64_t)n*(uint64_t)(dim-begin_dim)];
+    }
+    T* buf=new T[(uint64_t)begin_dim];
+    uint32_t offset=dim-begin_dim;
+    for (uint32_t i=0;i<n;++i){
+      reader.read((char*)buf,sizeof(T)*begin_dim);
+      for (uint32_t j=0;j<offset;++j){
+        reader.read((char*)(data+j*n+i),sizeof(T));
+      }
+    }
+    delete [] buf;
+    buf= nullptr;
+    std::cout << "read binary file from " << file_name << " done in ... seconds, n = "
+                  << n << ", dim = " << offset << std::endl;
+  }
+}
+
+void build_hnsw_sq(const std::string &index_path,
+                   const int hnswM,
+                   const int hnswefC,
+                   MetricType metric_type) {
+  TimeRecorder rc("create_graph_index");
+  std::cout << "build hnsw parameters:" << std::endl;
+  std::cout << " index_path: " << index_path << " hnsw.M: " << hnswM
+            << " hnsw.efConstruction: " << hnswefC
+            << " metric_type: " << (int)metric_type << std::endl;
+  float *pdata = nullptr;
+  uint32_t *pids = nullptr;
+  uint32_t npts, ndim, nids, nidsdim,npts2;
+  uint32_t total_n=0;
+
+  auto read_meta = [](const std::string& file_name, uint32_t& n, uint32_t& dim) {
+      std::ifstream reader(file_name, std::ios::binary);
+      reader.read((char*)&n, sizeof(uint32_t));
+      reader.read((char*)&dim, sizeof(uint32_t));
+      reader.close();
+  };
+  read_meta(index_path+BUCKET+CENTROIDS+BIN,total_n,ndim);
+  std::cout<<"after reading meta data"<<std::endl;
+  uint32_t half_dim=ndim/2;
+  pdata=new float[(uint64_t)total_n*(uint64_t)half_dim];
+  float *codes=new float[256*ndim];
+  auto *codebook=new uint8_t [(uint64_t)total_n*(uint64_t)ndim];
+  memset(codebook,0,sizeof(uint8_t)*(uint64_t)total_n*(uint64_t)ndim);
+  std::cout<<"start sq"<<std::endl;
+  read_bin_file_half_dimension(index_path+BUCKET+CENTROIDS+BIN,pdata,npts,ndim,0);
+  std::cout<<"first pdata  initialized"<<std::endl;
+#pragma omp parallel for
+  for (uint32_t i=0;i<half_dim;++i){
+    float *centers=new float[256];
+    kmeans(total_n,pdata+i*total_n,1,256,centers);
+    for (int j=0;j<256;j++){
+      codes[j*ndim+i]=centers[j];
+    }
+    for (uint32_t j=0;j<total_n;++j){
+      float min_dis = std::numeric_limits<float>::max();
+      for (uint32_t k=0;k<256;++k){
+        float diff=codes[k*ndim+i]-pdata[i*total_n+j];
+        float now_dis=diff*diff;
+        if (now_dis<min_dis){
+          min_dis=now_dis;
+          uint32_t* p32=&k;
+          uint8_t* p8=(uint8_t*)p32;
+          codebook[j*ndim+i]=(uint8_t)(*(p8));
+        }
+      }
+    }
+  }
+  std::cout<<"first part code computed"<<std::endl;
+
+  delete[] pdata;
+  pdata=nullptr;
+  read_bin_file_half_dimension(index_path+BUCKET+CENTROIDS+BIN,pdata,npts,ndim,half_dim);
+  std::cout<<"second pdata of second part initialized"<<std::endl;
+#pragma omp parallel for
+  for (uint32_t i=half_dim;i<ndim;++i){
+    float *centers=new float[256];
+    kmeans(total_n,pdata+(i-half_dim)*total_n,1,256,centers);
+    for (int j=0;j<256;j++){
+      codes[j*ndim+i]=centers[j];
+    }
+    for (uint32_t j=0;j<total_n;++j){
+      float min_dis = std::numeric_limits<float>::max();
+      for (uint32_t k=0;k<256;++k){
+        float diff=codes[k*ndim+i]-pdata[(i-half_dim)*total_n+j];
+        float now_dis=diff*diff;
+        if (now_dis<min_dis){
+          min_dis=now_dis;
+          uint32_t* p32=&k;
+          uint8_t* p8=(uint8_t*)p32;
+          codebook[j*ndim+i]=(uint8_t)(*(p8));
+        }
+      }
+    }
+  }
+  std::cout<<"second part code computed"<<std::endl;
+  delete[] pdata;
+  pdata= nullptr;
+
+  rc.RecordSection("load centroids of buckets and compute SQ done");
+  rc.RecordSection("load centroids of buckets and compute SQ done");
+
+
+  sq_hnswlib::SpaceInterface<float> *space= nullptr;
+  if (MetricType::L2==metric_type){
+    space=new sq_hnswlib::L2Space(ndim);
+  }
+  else if (MetricType::IP==metric_type) {
+    space = new sq_hnswlib::InnerProductSpace(ndim);
+  } else{
+    std::cout << "invalid metric_type = " << (int)metric_type << std::endl;
+    return;
+  }
+  util::read_bin_file<uint32_t>(index_path + CLUSTER + COMBINE_IDS + BIN, pids, nids,
+                          nidsdim);
+
+  auto index_hnsw = std::make_shared<sq_hnswlib::HierarchicalNSW<float>>(
+          space, total_n, hnswM, hnswefC,100,codes);
+  index_hnsw->addPoint(codebook, pids[0]);
+#pragma omp parallel for
+  for (int64_t i = 1; i < total_n; i++) {
+    index_hnsw->addPoint(codebook + i * ndim, pids[i]);
+  }
+  std::cout << "hnsw totally add " << npts << " points" << std::endl;
+  rc.RecordSection("create index hnsw done");
+  index_hnsw->saveIndex(index_path + HNSW + INDEX + BIN);
+  rc.RecordSection("hnsw save index done");
+  delete[] pids;
+  pids = nullptr;
+  rc.ElapseFromBegin("create index hnsw totally done");
 }
 
 template <typename DATAT, typename DISTT>
