@@ -52,7 +52,6 @@ void search_bbann_queryonly(
   uint32_t cid, bid;
   const uint32_t vec_size = sizeof(DATAT) * dim;
   const uint32_t entry_size = vec_size + sizeof(uint32_t);
-  DATAT *vec;
 
   std::function<void(size_t, DISTT *, uint32_t *)> heap_heapify_func;
   std::function<bool(DISTT, DISTT)> cmp_func;
@@ -226,6 +225,7 @@ void search_bbann_queryonly(
       auto begin_th = begin + wait_num_per_batch * th;
       auto end_th = std::min(int(begin_th + wait_num_per_batch), end);
       auto num_th = end_th - begin_th;
+      DATAT *vec;
 
       std::vector<struct io_event> events(num_th);
 
