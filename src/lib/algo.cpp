@@ -49,7 +49,7 @@ void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,
 template <typename DATAT>
 void train_cluster(const std::string &raw_data_bin_file,
                    const std::string &output_path, const int32_t K1,
-                   float **centroids, double &avg_len, bool vector_use_sq = false) {
+                   float **centroids, double &avg_len, bool vector_use_sq) {
   TimeRecorder rc("train cluster");
   std::cout << "train_cluster parameters:" << std::endl;
   std::cout << " raw_data_bin_file: " << raw_data_bin_file
@@ -610,7 +610,8 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len) {
 #define ALGO_LIB_DECL(DATAT)                                                   \
   template void train_cluster<DATAT>(                                          \
       const std::string &raw_data_bin_file, const std::string &output_path,    \
-      const int32_t K1, float **centroids, double &avg_len);                   \
+      const int32_t K1, float **centroids, double &avg_len,                    \
+      bool vector_use_sq=false);                                               \
   template void reservoir_sampling<DATAT>(const std::string &data_file,        \
                                           const size_t sample_num,             \
                                           DATAT *sample_data);

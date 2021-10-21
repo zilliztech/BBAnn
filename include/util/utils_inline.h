@@ -186,6 +186,16 @@ inline void random_sampling_k2(
 }
 
 template<typename T>
+inline void transform_data(T* data, T* tdata, int64_t n, uint32_t dim) {
+#pragma omp parallel for
+    for (auto i = 0; i < n; i++) {
+        for (auto j = 0; j < dim; j++) {
+            tdata[n * j + i] = data[i * dim + j];
+        }
+    }
+}
+
+template<typename T>
 inline void train_code(T* max_len, T* min_len, T* data, int64_t n, uint32_t dim){
     float rs_arg = 0.02;
     int o;

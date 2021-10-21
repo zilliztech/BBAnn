@@ -329,7 +329,7 @@ void BBAnnIndex2<dataT, distanceT>::BuildWithParameter(
   double avg_len;
   // sampling and do K1-means to get the first round centroids
   train_cluster<dataT>(dataFilePath_, indexPrefix_, para.K1, &centroids,
-                       avg_len);
+                       avg_len, para.vector_use_sq);
   assert(centroids != nullptr);
   rc.RecordSection("train cluster to get " + std::to_string(para.K1) +
                    " centroids done.");

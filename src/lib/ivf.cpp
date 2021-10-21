@@ -608,8 +608,8 @@ void non_recursive_multilevel_kmeans(
     std::mutex &mutex, // mutex to protect write out centroids
     std::vector<ClusteringTask> &output_tasks, // output clustering tasks
     bool vector_use_sq, // whether use scalar quantization on base vector
-    const std::vector<T> &max_len, // the max value on each dimension
-    const std::vector<T> &min_len, // the min value on each dimension
+    std::vector<T> &max_len, // the max value on each dimension
+    std::vector<T> &min_len, // the min value on each dimension
     bool kmpp,                                 // k-means parameter
     float avg_len,                             // k-means parameter
     int64_t niter,                             // k-means parameter
@@ -760,6 +760,7 @@ void non_recursive_multilevel_kmeans(
   // alloc buffer to organize the persistent layout, persistent layout is repeated[vector, id],
   // in-memory layout is repeated[vector] and repeated[id]
   char *data_blk_buf = new char[blk_size];
+  std::vector<uint8_t > codes(threshold, 0);
 
   // check each k2 cluster, persistent or split again
   for (int i = 0; i < k2; i++) {
@@ -786,12 +787,35 @@ void non_recursive_multilevel_kmeans(
       *reinterpret_cast<uint32_t *>(data_blk_buf) = bucket_size;
       char *beg_address = data_blk_buf + sizeof(uint32_t);
 
-      // copy data to the persistent buffer
-      for (int j = 0; j < bucket_size; j++) {
-        memcpy(beg_address + j * entry_size, data + dim * (bucket_offset + j),
-               vector_size);
-        memcpy(beg_address + j * entry_size + vector_size,
-               ids + bucket_offset + j, id_size);
+      if (vector_use_sq) {
+        bbann::encode_uint8(max_len.data(),             // max from meta file
+                            min_len.data(),             // min from meta file
+                            data + dim * bucket_offset, // address of source vector
+                            codes.data(),               // output variable, codes
+                            bucket_size,                // number of vector in a bucket
+                            dim);                       // dimension
+
+        int code_size = sizeof(uint8_t) * dim;
+        entry_size = code_size + id_size;
+
+        // copy data to the persistent buffer
+        for (int j = 0; j < bucket_size; j++) {
+          auto entry_address = beg_address + j * entry_size;
+          memcpy(entry_address,                // dest
+                 codes.data() + j * code_size, // src
+                 code_size);
+          memcpy(entry_address + code_size,    // dest
+                 ids + bucket_offset + j,      // src
+                 id_size);
+        }
+      } else {
+        // copy data to the persistent buffer
+        for (int j = 0; j < bucket_size; j++) {
+          memcpy(beg_address + j * entry_size, data + dim * (bucket_offset + j),
+                 vector_size);
+          memcpy(beg_address + j * entry_size + vector_size,
+                 ids + bucket_offset + j, id_size);
+        }
       }
 
       // need a lock
@@ -1113,10 +1137,19 @@ void same_size_kmeans(int64_t nx, const T *x_in, int64_t dim, int64_t k,
   template void non_recursive_multilevel_kmeans<T>(                            \
       uint32_t k1_id, int64_t cluster_size, T * data, uint32_t * ids,          \
       int64_t round_offset, int64_t dim, uint32_t threshold,                   \
-      const uint64_t blk_size, uint32_t &blk_num, IOWriter &data_writer,       \
-      IOWriter &centroids_writer, IOWriter &centroids_id_writer,               \
+      const uint64_t blk_size, uint32_t &blk_num,                              \
+      /* IOWriter */                                                           \
+      IOWriter &data_writer,                                                   \
+      IOWriter &centroids_writer,                                              \
+      IOWriter &centroids_id_writer,                                           \
+      /* parameters for multi-thread accelerate */                             \
       int64_t centroids_id_start_position, int level, std::mutex &mutex,       \
-      std::vector<ClusteringTask> &output_tasks, bool kmpp = false,            \
+      std::vector<ClusteringTask> &output_tasks,                               \
+      /* SQ encode on base vectors */                                          \
+      bool vector_use_sq,                                                      \
+      std::vector<T> &max_len, std::vector<T> &min_len,                        \
+      /* k-means parameters */                                                 \
+      bool kmpp = false,                                                       \
       float avg_len, int64_t niter, int64_t seed);                             \
   template void same_size_kmeans<T>(                                           \
       int64_t nx, const T *x_in, int64_t dim, int64_t k, float *centroids,     \
