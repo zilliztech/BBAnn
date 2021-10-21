@@ -607,6 +607,9 @@ void non_recursive_multilevel_kmeans(
     int level,         // n-th round recursive clustering, start with 0
     std::mutex &mutex, // mutex to protect write out centroids
     std::vector<ClusteringTask> &output_tasks, // output clustering tasks
+    bool vector_use_sq, // whether use scalar quantization on base vector
+    const std::vector<T> &max_len, // the max value on each dimension
+    const std::vector<T> &min_len, // the min value on each dimension
     bool kmpp,                                 // k-means parameter
     float avg_len,                             // k-means parameter
     int64_t niter,                             // k-means parameter
@@ -616,11 +619,15 @@ void non_recursive_multilevel_kmeans(
   data = data + round_offset * dim;
   ids = ids + round_offset;
 
+  // Not used
   float weight = 0;
+
   int64_t vector_size = sizeof(T) * dim;
   int64_t id_size = sizeof(uint32_t);
 
-  // Step 0: set the num of cluster in this round clustering
+
+
+  // Step 0: set k2, the num of cluster in this round clustering
 
   int64_t k2 = -1; // num cluster in this round clustering
   bool do_same_size_kmeans = (LevelType(level) >= LevelType ::BALANCE_LEVEL) ||
@@ -641,17 +648,21 @@ void non_recursive_multilevel_kmeans(
   //           << "[do same size kmeans " << do_same_size_kmeans << "] "
   //           << std::endl;
 
-  // Step 1: clustering
+
+
+
+  // Step 1: k2, clustering in a file
 
   std::vector<float> k2_centroids(k2 * dim, 0.0);
   std::vector<int64_t> cluster_id(cluster_size, -1);
 
   if (do_same_size_kmeans) {
-    // use same size kmeans or graph partition
+    // use same size k-means or graph partition
     k2 = std::max((cluster_size + threshold - 1) / threshold, 1L);
     same_size_kmeans<T>(cluster_size, data, dim, k2, k2_centroids.data(),
                         cluster_id.data(), kmpp, avg_len, niter, seed);
   } else {
+    // sampling if needed
     int64_t train_size = cluster_size;
     T *train_data = nullptr;
     if (cluster_size > k2 * K2_MAX_POINTS_PER_CENTROID) {
@@ -662,15 +673,23 @@ void non_recursive_multilevel_kmeans(
     } else {
       train_data = data;
     }
+
+    // clustering
     kmeans<T>(train_size, train_data, dim, k2, k2_centroids.data(), kmpp,
               avg_len, niter, seed);
+
+
+    // free temp memory for sampling
     if (cluster_size > k2 * K2_MAX_POINTS_PER_CENTROID) {
       delete[] train_data;
     }
 
+    // Not used
     // Dynamic balance constraint K-means:
     // balanced_kmeans<T>(cluster_size, data, dim, k2, k2_centroids, weight,
     // kmpp, avg_len, niter, seed);
+
+    // Assign vector to centroids
     std::vector<float> dists(cluster_size, -1);
     if (weight != 0 && cluster_size <= KMEANS_THRESHOLD) {
       dynamic_assign<T, float, float>(data, k2_centroids.data(), dim,
@@ -685,15 +704,20 @@ void non_recursive_multilevel_kmeans(
     // dists is useless, so delete first
     std::vector<float>().swap(dists);
 
+    // If cluster is small, do merging
     merge_clusters<T>((LevelType)level, dim, cluster_size, k2, data, cluster_id,
                       k2_centroids, avg_len);
 
+    // Not used
     // split_clusters_half(dim, k2, cluster_size, data, nullptr,
     // cluster_id.data(), k2_centroids, avg_len);
   }
   // std::cout << "step 1: clustering: "
   //           << "cluster centroids be wrote into k2_centroids and cluster_id: "
   //           << std::endl;
+
+
+
 
   // Step 2: reorder data by cluster id
 
@@ -723,14 +747,24 @@ void non_recursive_multilevel_kmeans(
 
   // std::cout << "step 2: reorder data by cluster id: " << std::endl;
 
+
+
+
   // Step 3: check all cluster, write out or generate new ClusteringTask
 
   int64_t bucket_size;
   int64_t bucket_offset;
+
   int entry_size = vector_size + id_size;
 
+  // alloc buffer to organize the persistent layout, persistent layout is repeated[vector, id],
+  // in-memory layout is repeated[vector] and repeated[id]
   char *data_blk_buf = new char[blk_size];
+
+  // check each k2 cluster, persistent or split again
   for (int i = 0; i < k2; i++) {
+
+    // find the offset and size of origin data
     if (i == 0) {
       bucket_size = bucket_pre_size[i];
       bucket_offset = 0;
@@ -738,15 +772,21 @@ void non_recursive_multilevel_kmeans(
       bucket_size = bucket_pre_size[i] - bucket_pre_size[i - 1];
       bucket_offset = bucket_pre_size[i - 1];
     }
+
     // std::cout<<"after kmeans : centroids i"<<i<<" has vectors
     // "<<(int)bucket_size<<std::endl;
+
+    // determine persisten or split again by bucket_size
     if (bucket_size <= threshold) {
       // write a blk to file
       // std::cout << bucket_size<<std::endl;
+
+      // initialize buffer
       memset(data_blk_buf, 0, blk_size);
       *reinterpret_cast<uint32_t *>(data_blk_buf) = bucket_size;
       char *beg_address = data_blk_buf + sizeof(uint32_t);
 
+      // copy data to the persistent buffer
       for (int j = 0; j < bucket_size; j++) {
         memcpy(beg_address + j * entry_size, data + dim * (bucket_offset + j),
                vector_size);
@@ -758,23 +798,26 @@ void non_recursive_multilevel_kmeans(
       {
         std::lock_guard<std::mutex> lock(mutex);
 
+        // used to calculate how many centroids has been added
         int64_t current_position = centroids_id_writer.get_position();
         assert(current_position != -1);
         // std::cout << "global_centroids_number: current_position: " <<
         // current_position << std::endl;
 
-        // centroid id is uint32_t type
-        int64_t blk_num =
+        // the k-th block in this file
+        int64_t local_block_index =
             (current_position - centroids_id_start_position) / sizeof(uint32_t);
 
         // make sure type cast safety
-        assert(blk_num >= 0);
+        assert(local_block_index >= 0);
 
         uint32_t global_id =
-            bbann::util::gen_global_block_id(k1_id, (uint32_t)blk_num);
+            bbann::util::gen_global_block_id(k1_id, (uint32_t)local_block_index);
 
-        // std::cout << "blk_size " << blk_size << std::endl;
+        // persistent a block
         data_writer.write((char *)data_blk_buf, blk_size);
+
+        // FIXME: ????????????????????????
         // convert centroids to specified datatype
         if (sizeof(T) != sizeof(float)) {
           T* k2_centroids_T = new T[dim];
@@ -786,6 +829,7 @@ void non_recursive_multilevel_kmeans(
         } else {
           centroids_writer.write((char *) (k2_centroids.data() + i * dim), sizeof(float) * dim);
         }
+
         centroids_id_writer.write((char *)(&global_id), sizeof(uint32_t));
       }
     } else {

@@ -49,7 +49,7 @@ void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,
 template <typename DATAT>
 void train_cluster(const std::string &raw_data_bin_file,
                    const std::string &output_path, const int32_t K1,
-                   float **centroids, double &avg_len) {
+                   float **centroids, double &avg_len, bool vector_use_sq = false) {
   TimeRecorder rc("train cluster");
   std::cout << "train_cluster parameters:" << std::endl;
   std::cout << " raw_data_bin_file: " << raw_data_bin_file
@@ -80,15 +80,19 @@ void train_cluster(const std::string &raw_data_bin_file,
   rc.RecordSection("kmeans done");
   assert((*centroids) != nullptr);
 
-  max_len.assign(dim, std::numeric_limits<DATAT>::min());
-  min_len.assign(dim, std::numeric_limits<DATAT>::max());
-  train_code<DATAT>(max_len.data(), min_len.data(), sample_data, sample_num, dim);
-  std::string meta_file = output_path + "meta";
-  IOWriter meta_writer(meta_file);
-  meta_writer.write((char*)max_len.data(), sizeof(DATAT) * dim);
-  meta_writer.write((char*)min_len.data(), sizeof(DATAT) * dim);
-  for(int i =0; i< dim; i++) {
-      std::cout<<"dim: "<<i<<"max: "<<max_len[i]<<", min: "<<min_len[i]<<std::endl;
+  if(vector_use_sq) {
+      std::vector<DATAT> max_len;
+      std::vector<DATAT> min_len;
+      max_len.assign(dim, std::numeric_limits<DATAT>::min());
+      min_len.assign(dim, std::numeric_limits<DATAT>::max());
+      train_code<DATAT>(max_len.data(), min_len.data(), sample_data, sample_num, dim);
+      std::string meta_file = output_path + META;
+      IOWriter meta_writer(meta_file);
+      meta_writer.write((char*)max_len.data(), sizeof(DATAT) * dim);
+      meta_writer.write((char*)min_len.data(), sizeof(DATAT) * dim);
+      for(int i =0; i< dim; i++) {
+          std::cout<<"dim: "<<i<<"max: "<<max_len[i]<<", min: "<<min_len[i]<<std::endl;
+      }
   }
 
   delete[] sample_data;
@@ -381,6 +385,18 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len) {
   uint32_t placeholder = 1;
   uint32_t global_centroids_number = 0;
   uint32_t centroids_dim = 0;
+  util::get_bin_metadata(getClusterRawDataFileName(para.indexPrefixPath, 0), cluster_size, cluster_dim);
+
+  std::vector<DATAT> max_len(cluster_dim);
+  std::vector<DATAT> min_len(cluster_dim);
+
+  if (para.vector_use_sq) {
+    std::cout << "vector sq: read max/min from meta file" << std::endl;
+    std::string meta_file = para.indexPrefixPath + META;
+    IOReader meta_reader(meta_file);
+    meta_reader.read((char*)max_len.data(), sizeof(DATAT));
+    meta_reader.read((char*)min_len.data(), sizeof(DATAT));
+  }
 
   {
     IOWriter centroids_writer(bucket_centroids_file);
@@ -410,8 +426,15 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len) {
       data_reader.read((char *)&cluster_dim, sizeof(uint32_t));
       ids_reader.read((char *)&ids_size, sizeof(uint32_t));
       ids_reader.read((char *)&ids_dim, sizeof(uint32_t));
-      entry_num = (para.blockSize - sizeof(uint32_t)) /
-                  (cluster_dim * sizeof(DATAT) + ids_dim * sizeof(uint32_t));
+
+      if (para.vector_use_sq) {
+        entry_num = (para.blockSize - sizeof(uint32_t)) /
+                    (cluster_dim * sizeof(uint8_t) + ids_dim * sizeof(uint32_t));
+      } else {
+        entry_num = (para.blockSize - sizeof(uint32_t)) /
+                    (cluster_dim * sizeof(DATAT) + ids_dim * sizeof(uint32_t));
+      }
+
       centroids_dim = cluster_dim;
       assert(cluster_size == ids_size);
       assert(ids_dim == 1);
@@ -460,10 +483,28 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len) {
         //           << " cur.num_elems:" << cur.num_elems
         //           << " cur.level:" << cur.level << std::endl;
         non_recursive_multilevel_kmeans<DATAT>(
-            i, cur.num_elems, datai, idi, cur.offset, cluster_dim, entry_num,
-            para.blockSize, blk_num, data_writer, centroids_writer,
-            centroids_id_writer, local_start_position, cur.level, mutex,
-            output_tasks, false, avg_len);
+            i, // the index of k1 round k-means
+            cur.num_elems, // number vectors in this cluster
+            datai, // buffer to place all vectors
+            idi,   // buffer to place all ids
+            cur.offset,     // the offset of to clustering data in this round
+            cluster_dim,    // the dimension of vector
+            entry_num,      // threshold, determines when to stop recursive clustering
+            para.blockSize, // general 4096, determines how many vectors can be placed in a block
+            blk_num,        // output variable, number block output in this round clustering
+            data_writer,          // file writer 1: to output base vectors
+            centroids_writer,     // file writer 2: to output centroid vectors
+            centroids_id_writer,  // file writer 3: to output centroid ids
+            local_start_position, // the start position of all centroids id
+            cur.level,    // n-th round recursive clustering, start with 0
+            mutex,        // mutext to protect write out centroids
+            output_tasks, // output clustering tasks
+            para.vector_use_sq, // whether use scalar quantization on base vector
+            max_len, // the max values in each dimension
+            min_len, // the min values in each dimension
+            false,   // k-means parameter
+            avg_len  // k-means parameter
+            );
 
         for (auto &output_task : output_tasks) {
           todo.push_back(output_task);
@@ -489,10 +530,28 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len) {
           //           << " cur.level:" << cur.level << std::endl;
           std::vector<ClusteringTask> output_tasks;
           non_recursive_multilevel_kmeans<DATAT>(
-              i, cur.num_elems, datai, idi, cur.offset, cluster_dim, entry_num,
-              para.blockSize, blk_num, data_writer, centroids_writer,
-              centroids_id_writer, local_start_position, cur.level, mutex,
-              output_tasks, false, avg_len);
+                  i, // the index of k1 round k-means
+                  cur.num_elems, // number vectors in this cluster
+                  datai, // buffer to place all vectors
+                  idi,   // buffer to place all ids
+                  cur.offset,     // the offset of to clustering data in this round
+                  cluster_dim,    // the dimension of vector
+                  entry_num,      // threshold, determines when to stop recursive clustering
+                  para.blockSize, // general 4096, determines how many vectors can be placed in a block
+                  blk_num,        // output variable, number block output in this round clustering
+                  data_writer,          // file writer 1: to output base vectors
+                  centroids_writer,     // file writer 2: to output centroid vectors
+                  centroids_id_writer,  // file writer 3: to output centroid ids
+                  local_start_position, // the start position of all centroids id
+                  cur.level,    // n-th round recursive clustering, start with 0
+                  mutex,        // mutext to protect write out centroids
+                  output_tasks, // output clustering tasks
+                  para.vector_use_sq, // whether use scalar quantization on base vector
+                  max_len, // the max values in each dimension
+                  min_len, // the min values in each dimension
+                  false,   // k-means parameter
+                  avg_len  // k-means parameter
+          );
           assert(output_tasks.empty());
         }
       };
