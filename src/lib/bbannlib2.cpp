@@ -50,7 +50,6 @@ void search_bbann_queryonly(
 
   search_graph<DATAT, DISTT>(index_hnsw, nq, dim, para.nProbe, para.efSearch, pquery,bucket_labels, nullptr);
 
-  uint32_t cid, bid;
   const uint32_t vec_size = sizeof(DATAT) * dim;
   const uint32_t entry_size = vec_size + sizeof(uint32_t);
   DATAT *vec;
@@ -171,7 +170,7 @@ void search_bbann_queryonly(
       std::vector<struct iocb> ios(num_th);
       std::vector<struct iocb *> cbs(num_th, nullptr);
       for (auto i = begin_th; i < end_th; i++) {
-        int cid, bid;
+        uint32_t cid, bid;
         util::parse_global_block_id(locs[i], cid, bid);
         auto offset = bid * para.blockSize;
         io_prep_pread(ios.data() + (i - begin_th), fds[cid], block_bufs[i], para.blockSize, offset);
