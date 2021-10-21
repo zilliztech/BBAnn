@@ -1,10 +1,19 @@
 #pragma once
+#include "aio_reader.h"
 #include "util/utils_inline.h"
+
 #include <cassert>
 #include <cstring>
+#include <fcntl.h> // open
 #include <fstream>
 #include <iostream>
+#include <libaio.h>
+#include <mutex>
 #include <sstream>
+#include <stdio.h>
+#include <stdlib.h>
+#include <thread>
+#include <unistd.h> // pread
 
 namespace ioreader {
 constexpr static uint64_t KILOBYTE = 1024;
@@ -133,6 +142,132 @@ private:
   uint64_t fsize_ = 0;
 };
 
+namespace bbann {
+
+constexpr int MAX_EVENTS_NUM = 1023;
+/*
+class CtxManager {
+public:
+  static CtxManager &GetInstance() {
+    std::call_once(flag_, &CtxManager::init);
+    return *ins_;
+  }
+
+  io_context_t get_ctx() { return ctx_; }
+
+private:
+  CtxManager() = default;
+  ~CtxManager() { io_destroy(ctx_); }
+  CtxManager(const CtxManager &) = delete;
+  CtxManager &operator=(const CtxManager &) = delete;
+
+  static void init() {
+    ins_ = new CtxManager();
+    ins_->ctx_ = 0;
+    auto r = io_setup(MAX_EVENTS_NUM, &ins_->ctx_);
+    if (r) {
+      std::cout << "io_setup() failed!"
+                << " r: " << r << std::endl;
+      exit(-1);
+    }
+  }
+
+  io_context_t ctx_ = 0;
+  static std::once_flag flag_;
+  static CtxManager *ins_;
+};
+*/
+// std::once_flag CtxManager::flag_;
+// CtxManager *CtxManager::ins_ = nullptr;
+
+template <class Tp> struct NAlloc {
+  typedef Tp value_type;
+  NAlloc() = default;
+  template <class T> NAlloc(const NAlloc<T> &) {}
+
+  Tp *allocate(std::size_t n) {
+    n *= sizeof(Tp);
+    Tp *p;
+    if (posix_memalign(reinterpret_cast<void **>(&p), 512, sizeof(Tp) * n) !=
+        0) {
+      throw std::bad_alloc();
+    }
+
+    std::cout << "allocating " << n << " bytes @ " << p << '\n';
+    return p;
+  }
+
+  void deallocate(Tp *p, std::size_t n) {
+    std::cout << "deallocating " << n * sizeof *p << " bytes @ " << p << "\n\n";
+    ::operator delete(p);
+  }
+};
+
+class AIOBucketReader {
+public:
+  // returns a vector of bucketSize * q bytes, and a vector of res_id
+  // where q is the actual unique blocks fetched from file.
+  // the block at bucketSize*resid[i] is the result of the bucketIds[i];
+  AIOBucketReader(std::string prefix, int eventsPerBatch)
+      : eventsPerBatch_(eventsPerBatch), prefix_(prefix) {}
+
+  std::vector<uint32_t> ReadToBuf(std::vector<uint32_t> bucketIds,
+                                  int blockSize, void *ans) {
+
+    int n = bucketIds.size();
+    std::vector<AIORequest> req;
+    std::vector<uint32_t> resId(n);
+    cid_to_fd.clear();
+    for (int i = 0; i < n; i++) {
+      uint32_t cid, bid;
+      util::parse_global_block_id(bucketIds[i], cid, bid);
+      if (i)
+        if (bucketIds[i] == bucketIds[i - 1]) {
+          resId[i] = resId[i - 1];
+          continue;
+        }
+      resId[i] = req.size();
+      AIORequest r;
+      r.fd = cid;
+      r.buf = reinterpret_cast<char *>(ans + req.size() * blockSize);
+      r.offset = bid * blockSize;
+      r.size = blockSize;
+      req.emplace_back(r);
+    }
+
+    {
+      // Critical section: only 1 thread is supposed to enter this.
+      const std::lock_guard<std::mutex> lock(mutex_);
+      for (auto &r : req) {
+        r.fd = getFd(r.fd);
+      }
+      io_context_t ctx = 0;
+      auto max_events_num = 1023;
+      io_setup(max_events_num, &ctx);
+      AIORead(ctx, req,  {}, 32);
+      io_destroy(ctx);
+
+      for (const auto &[cid, fd] : cid_to_fd) {
+        close(fd);
+      }
+      cid_to_fd.clear();
+    }
+    return resId;
+  }
+
+  int getFd(uint32_t cid) {
+    if (!cid_to_fd.count(cid)) {
+      cid_to_fd[cid] = open(getClusterRawDataFileName(prefix_, cid).c_str(),
+                            O_DIRECT | O_RDONLY);
+    }
+    return cid_to_fd[cid];
+  }
+
+  std::unordered_map<int, int> cid_to_fd;
+  std::mutex mutex_;
+  std::string prefix_;
+  int eventsPerBatch_;
+};
 class CachedBucketReader {
 public:
   CachedBucketReader(std::string prefix)
@@ -163,3 +298,5 @@ public:
   std::ifstream fh_;
   std::string prefix_;
 };
+
+} // namespace bbann

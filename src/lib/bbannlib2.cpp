@@ -425,22 +425,49 @@ BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
 
   const uint32_t vec_size = sizeof(dataT) * dim;
   const uint32_t entry_size = vec_size + sizeof(uint32_t);
-
+  AIOBucketReader reader(para.indexPrefixPath, para.aio_EventsPerBatch);
   // -- a function that reads the file for bucketid/queryid in
   // bucketToQuery[a..b]
   //
   auto run_bucket_scan =
       [&, this, para, pquery](int l, int r) -> std::list<qidIdDistTupleType> {
     /* return a list of tuple <queryid, id, dist>:*/
+
+    // auto cachereader =
+    //    std::make_unique<CachedBucketReader>(para.indexPrefixPath);
+    // std::vector<char> buf_v(para.blockSize);
+    // char *buf = &buf_v[0];
+
     std::list<qidIdDistTupleType> ret;
-    std::vector<char> buf_v(para.blockSize);
-    char *buf = &buf_v[0];
     auto dis_computer = util::select_computer<dataT, dataT, distanceT>(para.metric);
-    auto reader = std::make_unique<CachedBucketReader>(para.indexPrefixPath);
+    // auto reader = std::make_unique<CachedBucketReader>(para.indexPrefixPath);
+    std::vector<uint32_t> bucketIds;
+    bucketIds.reserve(r - l);
     for (int i = l; i < r; i++) {
-      const auto [bucketid, qid] = bucketToQuery[i];
+      bucketIds.emplace_back(bucketToQuery[i].first);
+    }
+    // std::cout << std::endl;
+    void *big_read_buf;
+    if (posix_memalign(&big_read_buf, 512, para.blockSize * (r - l)) != 0) {
+      std::cerr << " err allocating  buf" << std::endl;
+      exit(-1);
+    }
+    auto resIds = reader.ReadToBuf(bucketIds, para.blockSize, big_read_buf);
+    /*
+    std::cout << "res size" << res.first.size() << std::endl;
+    std::cout << "id size " << res.second.size() << std::endl;
+    for (const auto id : res.second) {
+      std::cout << id << " ";
+    }
+    std::cout << std::endl;
+    std::cout << " expected id size" << r - l << std::endl;*/
+
+    for (int i = l; i < r; i++) {
+      const auto qid = bucketToQuery[i].second;
       const dataT *q_idx = pquery + qid * dim;
-      reader->readToBuf(bucketid, buf, para.blockSize);
+      // std::cout << "trying access" << res.second[i - l] << std::endl;
+      // char *buf = &res.first[res.second[i - l] * para.blockSize];
+      char *buf = (char *)big_read_buf + resIds[i - l] * para.blockSize;
       const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
       char *data_begin = buf + sizeof(uint32_t);
 
@@ -455,9 +482,60 @@ BBAnnIndex2<dataT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
         }
       }
     }
-    std::cout << "Query number:" << r-l <<"  read count:" << reader->unique_reads_ << std::endl;
+    std::cout << "Finished query number:" << r - l << std::endl;
+    free(big_read_buf);
+    std::cout << " relleased big_read_buf" << std::endl;
     return ret;
   };
+  // execute queries with "index mod (1<<shift) == thid".
+  auto run_bucket_scan_shift =
+      [&, this, para, pquery](int thid,
+                              int shift) -> std::list<qidIdDistTupleType> {
+  /* return a list of tuple <queryid, id, dist>:*/
+#define getIndex(i, shift, thid) ((i << shift) + thid)
+    std::list<qidIdDistTupleType> ret;
+    auto dis_computer = util::select_computer<dataT, dataT, distanceT>(para.metric);
+    // auto reader = std::make_unique<CachedBucketReader>(para.indexPrefixPath);
+    std::vector<uint32_t> bucketIds;
+    int totalQuerySize = bucketToQuery.size();
+    int thisQuerySize = totalQuerySize >> shift;
+    bucketIds.reserve(thisQuerySize);
+    for (int i = 0; i < thisQuerySize; i++) {
+      bucketIds.emplace_back(bucketToQuery[getIndex(i, shift, thid)].first);
+    }
+    // std::cout << std::endl;
+    void *big_read_buf;
+    if (posix_memalign(&big_read_buf, 512, para.blockSize * thisQuerySize) !=
+        0) {
+      std::cerr << " err allocating  buf" << std::endl;
+      exit(-1);
+    }
+    auto resIds = reader.ReadToBuf(bucketIds, para.blockSize, big_read_buf);
+
+    for (int i = 0; i < thisQuerySize; i++) {
+      const auto qid = bucketToQuery[getIndex(i, shift, thid)].second;
+      const dataT *q_idx = pquery + qid * dim;
+      char *buf = (char *)big_read_buf + resIds[i] * para.blockSize;
+      const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
+      char *data_begin = buf + sizeof(uint32_t);
+
+      for (uint32_t k = 0; k < entry_num; ++k) {
+        char *entry_begin = data_begin + entry_size * k;
+        auto dis =
+            dis_computer(reinterpret_cast<dataT *>(entry_begin), q_idx, dim);
+        if (dis < radius) {
+          const uint32_t id =
+              *reinterpret_cast<uint32_t *>(entry_begin + vec_size);
+          ret.push_back(std::make_tuple(qid, id, dis));
+        }
+      }
+    }
+    std::cout << "Finished query number:" << thisQuerySize << std::endl;
+    free(big_read_buf);
+    std::cout << " relleased big_read_buf" << std::endl;
+    return ret;
+  };
+
   std::cout << "Need to access bucket data for " << bucketToQuery.size()
             << " times, " << std::endl;
   uint32_t totQuery = 0;

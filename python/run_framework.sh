@@ -12,7 +12,6 @@ docker build --rm -f Dockerfile.local -t billion-scale-benchmark-bbann .
 popd
 
 pushd ../benchmark
-cp ../python/Dockerfile.bbann  install/
 cp ../python/bbann.py benchmark/algorithms/bbann.py
 # rm -rf results/random-xs/*
 

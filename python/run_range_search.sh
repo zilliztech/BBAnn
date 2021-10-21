@@ -19,9 +19,12 @@ pushd ../
 docker build --rm -f Dockerfile.local -t billion-scale-benchmark-bbann .
 popd
 
+
+sudo rm -rf build/
+sudo python3 setup.py install -f
+
 set -e
 pushd ../benchmark
-cp ../python/Dockerfile.bbann  install/
 cp ../python/bbann.py benchmark/algorithms/bbann.py
 
 # python3 install.py --algorithm bbann
