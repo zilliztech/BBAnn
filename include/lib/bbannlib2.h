@@ -2,6 +2,7 @@
 #include "ann_interface.h"
 
 #include "hnswlib/hnswalg.h"
+#include "lib/algo.h"
 #include <iostream>
 #include <memory>
 #include <stdint.h>
@@ -9,39 +10,6 @@
 #include <tuple>
 
 namespace bbann {
-
-namespace consts {
-// num of clusters in the first round k-means
-// constexpr static int K1 = 10;
-// sample rate of the first round k-means
-constexpr static float K1_SAMPLE_RATE = 0.01;
-// sample rate of the pq train set
-constexpr static float PQ_SAMPLE_RATE = 0.01;
-// the threshold of the second round k-means, if the size of cluster is larger
-// than this threshold, than do ((cluster size)/threshold)-means
-constexpr static int SPLIT_THRESHOLD = 500;
-// the max cluster number in hierarchical_cluster
-constexpr static int MAX_CLUSTER_K2 = 500;
-
-constexpr static int KMEANS_THRESHOLD = 2000;
-
-} // namespace consts
-struct BBAnnParameters {
-  std::string dataFilePath;
-  std::string indexPrefixPath;
-  std::string queryPath;
-  std::string groundTruthFilePath;
-  MetricType metric;
-  int K = 20; // top k.
-  int hnswM = 32;
-  int hnswefC = 500;
-  int K1 = 20;
-  int blockSize = 1;
-  int nProbe = 2;
-  int efSearch = 250;
-  int rangeSearchProbeCount = 20;
-  int aio_EventsPerBatch = 512;
-};
 
 template <typename dataT>
 struct BBAnnIndex2

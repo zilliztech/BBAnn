@@ -13,13 +13,11 @@ cd src/
 make TimeRecorder
 cd lib
 make clean
-make BBAnnLib2_s
+make -j
 popd
 
 
 sudo rm -rf build/
-sudo rm -rf dist/
-sudo rm -rf bbannpy.egg-info
 sudo python3 setup.py install -f
 
 set -e

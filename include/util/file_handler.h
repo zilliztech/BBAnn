@@ -98,11 +98,16 @@ public:
     writer_.close();
   }
 
+  // returns current position in the output stream
+  int64_t get_position() { return cur_pos_; }
+
   uint64_t get_file_size() { return fsize_; }
 
   void write(char *buff, const uint64_t n_bytes) {
     assert(buff != nullptr);
-    if (n_bytes + cur_off_ <= cache_size_) {
+    cur_pos_ += n_bytes;
+
+      if (n_bytes + cur_off_ <= cache_size_) {
       memcpy(cache_buf_ + cur_off_, buff, n_bytes);
       cur_off_ += n_bytes;
     } else {
@@ -131,20 +136,13 @@ private:
   char *cache_buf_ = nullptr;
   // offset into cache_buf for cur_pos
   uint64_t cur_off_ = 0;
+  uint64_t cur_pos_ = 0;
 
-  // file size
+    // file size
   uint64_t fsize_ = 0;
 };
 
 namespace bbann {
-inline std::string getClusterRawDataFileName(std::string prefix,
-                                             int cluster_id) {
-  return prefix + "cluster-" + std::to_string(cluster_id) + "-raw_data.bin";
-}
-inline std::string getClusterGlobalIdsFileName(std::string prefix,
-                                               int cluster_id) {
-  return prefix + "cluster-" + std::to_string(cluster_id) + "-global_ids.bin";
-}
 
 constexpr int MAX_EVENTS_NUM = 1023;
 /*
@@ -276,23 +274,21 @@ public:
       : prefix_(prefix), last_cid_(-1), last_bid_(-1), unique_reads_(0) {}
   void readToBuf(int bucketid, char *buf, int blockSize) {
     uint32_t cid, bid;
-    util::parse_global_block_id(bucketid, cid, bid);
+    bbann::util::parse_global_block_id(bucketid, cid, bid);
     if (last_cid_ != cid) {
-      fh_ = std::ifstream(getClusterRawDataFileName(prefix_, cid),
+      fh_ = std::ifstream(bbann::getClusterRawDataFileName(prefix_, cid),
                           std::ios::binary);
       fh_.seekg(bid * blockSize);
       fh_.read(buf, blockSize);
       last_cid_ = cid;
       last_bid_ = bid;
       unique_reads_++;
-      // std::cout << "cached offset" << bid * blockSize << std::endl;
       return;
     }
     if (last_bid_ != bid) {
       last_bid_ = bid;
       fh_.seekg(bid * blockSize);
       fh_.read(buf, blockSize);
-      // std::cout << "cached offset" << bid * blockSize << std::endl;
       unique_reads_++;
     }
   }

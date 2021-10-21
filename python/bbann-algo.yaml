@@ -55,7 +55,7 @@ random-range-xs:
           args: |
             [{"hnswM":32, "hnswefC":200, "K1":20, "blockSize":4096, "identifier": "range"}]
           query-args: |
-            [{"nProbe":20, "efSearch":100, "K1":20, "blockSize":4096, "identifier": "range"}]
+            [{"nProbe":2, "efSearch":100, "K1":20, "blockSize":4096, "identifier": "range"}]
 random-range-s:
     faiss-t1:
       docker-tag: billion-scale-benchmark-faissconda

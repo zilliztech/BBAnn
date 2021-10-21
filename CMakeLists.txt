@@ -38,16 +38,10 @@ endif(DIRECTIO)
 add_compile_options(-march=native -O3)
 
 include_directories(include)
+add_compile_options(-march=native)
 
 add_subdirectory(src)
 
-add_executable(build_bbann build_bbann.cpp)
-add_executable(search_bbann search_bbann.cpp)
+# add_subdirectory(test)
+# add_subdirectory(scripts)
 
-add_subdirectory(test)
-add_subdirectory(scripts)
-
-target_link_libraries(build_bbann BBAnn)
-target_link_libraries(search_bbann BBAnn)
-
-add_compile_options(-march=native)

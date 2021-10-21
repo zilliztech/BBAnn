@@ -59,10 +59,3 @@ public:
                               uint64_t numQuery, double radius,
                               const paraT para) = 0;
 };
-namespace bbann {
-enum class MetricType {
-  None = 0,
-  L2 = 1,
-  IP = 2,
-};
-}

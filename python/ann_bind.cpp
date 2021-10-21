@@ -7,18 +7,9 @@
 #include <pybind11/stl_bind.h>
 #include <string>
 
-#define ANN_LIB_2
-#ifdef ANN_LIB
-#include "ann_interface.h"
-#include "bbann.h"
-#include "lib/bbannlib.h"
-#endif
-#ifdef ANN_LIB_2
 #include "lib/bbannlib2.h"
 using bbann::BBAnnIndex2;
 using bbann::BBAnnParameters;
-using bbann::MetricType;
-#endif
 
 namespace py = pybind11;
 
@@ -175,18 +166,11 @@ PYBIND11_MODULE(bbannpy, m) {
   CLASSWRAPPER_DECL(UInt8Wrapper, "UInt8Index");
   CLASSWRAPPER_DECL(Int8Wrapper, "Int8Index");
 #undef CLASSWRAPPER_DECL
-#ifdef ANN_LIB
-  IndexBindWrapper<BBAnnIndex<float, BBAnnParameters>, FloatWrapper>(m);
-  IndexBindWrapper<BBAnnIndex<uint8_t, BBAnnParameters>, UInt8Wrapper>(m);
-  IndexBindWrapper<BBAnnIndex<int8_t, BBAnnParameters>, Int8Wrapper>(m);
-#endif
 
-#ifdef ANN_LIB_2
   IndexBindWrapper<BBAnnIndex2<float>, FloatWrapper>(m);
   IndexBindWrapper<BBAnnIndex2<uint8_t>, UInt8Wrapper>(m);
   IndexBindWrapper<BBAnnIndex2<int8_t>, Int8Wrapper>(m);
 
-#endif
   DataReaderBindWrapper<float>(m, "read_bin_float");
   DataReaderBindWrapper<int8_t>(m, "read_bin_int8");
   DataReaderBindWrapper<uint8_t>(m, "read_bin_uint8");
