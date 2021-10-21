@@ -12,7 +12,7 @@ namespace bbann {
 std::string Hello() { return "Hello!!!!"; }
 
 
-void search_graph_hnsw_sq(std::shared_ptr<sq_hnswlib::HierarchicalNSW<DISTT>> index_hnsw_sq,
+void search_graph_hnsw_sq(std::shared_ptr<sq_hnswlib::HierarchicalNSW<float>> index_hnsw_sq,
                           const int nq, const int dq, const int nprobe,
                           const int refine_nprobe, const float *pquery,
                           uint32_t *buckets_label, float *centroids_dist) {
@@ -197,6 +197,16 @@ void divide_raw_data(const BBAnnParameters para, const float *centroids) {
   rc.ElapseFromBegin("split_raw_data totally done");
 }
 
+template<typename T>
+inline void transform_data(T* data, T* tdata, int64_t n, uint32_t dim) {
+#pragma omp parallel for
+  for (auto i = 0; i < n; i++) {
+    for (auto j = 0; j < dim; j++) {
+      tdata[n * j + i] = data[i * dim + j];
+    }
+  }
+}
+
 template <typename DATAT, typename DISTT>
 hnswlib::SpaceInterface<DISTT> *getDistanceSpace(MetricType metric_type,
                                                  uint32_t ndim) {
@@ -269,7 +279,7 @@ void build_hnsw_sq(const std::string &index_path,
       reader.read((char*)&dim, sizeof(uint32_t));
       reader.close();
   };
-  get_bin_metadata(index_path+BUCKET+CENTROIDS+BIN,  total_n, ndim);
+  util::get_bin_metadata(index_path+BUCKET+CENTROIDS+BIN,  total_n, ndim);
   int64_t sample_num = total_n * K1_SAMPLE_RATE;
   float *sample_data = new float[sample_num * ndim];
   float *t_sample_data = new float[sample_num * ndim];
@@ -322,14 +332,13 @@ void build_hnsw_sq(const std::string &index_path,
   if (MetricType::L2==metric_type){
     space=new sq_hnswlib::L2Space(ndim);
   }
-  else if (MetricType::IP==metric_type){
-    space=new sq_hnswlib::InnerProductSpace(ndim);
-  }
-  else{
+  else if (MetricType::IP==metric_type) {
+    space = new sq_hnswlib::InnerProductSpace(ndim);
+  } else{
     std::cout << "invalid metric_type = " << (int)metric_type << std::endl;
     return;
   }
-  read_bin_file<uint32_t>(index_path + CLUSTER + COMBINE_IDS + BIN, pids, nids,
+  util::read_bin_file<uint32_t>(index_path + CLUSTER + COMBINE_IDS + BIN, pids, nids,
                           nidsdim);
 
   auto index_hnsw = std::make_shared<sq_hnswlib::HierarchicalNSW<float>>(

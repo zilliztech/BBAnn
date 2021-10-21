@@ -25,7 +25,7 @@ bool BBAnnIndex2<dataT, distanceT>::LoadIndex(std::string &indexPathPrefix, cons
   util::get_bin_metadata(getBucketCentroidsFileName(), bucket_num, dim);
 
   std::cout << "BBAnnIndex2::LoadIndex: "
-            << "use_hnsw_sq: " << para.use_hnsw_sq ? "true" : "false"
+            << "use_hnsw_sq: " << (para.use_hnsw_sq ? std::string("true") : std::string("false"))
             << std::endl;
 
   if (para.use_hnsw_sq) {
@@ -70,14 +70,14 @@ void search_bbann_queryonly(
   auto dis_computer = util::select_computer<DATAT, DATAT, DISTT>(para.metric);
 
   std::cout << "search_bbann_queryonly: "
-            << "use_hnsw_sq: " << para.use_hnsw_sq ? "true" : "false"
-          << std::endl;
+            << "use_hnsw_sq: " << (para.use_hnsw_sq ? std::string("true") : std::string("false"))
+            << std::endl;
 
   if (para.use_hnsw_sq) {
-    search_graph_hnsw_sq(index_sq_hnsw, nq, dim, para.nProbe, para.efSearch, pquery,
+    search_graph_hnsw_sq(index_sq_hnsw, nq, dim, para.nProbe, para.efSearch, (const float*)pquery,
                          bucket_labels, nullptr);
   } else {
-    search_graph<DATAT>(index_hnsw, nq, dim, para.nProbe, para.efSearch, pquery,
+    search_graph<DATAT, DISTT>(index_hnsw, nq, dim, para.nProbe, para.efSearch, pquery,
                         bucket_labels, nullptr);
   }
 
@@ -337,8 +337,8 @@ void BBAnnIndex2<dataT, distanceT>::BatchSearchCpp(
   std::cout << "Query: " << std::endl;
 
   std::cout << "BBAnnIndex2::BatchSearchCpp: "
-            << "use_hnsw_sq: " << para.use_hnsw_sq ? "true" : "false"
-          << std::endl;
+            << "use_hnsw_sq: " << (para.use_hnsw_sq ? std::string("true") : std::string("false"))
+            << std::endl;
   if (para.use_hnsw_sq) {
     search_bbann_queryonly<dataT, distanceT>(
             nullptr, index_sq_hnsw_, para, knn, pquery, answer_ids, answer_dists, numQuery, dim);

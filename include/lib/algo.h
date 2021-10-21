@@ -24,6 +24,13 @@ void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,
                   const int refine_nprobe, const DATAT *pquery,
                   uint32_t *buckets_label, float *centroids_dist);
 
+
+void search_graph_hnsw_sq(std::shared_ptr<sq_hnswlib::HierarchicalNSW<float>> index_hnsw_sq,
+                          const int nq, const int dq, const int nprobe,
+                          const int refine_nprobe, const float *pquery,
+                          uint32_t *buckets_label, float *centroids_dist);
+
+
 template <typename DATAT>
 void train_cluster(const std::string &raw_data_bin_file,
                    const std::string &output_path, const int32_t K1,
@@ -42,8 +49,13 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len);
 template <typename DATAT, typename DISTT>
 void build_graph(const std::string &index_path, const int hnswM,
                  const int hnswefC, MetricType metric_type,
-                 const uint64_t block_size, const int32_t sample,
-                 bool use_hnsw_sq);
+                 const uint64_t block_size, const int32_t sample);
+
+void build_hnsw_sq(const std::string &index_path,
+                  const int hnswM,
+                  const int hnswefC,
+                  MetricType metric_type);
+
 template <typename DATAT, typename DISTT>
 hnswlib::SpaceInterface<DISTT> *getDistanceSpace(MetricType metric_type,
                                                  uint32_t ndim);
