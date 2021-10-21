@@ -119,8 +119,6 @@ void search_bbann_queryonly(
   std::vector<char *> block_bufs;
   block_bufs.resize(block_nums);
 
-  std::cout << "num of fds: " << fds.size() << std::endl;
-
   std::cout << "EAGAIN: " << EAGAIN << ", EFAULT: " << EFAULT
             << ", EINVAL: " << EINVAL << ", ENOMEM: " << ENOMEM
             << ", ENOSYS: " << ENOSYS << std::endl;
@@ -272,8 +270,8 @@ void search_bbann_queryonly(
   /*gather_vec_searched_per_query(index_path, pquery, nq, nprobe, dq,
   block_size, buf, bucket_labels); rc.RecordSection("gather statistics done");*/
 
-  for (int i = 0; i < K1, i++) {
-    close(fd[i]);
+  for (int i = 0; i < para.K1; i++) {
+    close(fds[i]);
   }
   delete[] fds;
   rc.RecordSection("close fds done");
