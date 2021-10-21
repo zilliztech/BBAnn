@@ -1,10 +1,15 @@
 #pragma once
 #include "hnswlib.h"
-
+#include "util/distance.h"
 namespace hnswlib {
+    template<typename T1, typename R>
+    inline static R
+    L2SqrCommon(const void *pVect1v, const void *pVect2v, const void *qty_ptr) {
+        return ::L2sqr<T1, T1, R>((T1 *) pVect1v, (T1 *) pVect2v, *(size_t*)qty_ptr);
+    }
 
     inline static float
-    L2Sqr(const void *pVect1v, const void *pVect2v, const void *qty_ptr) {
+    L2SqrFloat(const void *pVect1v, const void *pVect2v, const void *qty_ptr) {
         float *pVect1 = (float *) pVect1v;
         float *pVect2 = (float *) pVect2v;
         size_t qty = *((size_t *) qty_ptr);
@@ -142,7 +147,7 @@ namespace hnswlib {
 
         float *pVect1 = (float *) pVect1v + qty4;
         float *pVect2 = (float *) pVect2v + qty4;
-        float res_tail = L2Sqr(pVect1, pVect2, &qty_left);
+        float res_tail = L2SqrFloat(pVect1, pVect2, &qty_left);
 
         return (res + res_tail);
     }
@@ -164,16 +169,43 @@ namespace hnswlib {
         }
     }
 #endif
+    template<typename DATAT, typename DISTT>
+    class L2Space : public SpaceInterface<DISTT> {
+        DISTFUNC<DISTT> fstdistfunc_;
+        size_t data_size_;
+        size_t dim_;
+    public:
+        L2Space(size_t dim) {
+            fstdistfunc_ = L2SqrCommon<DATAT, DISTT>;
+            dim_ = dim;
+            data_size_ = dim * sizeof(DATAT);
+        }
 
-    class L2Space : public SpaceInterface<float> {
+        size_t get_data_size() {
+            return data_size_;
+        }
 
+        DISTFUNC<DISTT> get_dist_func() {
+            return fstdistfunc_;
+        }
+
+        void *get_dist_func_param() {
+            return &dim_;
+        }
+
+        ~L2Space() {}
+    };
+
+
+    template<>
+    class L2Space<float, float> : public SpaceInterface<float> {
         DISTFUNC<float> fstdistfunc_;
         size_t data_size_;
         size_t dim_;
     public:
         L2Space(size_t dim) {
-            fstdistfunc_ = L2Sqr;
-        #if defined(USE_SSE) || defined(USE_AVX)
+            fstdistfunc_ = L2SqrFloat;
+    #if defined(USE_SSE) || defined(USE_AVX)
             if (dim % 16 == 0)
                 fstdistfunc_ = L2SqrSIMD16Ext;
             else if (dim > 16)
@@ -182,7 +214,7 @@ namespace hnswlib {
                 fstdistfunc_ = L2SqrSIMD4Ext;
             else if (dim > 4)
                 fstdistfunc_ = L2SqrSIMD4ExtResiduals;
-        #endif
+    #endif
             dim_ = dim;
             data_size_ = dim * sizeof(float);
         }
@@ -275,6 +307,5 @@ namespace hnswlib {
 
         ~L2SpaceI() {}
     };
-
 
 }

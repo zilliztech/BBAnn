@@ -111,6 +111,24 @@ inline void parse_global_block_id(uint32_t id, uint32_t &cid, uint32_t &bid) {
   return;
 }
 
+inline uint64_t gen_id(const uint32_t cid, const uint32_t bid, const uint32_t off) {
+    uint64_t ret = 0;
+    ret |= (cid & 0xff);
+    ret <<= 24;
+    ret |= (bid & 0xffffff);
+    ret <<= 32;
+    ret |= (off & 0xffffffff);
+    return ret;
+}
+
+inline void parse_id(uint64_t id, uint32_t& cid, uint32_t& bid, uint32_t& off) {
+    off = (id & 0xffffffff);
+    id >>= 32;
+    bid = (id & 0xffffff);
+    id >>= 24;
+    cid = (id & 0xff);
+}
+
 template <typename T1, typename T2, typename R>
 using Computer = std::function<R(const T1 *, const T2 *, int n)>;
 

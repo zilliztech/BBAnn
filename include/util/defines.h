@@ -47,6 +47,7 @@ struct BBAnnParameters {
   int efSearch = 250;
   int rangeSearchProbeCount = 20;
   int aio_EventsPerBatch = 512;
+  int sample = 1;
 };
 
 
