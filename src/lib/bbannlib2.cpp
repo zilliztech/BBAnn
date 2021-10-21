@@ -520,14 +520,10 @@ BBAnnIndex2<dataT, distanceT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
         }
       }
     }
-<<<<<<< HEAD
+
     std::cout << "Finished query number:" << thisQuerySize << std::endl;
     free(big_read_buf);
     std::cout << " relleased big_read_buf" << std::endl;
-=======
-    std::cout << "Query number:" << r - l
-              << "  read count:" << reader->unique_reads_ << std::endl;
->>>>>>> 301a111 (nao zi bu zhuan le)
     return ret;
   };
 

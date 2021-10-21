@@ -54,16 +54,9 @@ public:
   // radius from each query, the lims array represents prefix sums of results'
   // lengths --
   // TODO(!!!!! -- updatedoc)
-<<<<<<< HEAD
-  virtual std::tuple<std::vector<uint32_t>, std::vector<float>, std::vector<uint64_t>>
- RangeSearchCpp(const dataT *pquery, uint64_t dim,
-                              uint64_t numQuery, double radius,
-                              const paraT para) = 0;
-};
-=======
   virtual std::tuple<std::vector<uint32_t>, std::vector<distanceT>,
                      std::vector<uint64_t>>
   RangeSearchCpp(const dataT *pquery, uint64_t dim, uint64_t numQuery,
                  double radius, const paraT para) = 0;
 };
->>>>>>> 301a111 (nao zi bu zhuan le)
+
