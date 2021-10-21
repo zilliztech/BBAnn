@@ -14,19 +14,16 @@
 # make clean
 # make BBAnnLib2_s
 # popd
+set -e
 
 pushd ../
 docker build --rm -f Dockerfile.local -t billion-scale-benchmark-bbann .
 popd
 
-
-sudo rm -rf build/
-sudo python3 setup.py install -f
-
-set -e
 pushd ../benchmark
 cp ../python/bbann.py benchmark/algorithms/bbann.py
 
+# cp ../python/Dockerfile.bbann benchmark/install/
 # python3 install.py --algorithm bbann
 
 # rm -rf results/random-range-xs/*
