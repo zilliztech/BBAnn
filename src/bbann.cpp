@@ -701,7 +701,7 @@ void search_bbann(
     std::ifstream myFile(file);
     if (myFile.fail()) {
         std::cout<<"File is not exist"<< file <<"write it"<<std::endl;
-        std::ofstream writer(file, std::ios::binary | std::ios::in);
+        std::ofstream writer(answer_bin_file, std::ios::binary);
         for (int64_t i = 0; i < nq; ++i) {
             const auto ii = i * nprobe;
             for (int64_t j = 0; j < nprobe; ++j) {
@@ -711,7 +711,7 @@ void search_bbann(
         }
         writer.close();
     } else {
-        int hit;
+        int hit = 0;
         uint32_t dim;
         for (int64_t i = 0; i < nq; ++i) {
             const auto ii = i * nprobe;
