@@ -153,6 +153,9 @@ inline std::string getClusterRawDataFileName(std::string prefix, int cluster_id)
 inline std::string getClusterGlobalIdsFileName(std::string prefix, int cluster_id) {
   return prefix + "cluster-" + std::to_string(cluster_id) + "-global_ids.bin";
 }
+inline std::string getSQMetaFileName(std::string prefix) {
+    return prefix + "meta";
+}
 
 inline float rand_float() {
   static std::mt19937 generator(1234);

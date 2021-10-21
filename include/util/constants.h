@@ -56,7 +56,6 @@ constexpr const char* GLOBAL_IDS = "global_ids";
 constexpr const char* CODEBOOK = "codebook";
 constexpr const char* RAWDATA = "raw_data";
 constexpr const char* SAMPLEDATA = "sampledata";
-constexpr const char* META = "meta";
 constexpr const char* INDEX = "index";
 
 // suffix

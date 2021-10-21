@@ -86,7 +86,7 @@ void train_cluster(const std::string &raw_data_bin_file,
       max_len.assign(dim, std::numeric_limits<DATAT>::min());
       min_len.assign(dim, std::numeric_limits<DATAT>::max());
       train_code<DATAT>(max_len.data(), min_len.data(), sample_data, sample_num, dim);
-      std::string meta_file = output_path + META;
+      std::string meta_file = getSQMetaFileName(output_path);
       IOWriter meta_writer(meta_file);
       meta_writer.write((char*)max_len.data(), sizeof(DATAT) * dim);
       meta_writer.write((char*)min_len.data(), sizeof(DATAT) * dim);
@@ -392,7 +392,7 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len) {
 
   if (para.vector_use_sq) {
     std::cout << "vector sq: read max/min from meta file" << std::endl;
-    std::string meta_file = para.indexPrefixPath + META;
+    std::string meta_file = getSQMetaFileName(para.indexPrefixPath);
     IOReader meta_reader(meta_file);
     meta_reader.read((char*)max_len.data(), sizeof(DATAT));
     meta_reader.read((char*)min_len.data(), sizeof(DATAT));
