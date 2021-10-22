@@ -472,13 +472,14 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len) {
         std::vector<ClusteringTask> output_tasks;
 
         auto cur = todo.front();
-        todo.pop_front();
 
         if (LevelType(cur.level) >= LevelType::BALANCE_LEVEL) {
           // std::cout << "non_recursive_multilevel_kmeans: "
           //           << "balance level, to parallel" << std::endl;
           break;
         }
+
+        todo.pop_front();
 
         // std::cout << "non_recursive_multilevel_kmeans: "
         //           << " cur.offset:" << cur.offset
@@ -558,7 +559,7 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len) {
         }
       };
 
-      size_t number_workers = 6;
+      size_t number_workers = 32;
       std::vector<std::thread> workers;
       for (size_t i = 0; i < number_workers; ++i) {
         workers.push_back(std::thread(func));
