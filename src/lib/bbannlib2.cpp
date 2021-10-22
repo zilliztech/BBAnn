@@ -1,19 +1,21 @@
 #include "lib/bbannlib2.h"
+
+#include <fcntl.h>  // open, pread
+#include <libaio.h>
+#include <omp.h>
+#include <stdint.h>
+#include <stdlib.h>  // posix_memalign
+#include <unistd.h>
+
+#include <iostream>
+#include <memory>
+#include <string>
+
 #include "ann_interface.h"
 #include "util/TimeRecorder.h"
 #include "util/file_handler.h"
 #include "util/heap.h"
 #include "util/utils_inline.h"
-#include <iostream>
-#include <memory>
-#include <omp.h>
-#include <stdint.h>
-#include <string>
-#include <unistd.h>
-
-#include <fcntl.h> // open, pread
-#include <libaio.h>
-#include <stdlib.h> // posix_memalign
 namespace bbann {
 
 template <typename dataT, typename distanceT>
@@ -38,21 +40,20 @@ void search_bbann_queryonly(
     const BBAnnParameters para, const int topk, const DATAT *pquery,
     uint32_t *answer_ids, DISTT *answer_dists, uint32_t nq, uint32_t dim) {
   TimeRecorder rc("search bigann");
-  std::cout << " index_hnsw: " << index_hnsw << " num_query: " << nq
-            << " query dims: " << dim << " nprobe: " << para.nProbe
-            << " refine_nprobe: " << para.efSearch << std::endl;
-
-  uint32_t *bucket_labels = new uint32_t[(int64_t)nq * para.nProbe];
   auto dis_computer = util::select_computer<DATAT, DATAT, DISTT>(para.metric);
 
-  search_graph<DATAT>(index_hnsw, nq, dim, para.nProbe, para.efSearch, pquery,
-                      bucket_labels, nullptr);
-  rc.RecordSection("search buckets done.");
+  std::cout << "search bigann parameters:" << std::endl;
+  std::cout << " index_path: " << para.indexPrefixPath
+            << " nprobe: " << para.nProbe << " hnsw_ef: " << para.efSearch
+            << " topk: " << topk << " K1: " << para.K1 << std::endl;
 
-  uint32_t cid, bid;
-  const uint32_t vec_size = sizeof(DATAT) * dim;
-  const uint32_t entry_size = vec_size + sizeof(uint32_t);
-  DATAT *vec;
+  uint32_t *bucket_labels = nullptr;
+
+  auto nprobe = para.nProbe;
+
+  answer_dists = new DISTT[(int64_t)nq * topk];
+  answer_ids = new uint32_t[(int64_t)nq * topk];
+  bucket_labels = new uint32_t[(int64_t)nq * nprobe];  // 400K * nprobe
 
   std::function<void(size_t, DISTT *, uint32_t *)> heap_heapify_func;
   std::function<bool(DISTT, DISTT)> cmp_func;
@@ -77,214 +78,269 @@ void search_bbann_queryonly(
   }
   rc.RecordSection("heapify answers heaps");
 
-  // step1
-  std::unordered_map<uint32_t, std::pair<std::string, uint32_t>> blocks;
-  std::unordered_map<uint32_t, std::vector<int64_t>>
-      labels_2_qidxs; // label -> query idxs
-  std::vector<uint32_t> locs;
-  // std::unordered_map<uint32_t, uint32_t> inverted_locs;  // not required
-  std::unordered_map<std::string, int> fds; // file -> file descriptor
-  for (int64_t i = 0; i < nq; ++i) {
-    const auto ii = i * para.nProbe;
-    for (int64_t j = 0; j < para.nProbe; ++j) {
-      auto label = bucket_labels[ii + j];
-      if (blocks.find(label) == blocks.end()) {
-        util::parse_global_block_id(label, cid, bid);
-        std::string cluster_file_path =
-            getClusterRawDataFileName(para.indexPrefixPath, cid);
-        std::pair<std::string, uint32_t> blockPair(cluster_file_path, bid);
-        blocks[label] = blockPair;
+  uint32_t cid, bid;
+  uint32_t gid;
+  const uint32_t vec_size = sizeof(DATAT) * dim;
+  const uint32_t entry_size = vec_size + sizeof(uint32_t);
 
-        if (fds.find(cluster_file_path) == fds.end()) {
-          auto fd = open(cluster_file_path.c_str(), O_RDONLY | O_DIRECT);
-          if (fd == 0) {
-            std::cout << "open() failed, fd: " << fd
-                      << ", file: " << cluster_file_path << ", errno: " << errno
-                      << ", error: " << strerror(errno) << std::endl;
-            exit(-1);
-          }
-          fds[cluster_file_path] = fd;
-        }
+  std::unordered_map<uint32_t, int> fds;  // cid -> file descriptor
+  for (uint32_t i = 0; i < para.K1; i++) {
+    std::string cluster_file_path =getClusterRawDataFileName(para.indexPrefixPath, i);
+    auto fd = open(cluster_file_path.c_str(), O_RDONLY | O_DIRECT);
+    if (fd == 0) {
+      std::cout << "open() failed, fd: " << fd
+                << ", file: " << cluster_file_path << ", errno: " << errno
+                << ", error: " << strerror(errno) << std::endl;
+      continue;
+    }
+    fds[i] = fd;
+  }
+  rc.RecordSection(std::string("open files done, number of clusters: ") + std::to_string(fds.size()));
 
-        labels_2_qidxs[label] = std::vector<int64_t>{i};
-        // inverted_locs[label] = locs.size();
-        locs.push_back(label);
-      }
-
-      if (labels_2_qidxs.find(label) == labels_2_qidxs.end()) {
-        labels_2_qidxs[label] = std::vector<int64_t>{i};
-      } else {
-        auto qidxs = labels_2_qidxs[label];
-        if (std::find(qidxs.begin(), qidxs.end(), i) == qidxs.end()) {
-          labels_2_qidxs[label].push_back(i);
-        }
-      }
+  auto max_blocks_num = 1024 * 1024;
+  if (max_blocks_num > nq * nprobe) {
+    max_blocks_num = nq * nprobe;
+  }
+  std::vector<char *> block_bufs(max_blocks_num);
+  for (auto i = 0; i < max_blocks_num; i++) {
+    auto r = posix_memalign((void **)(&block_bufs[i]), 4096, para.blockSize);
+    if (r != 0) {
+      std::cout << "posix_memalign() failed, returned: " << r
+                << ", errno: " << errno << ", error: " << strerror(errno)
+                << std::endl;
+      exit(-1);
     }
   }
-  rc.RecordSection("calculate block position done");
+  rc.RecordSection("allocate cache memory");
 
-  auto block_nums = blocks.size();
-  std::cout << "block num: " << block_nums << "\tloc num: " << locs.size()
-            << "\tnq: " << nq << "\tnprobe: " << para.nProbe
-            << "\tblock_size: " << para.blockSize << std::endl;
+  auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, int end, int nr, int wait_nr) {
+    auto page_cache_num = bufs.size();
 
-  // step2 load unique blocks from IO
-  std::vector<char *> block_bufs;
-  block_bufs.resize(block_nums);
-  std::cout << "block_bufs.size(): " << block_bufs.size() << std::endl;
-
-  std::cout << "num of fds: " << fds.size() << std::endl;
-
-  std::cout << "EAGAIN: " << EAGAIN << ", EFAULT: " << EFAULT
-            << ", EINVAL: " << EINVAL << ", ENOMEM: " << ENOMEM
-            << ", ENOSYS: " << ENOSYS << std::endl;
-
-  auto max_events_num = util::get_max_events_num_of_aio();
-  max_events_num = 1024;
-  io_context_t ctx = 0;
-  auto r = io_setup(max_events_num, &ctx);
-  if (r) {
-    std::cout << "io_setup() failed, returned: " << r
-              << ", strerror(r): " << strerror(r) << ", errno: " << errno
-              << ", error: " << strerror(errno) << std::endl;
-    exit(-1);
-  }
-
-  auto n_batch = (block_nums + max_events_num - 1) / max_events_num;
-  std::cout << "block_nums: " << block_nums << ", q_depth: " << max_events_num
-            << ", n_batch: " << n_batch << std::endl;
-
-  auto io_submit_threads_num = 8;
-  auto io_wait_threads_num = 8;
-
-  std::deque<std::mutex> heap_mtxs;
-  heap_mtxs.resize(nq);
-
-  for (auto n = 0; n < n_batch; n++) {
-    auto begin = n * max_events_num;
-    auto end = std::min(int((n + 1) * max_events_num), int(block_nums));
     auto num = end - begin;
 
-    auto num_per_batch =
-        (num + io_submit_threads_num - 1) / io_submit_threads_num;
-
-    for (auto th = begin; th < end; th++) {
-      auto r = posix_memalign((void **)(&block_bufs[th]), 512, para.blockSize);
-      if (r != 0) {
-        std::cout << "posix_memalign() failed, returned: " << r
-                  << ", errno: " << errno << ", error: " << strerror(errno)
-                  << std::endl;
-        exit(-1);
-      }
+    if (num < nr) {
+      nr = num;
     }
 
-#pragma omp parallel for
-    for (auto th = 0; th < io_submit_threads_num; th++) {
-      auto begin_th = begin + num_per_batch * th;
-      auto end_th = std::min(int(begin_th + num_per_batch), end);
-      auto num_th = end_th - begin_th;
-
-      std::vector<struct iocb> ios(num_th);
-      std::vector<struct iocb *> cbs(num_th, nullptr);
-      for (auto i = begin_th; i < end_th; i++) {
-        auto block = blocks[locs[i]];
-        auto offset = block.second * para.blockSize;
-        io_prep_pread(ios.data() + (i - begin_th), fds[block.first],
-                      block_bufs[i], para.blockSize, offset);
-
-        // Unfortunately, a lambda fundtion with capturing variables cannot
-        // convert to a function pointer. But fortunately, in fact we only need
-        // the location of label when the io is done.
-
-        // auto callback = static_cast<void*>(locs.data() + i);
-        // auto callback = (locs.data() + i);
-        auto callback = new int[1];
-        callback[0] = i;
-
-        // io_set_callback(ios.data() + (i - begin_th), callback);
-        ios[i - begin_th].data = callback;
-      }
-
-      for (auto i = 0; i < num_th; i++) {
-        cbs[i] = ios.data() + i;
-      }
-
-      r = io_submit(ctx, num_th, cbs.data());
-      if (r != num_th) {
-        std::cout << "io_submit() failed, returned: " << r
-                  << ", strerror(-r): " << strerror(-r) << ", errno: " << errno
-                  << ", error: " << strerror(errno) << std::endl;
-        exit(-1);
-      }
+    if (num < wait_nr) {
+      wait_nr = num;
     }
 
-    auto wait_num_per_batch =
-        (num + io_wait_threads_num - 1) / io_wait_threads_num;
+    if (nr < wait_nr) {
+      wait_nr = nr;
+    }
 
+    std::vector<struct iocb> ios(num);
+    std::vector<struct iocb *> cbs(num, nullptr);
+    std::vector<struct io_event> events(num);
 #pragma omp parallel for
-    for (auto th = 0; th < io_wait_threads_num; th++) {
-      auto begin_th = begin + wait_num_per_batch * th;
-      auto end_th = std::min(int(begin_th + wait_num_per_batch), end);
-      auto num_th = end_th - begin_th;
+    for (auto i = 0; i < num; i++) {
+      auto loc = begin + i;
+      auto label = bucket_labels[loc];
+      uint32_t cid, bid;
+      util::parse_global_block_id(label, cid, bid);
+      io_prep_pread(ios.data() + i, fds[cid], bufs[loc % page_cache_num],
+                    para.blockSize, bid * para.blockSize);
 
-      std::vector<struct io_event> events(num_th);
+      cbs[i] = ios.data() + i;
+    }
 
-      r = io_getevents(ctx, num_th, num_th, events.data(), NULL);
-      if (r != num_th) {
-        std::cout << "io_getevents() failed, returned: " << r
-                  << ", strerror(-r): " << strerror(-r) << ", errno: " << errno
-                  << ", error: " << strerror(errno) << std::endl;
-        exit(-1);
+    auto done = 0;
+    auto submitted = 0;
+    auto to_submit_num = nr;
+
+    while (done < num) {
+      auto uppper = num - submitted;
+      if (to_submit_num > uppper) {
+        to_submit_num = uppper;
+      }
+      if (to_submit_num > nr) {
+        to_submit_num = nr;
       }
 
-      for (auto en = 0; en < num_th; en++) {
-        auto loc = *reinterpret_cast<int *>(events[en].data);
-        delete[] reinterpret_cast<int *>(events[en].data);
-        auto label = locs[loc];
-        // auto label = *reinterpret_cast<uint32_t *>(events[en].data);
-        // char * buf = reinterpret_cast<char*>(events[en].obj->u.c.buf);
-        char *buf = block_bufs[loc];
-        const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
-        char *buf_begin = buf + sizeof(uint32_t);
-
-        auto nq_idxs = labels_2_qidxs[label];
-        for (auto iter = 0; iter < nq_idxs.size(); iter++) {
-          auto nq_idx = nq_idxs[iter];
-          const DATAT *q_idx = pquery + nq_idx * dim;
-
-          std::vector<DISTT> diss(entry_num);
-          std::vector<uint32_t> ids(entry_num);
-          for (uint32_t k = 0; k < entry_num; ++k) {
-            char *entry_begin = buf_begin + entry_size * k;
-            vec = reinterpret_cast<DATAT *>(entry_begin);
-            auto dis = dis_computer(vec, q_idx, dim);
-            auto id = *reinterpret_cast<uint32_t *>(entry_begin + vec_size);
-            diss[k] = dis;
-            ids[k] = id;
-          }
-
-          heap_mtxs[nq_idx].lock();
-          for (auto k = 0; k < entry_num; k++) {
-            auto dis = diss[k];
-            auto id = ids[k];
-            if (cmp_func(answer_dists[topk * nq_idx], dis)) {
-              heap_swap_top_func(topk, answer_dists + topk * nq_idx,
-                                 answer_ids + topk * nq_idx, dis, id);
-            }
-          }
-          heap_mtxs[nq_idx].unlock();
+      if (to_submit_num > 0) {
+        auto r_submit =
+            io_submit(aio_ctx, to_submit_num, cbs.data() + submitted);
+        if (r_submit < 0) {
+          std::cout << "io_submit() failed, returned: " << r_submit
+                    << ", strerror(-r): " << strerror(-r_submit)
+                    << ", begin: " << begin << ", end: " << end
+                    << ", submitted: " << submitted << std::endl;
+          exit(-1);
         }
+        submitted += r_submit;
+      }
+
+      auto pending = submitted - done;
+      auto r_done =
+          io_getevents(aio_ctx, pending < wait_nr ? pending : wait_nr, nr, events.data() + done, NULL);
+      if (r_done < wait_nr) {
+        std::cout << "io_getevents() failed, returned: " << r_done
+                  << ", strerror(-): " << strerror(-r_done) << std::endl;
+        exit(-1);
+      }
+
+      to_submit_num = r_done; // nr - (submitted - done)
+      done += r_done;
+    }
+  };
+
+  // not thread safe.
+  auto compare_by_label = [&](int q, int loc, const std::vector<char *> &bufs,
+                              bool twice = false) {
+    auto page_cache_num = bufs.size();
+
+    char *buf = bufs[loc % page_cache_num];
+    const DATAT *q_idx = pquery + q * dim;
+
+    const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
+    char *buf_begin = buf + sizeof(uint32_t);
+
+    for (uint32_t k = 0; k < entry_num; ++k) {
+      char *entry_begin = buf_begin + entry_size * k;
+      auto vec = reinterpret_cast<DATAT *>(entry_begin);
+      auto dis = dis_computer(vec, q_idx, dim);
+      if (cmp_func(answer_dists[topk * q], dis)) {
+        heap_swap_top_func(
+            topk, answer_dists + topk * q, answer_ids + topk * q, dis,
+            *reinterpret_cast<uint32_t *>(entry_begin + vec_size));
+      }
+    }
+  };
+
+  auto compute = [&](const std::vector<char *> &bufs, int i,
+                     bool twice = false) {
+    const auto ii = i * nprobe;
+
+    for (int64_t j = 0; j < nprobe; ++j) {
+      compare_by_label(i, ii + j, bufs, twice);
+    }
+  };
+
+  auto run_query = [&](int l, int r) {
+    // step 1: search graph.
+#if 0
+    std::cout << "search graph parameters:" << std::endl;
+    std::cout << " index_hnsw: " << index_hnsw << " nq: " << r - l << " dim: " << dim
+              << " nprobe: " << nprobe << " refine_nprobe: " << para.efSearch
+              << std::endl;
+#endif
+    search_graph<DATAT>(index_hnsw, r - l, dim, nprobe, para.efSearch,
+                        pquery + l * dim, bucket_labels + l * nprobe, nullptr);
+
+    auto num_jobs = 4;
+    auto max_events_num = 1023;
+    auto nr = 32;
+    std::vector<io_context_t> ctxs(num_jobs, 0);
+#pragma omp parallel for
+    for (auto i = 0; i < num_jobs; i++) {
+      if (io_setup(max_events_num, &ctxs[i])) {
+        std::cout << "io_setup() failed !" << std::endl;
+        exit(-1);
       }
     }
 
-    for (auto th = begin; th < end; th++) {
-      delete[] block_bufs[th];
+#pragma omp parallel for
+    for (auto i = 0; i < num_jobs; i++) {
+      auto l_ = l + (r - l) * i / num_jobs;
+      auto r_ = l + (r - l) * (i + 1) / num_jobs;
+      if (r_ > r) {
+        r_ = r;
+      }
+
+      auto begin = l_ * nprobe;
+      auto end = r_ * nprobe;
+
+#if 0
+      std::string s;
+      s = s + "i: " + std::to_string(i) + ", l: " + std::to_string(l) +
+          ", r: " + std::to_string(r) + ", l_: " + std::to_string(l_) +
+          ", r_: " + std::to_string(r_) + "\n";
+      std::cout << s << std::endl;
+#endif
+
+      // step 2: io.
+      fio_way(ctxs[i], block_bufs, begin, end, max_events_num, 32);
+
+      // step 3: compute distance && heap sort.
+#pragma omp parallel for
+      for (auto j = l_; j < r_; j++) {
+        compute(block_bufs, j);
+      }
     }
+
+#pragma omp parallel for
+    for (auto i = 0; i < num_jobs; i++) {
+      io_destroy(ctxs[i]);
+    }
+
+#if 0
+    // step 3: compute distance && heap sort.
+#pragma omp parallel for
+    for (auto i = l; i < r; i++) {
+      compute(block_bufs, i);
+    }
+#endif
+  };
+
+  auto n_batch = (nq * nprobe + max_blocks_num - 1) / max_blocks_num;
+  auto nq_per_batch = util::round_up_div(nq, n_batch);
+  std::cout << "nq: " << nq << ", n_batch: " << n_batch
+            << ", nq_per_batch: " << nq_per_batch << std::endl;
+
+  auto run_batch_query = [&](int n) {
+    auto q_begin = n * nq_per_batch;
+    auto q_end = (n + 1) * nq_per_batch;
+    if (q_end > nq) {
+      q_end = nq;
+    }
+
+    auto threads_num = 16;
+    auto num = q_end - q_begin;
+    if (num < threads_num) {
+      threads_num = num;
+    }
+
+#if 0
+    std::string s;
+    s = s + "n: " + std::to_string(n) + ", q_begin" + std::to_string(q_begin) +
+        ", q_end: " + std::to_string(q_end) +
+        ", threads_num: " + std::to_string(threads_num) +
+        ", num: " + std::to_string(num) + "\n";
+    std::cout << s << std::endl;
+#endif
+
+#pragma omp parallel for
+    for (auto i = 0; i < threads_num; i++) {
+      auto l = q_begin + i * num / threads_num;
+      auto r = q_begin + (i + 1) * num / threads_num;
+      if (r > q_end) {
+        r = q_end;
+      }
+
+#if 0
+      std::string s;
+      s = s + "i: " + std::to_string(i) + ", l: " + std::to_string(l) +
+          ", r: " + std::to_string(r) + "\n";
+      std::cout << s << std::endl;
+#endif
+
+      run_query(l, r);
+    }
+  };
+
+  for (auto i = 0; i < n_batch; i++) {
+    run_batch_query(i);
   }
-  rc.RecordSection("async io done");
+  rc.RecordSection("query done");
 
   /*gather_vec_searched_per_query(index_path, pquery, nq, nprobe, dq,
   block_size, buf, bucket_labels); rc.RecordSection("gather statistics done");*/
+
+  for (auto i = 0; i < max_blocks_num; i++) {
+    delete[] block_bufs[i];
+  }
+  rc.RecordSection("release cache buf");
 
   for (auto iter = fds.begin(); iter != fds.end(); iter++) {
     close(iter->second);
@@ -390,11 +446,11 @@ BBAnnIndex2<dataT, distanceT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
       const auto reti = index_hnsw_->searchRange(
           pquery + i * dim, para.rangeSearchProbeCount, radius);
       for (auto const &[dist, bucket_label] : reti) {
-          // convert the bucket label from 64bit to 32 bit
-          uint32_t cid, bid, offset;
-          bbann::util::parse_id(bucket_label, cid, bid, offset);
-          auto bucket_label32 = bbann::util::gen_global_block_id(cid, bid);
-          ret.emplace_back(std::make_pair(bucket_label32, i));
+        // convert the bucket label from 64bit to 32 bit
+        uint32_t cid, bid, offset;
+        bbann::util::parse_id(bucket_label, cid, bid, offset);
+        auto bucket_label32 = bbann::util::gen_global_block_id(cid, bid);
+        ret.emplace_back(std::make_pair(bucket_label32, i));
       }
     }
     return ret;
@@ -418,8 +474,8 @@ BBAnnIndex2<dataT, distanceT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
   // -- a function that reads the file for bucketid/queryid in
   // bucketToQuery[a..b]
   //
-  auto run_bucket_scan =
-      [&, this, para, pquery](int l, int r) -> std::list<qidIdDistTupleType> {
+  auto run_bucket_scan = [&, this, para, pquery](
+                             int l, int r) -> std::list<qidIdDistTupleType> {
     /* return a list of tuple <queryid, id, dist>:*/
 
     // auto cachereader =
@@ -429,7 +485,8 @@ BBAnnIndex2<dataT, distanceT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
 
     std::list<qidIdDistTupleType> ret;
 
-    auto dis_computer = util::select_computer<dataT, dataT, distanceT>(para.metric);
+    auto dis_computer =
+        util::select_computer<dataT, dataT, distanceT>(para.metric);
     // auto reader = std::make_unique<CachedBucketReader>(para.indexPrefixPath);
     std::vector<uint32_t> bucketIds;
     bucketIds.reserve(r - l);
@@ -478,13 +535,14 @@ BBAnnIndex2<dataT, distanceT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
     return ret;
   };
   // execute queries with "index mod (1<<shift) == thid".
-  auto run_bucket_scan_shift =
-      [&, this, para, pquery](int thid,
-                              int shift) -> std::list<qidIdDistTupleType> {
+  auto run_bucket_scan_shift = [&, this, para, pquery](
+                                   int thid,
+                                   int shift) -> std::list<qidIdDistTupleType> {
   /* return a list of tuple <queryid, id, dist>:*/
 #define getIndex(i, shift, thid) ((i << shift) + thid)
     std::list<qidIdDistTupleType> ret;
-    auto dis_computer = util::select_computer<dataT, dataT, distanceT>(para.metric);
+    auto dis_computer =
+        util::select_computer<dataT, dataT, distanceT>(para.metric);
     // auto reader = std::make_unique<CachedBucketReader>(para.indexPrefixPath);
     std::vector<uint32_t> bucketIds;
     int totalQuerySize = bucketToQuery.size();
@@ -579,19 +637,19 @@ BBAnnIndex2<dataT, distanceT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
   return std::make_tuple(ids, dists, lims);
 }
 
-#define BBANNLIB_DECL(dataT, distanceT)                                        \
-  template bool BBAnnIndex2<dataT, distanceT>::LoadIndex(                      \
-      std::string &indexPathPrefix);                                           \
-  template void BBAnnIndex2<dataT, distanceT>::BatchSearchCpp(                 \
-      const dataT *pquery, uint64_t dim, uint64_t numQuery, uint64_t knn,      \
-      const BBAnnParameters para, uint32_t *answer_ids,                        \
-      distanceT *answer_dists);                                                \
-  template void BBAnnIndex2<dataT, distanceT>::BuildIndexImpl(                 \
-      const BBAnnParameters para);                                             \
-  template std::tuple<std::vector<uint32_t>, std::vector<distanceT>,           \
-                      std::vector<uint64_t>>                                   \
-  BBAnnIndex2<dataT, distanceT>::RangeSearchCpp(                               \
-      const dataT *pquery, uint64_t dim, uint64_t numQuery, double radius,     \
+#define BBANNLIB_DECL(dataT, distanceT)                                    \
+  template bool BBAnnIndex2<dataT, distanceT>::LoadIndex(                  \
+      std::string &indexPathPrefix);                                       \
+  template void BBAnnIndex2<dataT, distanceT>::BatchSearchCpp(             \
+      const dataT *pquery, uint64_t dim, uint64_t numQuery, uint64_t knn,  \
+      const BBAnnParameters para, uint32_t *answer_ids,                    \
+      distanceT *answer_dists);                                            \
+  template void BBAnnIndex2<dataT, distanceT>::BuildIndexImpl(             \
+      const BBAnnParameters para);                                         \
+  template std::tuple<std::vector<uint32_t>, std::vector<distanceT>,       \
+                      std::vector<uint64_t>>                               \
+  BBAnnIndex2<dataT, distanceT>::RangeSearchCpp(                           \
+      const dataT *pquery, uint64_t dim, uint64_t numQuery, double radius, \
       const BBAnnParameters para);
 
 BBANNLIB_DECL(float, float);
@@ -600,4 +658,4 @@ BBANNLIB_DECL(int8_t, int32_t);
 
 #undef BBANNLIB_DECL
 
-} // namespace bbann
+}  // namespace bbann

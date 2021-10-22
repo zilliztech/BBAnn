@@ -15,6 +15,10 @@
 namespace bbann {
 namespace util {
 
+inline int round_up_div(int x, int y) {
+  return (x + y - 1) / y;
+}
+
 inline int get_max_events_num_of_aio() {
   auto file = "/proc/sys/fs/aio-max-nr";
   auto f = std::ifstream(file);
