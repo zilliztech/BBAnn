@@ -40,7 +40,8 @@ void search_bbann_queryonly(
   TimeRecorder rc("search bigann");
   std::cout << " index_hnsw: " << index_hnsw << " num_query: " << nq
             << " query dims: " << dim << " nprobe: " << para.nProbe
-            << " refine_nprobe: " << para.efSearch << std::endl;
+            << " refine_nprobe: "
+            << para.efSearch << std::endl;
 
   uint32_t *bucket_labels = new uint32_t[(int64_t)nq * para.nProbe];
   auto dis_computer = util::select_computer<DATAT, DATAT, DISTT>(para.metric);
@@ -78,52 +79,41 @@ void search_bbann_queryonly(
   rc.RecordSection("heapify answers heaps");
 
   // step1
-  std::unordered_map<uint32_t, std::pair<std::string, uint32_t>> blocks;
-  std::unordered_map<uint32_t, std::vector<int64_t>>
-      labels_2_qidxs; // label -> query idxs
+  // label -> query idxs
+  int* fds = new int[para.K1];
+#pragma omp parallel for
+  for (int64_t i = 0; i < para.K1; i++) {
+      std::string cluster_file_path =getClusterRawDataFileName(para.indexPrefixPath, i);
+      auto fd = open(cluster_file_path.c_str(), O_RDONLY | O_DIRECT);
+      if (fd == 0) {
+          std::cout << "open() failed, fd: " << fd
+                    << ", file: " << cluster_file_path << ", errno: " << errno
+                    << ", error: " << strerror(errno) << std::endl;
+          exit(-1);
+      }
+      fds[i] = fd;
+  }
+
+  std::unordered_map<uint32_t, std::vector<int64_t>> labels_2_qidxs;
+  labels_2_qidxs.reserve(nq * para.nProbe);
   std::vector<uint32_t> locs;
-  // std::unordered_map<uint32_t, uint32_t> inverted_locs;  // not required
-  std::unordered_map<std::string, int> fds; // file -> file descriptor
+  locs.reserve(nq * para.nProbe);
+
   for (int64_t i = 0; i < nq; ++i) {
     const auto ii = i * para.nProbe;
     for (int64_t j = 0; j < para.nProbe; ++j) {
       auto label = bucket_labels[ii + j];
-      if (blocks.find(label) == blocks.end()) {
-        util::parse_global_block_id(label, cid, bid);
-        std::string cluster_file_path =
-            getClusterRawDataFileName(para.indexPrefixPath, cid);
-        std::pair<std::string, uint32_t> blockPair(cluster_file_path, bid);
-        blocks[label] = blockPair;
-
-        if (fds.find(cluster_file_path) == fds.end()) {
-          auto fd = open(cluster_file_path.c_str(), O_RDONLY | O_DIRECT);
-          if (fd == 0) {
-            std::cout << "open() failed, fd: " << fd
-                      << ", file: " << cluster_file_path << ", errno: " << errno
-                      << ", error: " << strerror(errno) << std::endl;
-            exit(-1);
-          }
-          fds[cluster_file_path] = fd;
-        }
-
-        labels_2_qidxs[label] = std::vector<int64_t>{i};
-        // inverted_locs[label] = locs.size();
-        locs.push_back(label);
-      }
-
       if (labels_2_qidxs.find(label) == labels_2_qidxs.end()) {
         labels_2_qidxs[label] = std::vector<int64_t>{i};
+        locs.push_back(label);
       } else {
-        auto qidxs = labels_2_qidxs[label];
-        if (std::find(qidxs.begin(), qidxs.end(), i) == qidxs.end()) {
-          labels_2_qidxs[label].push_back(i);
-        }
+        labels_2_qidxs[label].push_back(i);
       }
     }
   }
   rc.RecordSection("calculate block position done");
 
-  auto block_nums = blocks.size();
+  auto block_nums = labels_2_qidxs.size();
   std::cout << "block num: " << block_nums << "\tloc num: " << locs.size()
             << "\tnq: " << nq << "\tnprobe: " << para.nProbe
             << "\tblock_size: " << para.blockSize << std::endl;
@@ -132,8 +122,6 @@ void search_bbann_queryonly(
   std::vector<char *> block_bufs;
   block_bufs.resize(block_nums);
   std::cout << "block_bufs.size(): " << block_bufs.size() << std::endl;
-
-  std::cout << "num of fds: " << fds.size() << std::endl;
 
   std::cout << "EAGAIN: " << EAGAIN << ", EFAULT: " << EFAULT
             << ", EINVAL: " << EINVAL << ", ENOMEM: " << ENOMEM
@@ -187,9 +175,10 @@ void search_bbann_queryonly(
       std::vector<struct iocb> ios(num_th);
       std::vector<struct iocb *> cbs(num_th, nullptr);
       for (auto i = begin_th; i < end_th; i++) {
-        auto block = blocks[locs[i]];
-        auto offset = block.second * para.blockSize;
-        io_prep_pread(ios.data() + (i - begin_th), fds[block.first],
+        uint32_t cid, bid;
+        bbann::util::parse_global_block_id(locs[i], cid, bid);
+        auto offset = bid * para.blockSize;
+        io_prep_pread(ios.data() + (i - begin_th), fds[cid],
                       block_bufs[i], para.blockSize, offset);
 
         // Unfortunately, a lambda fundtion with capturing variables cannot
@@ -286,9 +275,10 @@ void search_bbann_queryonly(
   /*gather_vec_searched_per_query(index_path, pquery, nq, nprobe, dq,
   block_size, buf, bucket_labels); rc.RecordSection("gather statistics done");*/
 
-  for (auto iter = fds.begin(); iter != fds.end(); iter++) {
-    close(iter->second);
+  for (int i = 0; i < para.K1; i ++) {
+      close(fds[i]);
   }
+  delete[] fds;
   rc.RecordSection("close fds done");
 
   delete[] bucket_labels;
