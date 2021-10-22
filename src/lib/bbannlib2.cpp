@@ -298,18 +298,17 @@ void search_bbann_queryonly(
   std::string answer_bin_file = para.indexPrefixPath + "a.answer";
     IOWriter answer_writer(answer_bin_file);
     std::cout<<"answer path" << answer_bin_file<<  std::endl;
-    std::ofstream answer_writer(answer_bin_file, std::ios::binary |std::ios::in );
     answer_writer.write((char *)&nq, sizeof(uint32_t));
     answer_writer.write((char *)&topk, sizeof(uint32_t));
 
     // cp
     uint32_t tot = nq * topk;
-    uint32_t *answer_ids1 = new uint32_t[tot]
+    uint32_t *answer_ids1 = new uint32_t[tot];
     DISTT *answer_dists1 =  new DISTT[t];
 
-    for (int i = 0; i < tot ; i++) {
-        answer_ids1[i] = answer_ids[i]
-        answer_dists1[i] = answer_dists[i]
+    for (int i = 0; i < tot; i++) {
+        answer_ids1[i] = answer_ids[i];
+        answer_dists1[i] = answer_dists[i];
     }
 
 
