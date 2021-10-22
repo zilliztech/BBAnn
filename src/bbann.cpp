@@ -339,7 +339,7 @@ void build_graph(const std::string &index_path, const int hnswM,
         for (uint32_t j = 0; j < bucketSample; ++j) {
             uint32_t picked = -1;
             for (uint32_t k = 0; k < entry_num; k++) {
-                if (indices.find(k) == indices.end()) {
+                if (indices.find(k) != indices.end()) {
                     //already picked
                     continue;
                 }
@@ -391,7 +391,7 @@ void build_graph(const std::string &index_path, const int hnswM,
              uint32_t picked = -1;
              DISTT pickedDistance;
              for (uint32_t k = 0; k < entry_num; k++) {
-                 if (indices.find(k) == indices.end()) {
+                 if (indices.find(k) != indices.end()) {
                      //already picked
                      continue;
                  }
