@@ -333,11 +333,29 @@ void build_graph(const std::string &index_path, const int hnswM,
             bucketSample = entry_num;
         }
         char *buf_begin = buf + sizeof(uint32_t);
-        for (int64_t j = 0; j < bucketSample; j++) {
-            // TODO, pick vectors smarter?
-            char *entry_begin = buf_begin + entry_size * j;
-            index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin), gen_id(cid0, bid0, j + 1));
+
+        // for top distance samples distance
+        std::unordered_set<int> indices;
+        for (uint32_t j = 0; j < bucketSample; ++j) {
+            uint32_t picked = -1;
+            for (uint32_t k = 0; k < entry_num; k++) {
+                if (indices.find(k) == indices.end()) {
+                    //already picked
+                    continue;
+                }
+                if (picked == -1 || pickFurther? (distance[k] > distance[picked]) : (distance[k] < distance[picked])) {
+                    picked = k;
+                }
+            }
+            if (picked == -1) {
+                break;
+            }
+            indices.insert(picked);
+            char *entry_begin = buf_begin + entry_size * picked;
+            index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin),bbann::util::gen_id(cid0, bid0, j + 1));
         }
+        delete[] distance;
+
         delete[] buf;
         fh.close();
     }
@@ -360,11 +378,35 @@ void build_graph(const std::string &index_path, const int hnswM,
              bucketSample = entry_num;
          }
          char *buf_begin = buf + sizeof(uint32_t);
-         for (int64_t j = 0; j < bucketSample; j++) {
-             // TODO, pick vectors smarter?
+         // calculate all distance to centroid
+         DISTT* distance = new DISTT[entry_num];
+         for (uint32_t j = 0; j < entry_num; ++j) {
              char *entry_begin = buf_begin + entry_size * j;
-             index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin), gen_id(cid, bid, j + 1));
+             distance[j] = dis_computer(reinterpret_cast<DATAT*>(entry_begin), pdata + i * ndim, ndim);
          }
+
+         // for top distance samples distance
+         std::unordered_set<int> indices;
+         for (uint32_t j = 0; j < bucketSample; ++j) {
+             uint32_t picked = -1;
+             DISTT pickedDistance;
+             for (uint32_t k = 0; k < entry_num; k++) {
+                 if (indices.find(k) == indices.end()) {
+                     //already picked
+                     continue;
+                 }
+                 if (picked == -1 || pickFurther? (distance[k] > distance[picked]) : (distance[k] < distance[picked])) {
+                     picked = k;
+                 }
+             }
+             if (picked == -1) {
+                 break;
+             }
+             indices.insert(picked);
+             char *entry_begin = buf_begin + entry_size * picked;
+             index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin),bbann::util::gen_id(cid, bid, j + 1));
+         }
+         delete[] distance;
          delete[] buf;
          fh.close();
      }
