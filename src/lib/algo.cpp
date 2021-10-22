@@ -223,7 +223,9 @@ void build_graph(const std::string &index_path, const int hnswM,
   std::cout << "build hnsw parameters:" << std::endl;
   std::cout << " index_path: " << index_path << " hnsw.M: " << hnswM
             << " hnsw.efConstruction: " << hnswefC
-            << " metric_type: " << (int)metric_type << std::endl;
+            << " metric_type: " << (int)metric_type
+            << " sample: " << sample
+            << std::endl;
 
   DATAT *pdata = nullptr;
   uint32_t *pids = nullptr;
@@ -309,7 +311,7 @@ void build_graph(const std::string &index_path, const int hnswM,
       fh.close();
     }
   }
-  std::cout << "hnsw totally add " << nblocks << " points" << std::endl;
+  std::cout << "hnsw totally add " << sample * nblocks << " points" << std::endl;
   rc.RecordSection("create index hnsw done");
   index_hnsw->saveIndex(index_path + HNSW + INDEX + BIN);
   rc.RecordSection("hnsw save index done");
