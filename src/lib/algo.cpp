@@ -280,7 +280,7 @@ void build_graph(const std::string &index_path, const int hnswM,
     }
     char *buf_begin = buf + sizeof(uint32_t);
 
-    std::cout<<"write to hnsw sample start, entry num" << entry_num<< std::endl
+    std::cout<<"write to hnsw sample start, entry num" << entry_num<< std::endl;
     // calculate all vectors distance to centroid
     DISTT* distance = new DISTT[entry_num];
     for (uint32_t j = 0; j < entry_num; ++j) {
