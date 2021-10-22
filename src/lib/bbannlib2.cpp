@@ -56,16 +56,18 @@ void search_bbann_queryonly(
 
   std::function<void(size_t, DISTT *, uint32_t *)> heap_heapify_func;
   std::function<bool(DISTT, DISTT)> cmp_func;
-  std::function<void(size_t, DISTT *, uint32_t *, DISTT, uint32_t)>
-      heap_swap_top_func;
+  std::function<void(size_t, DISTT *, uint32_t *, DISTT, uint32_t)>heap_swap_top_func;
+  std::function<void(size_t, DISTT *, uint32_t *, DISTT, uint32_t)> heap_order_func;
   if (para.metric == MetricType::L2) {
     heap_heapify_func = heap_heapify<CMax<DISTT, uint32_t>>;
     cmp_func = CMax<DISTT, uint32_t>::cmp;
     heap_swap_top_func = heap_swap_top<CMax<DISTT, uint32_t>>;
+    heap_order_func = heap_reorder<CMax<DISTT, uint32_t>>;
   } else if (para.metric == MetricType::IP) {
     heap_heapify_func = heap_heapify<CMin<DISTT, uint32_t>>;
     cmp_func = CMin<DISTT, uint32_t>::cmp;
     heap_swap_top_func = heap_swap_top<CMin<DISTT, uint32_t>>;
+    heap_order_func = heap_reorder<CMin<DISTT, uint32_t>>;
   }
 
   // init answer heap
@@ -315,7 +317,7 @@ void search_bbann_queryonly(
     for (int i = 0; i < nq; i++) {
         auto ans_disi = answer_dists1 + topk * i;
         auto ans_idsi = answer_ids1 + topk * i;
-        heap_heapify_func(topk, ans_disi, ans_idsi);
+        heap_order_func(topk, ans_disi, ans_idsi);
     }
 
 
