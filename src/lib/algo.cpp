@@ -394,8 +394,8 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len) {
     std::cout << "vector sq: read max/min from meta file" << std::endl;
     std::string meta_file = getSQMetaFileName(para.indexPrefixPath);
     IOReader meta_reader(meta_file);
-    meta_reader.read((char*)max_len.data(), sizeof(DATAT));
-    meta_reader.read((char*)min_len.data(), sizeof(DATAT));
+    meta_reader.read((char*)max_len.data(), sizeof(DATAT) * cluster_dim);
+    meta_reader.read((char*)min_len.data(), sizeof(DATAT) * cluster_dim);
   }
 
   {

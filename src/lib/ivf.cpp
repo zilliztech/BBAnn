@@ -760,7 +760,7 @@ void non_recursive_multilevel_kmeans(
   // alloc buffer to organize the persistent layout, persistent layout is repeated[vector, id],
   // in-memory layout is repeated[vector] and repeated[id]
   char *data_blk_buf = new char[blk_size];
-  std::vector<uint8_t > codes(threshold, 0);
+  std::vector<uint8_t > codes(threshold * dim, 0);
 
   // check each k2 cluster, persistent or split again
   for (int i = 0; i < k2; i++) {

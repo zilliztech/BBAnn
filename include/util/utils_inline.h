@@ -190,7 +190,6 @@ inline void random_sampling_k2(
 
 template<typename T>
 inline void transform_data(T* data, T* tdata, int64_t n, uint32_t dim) {
-#pragma omp parallel for
     for (auto i = 0; i < n; i++) {
         for (auto j = 0; j < dim; j++) {
             tdata[n * j + i] = data[i * dim + j];
@@ -200,7 +199,7 @@ inline void transform_data(T* data, T* tdata, int64_t n, uint32_t dim) {
 
 template<typename T>
 inline void train_code(T* max_len, T* min_len, T* data, int64_t n, uint32_t dim){
-    float rs_arg = 0.02;
+    float rs_arg = 0.0;
     int o;
     T* min,max;
     T* tdata = new T[n * dim];
@@ -289,13 +288,12 @@ inline void train_code(T* max_len, T* min_len, T* data, int64_t n, uint32_t dim)
 
 template<typename T>
 inline void encode_uint8(T* max_len, T* min_len, T* data, uint8_t* code, int64_t n, uint32_t dim)  {
-#pragma omp parallel for
     for (int64_t i = 0; i < n; i++) {
         T x_temp;
-        auto * __restrict x = data + i * dim;
-        auto * __restrict y = code + i * dim;
+        T * __restrict x = data + i * dim;
+        uint8_t * __restrict y = code + i * dim;
         for(int d = 0; d < dim; d++) {
-            x_temp = (x[d] - min_len[d])/(max_len[d] - min_len[d]);
+            x_temp = (x[d] - min_len[d]) / (max_len[d] - min_len[d]);
             if(x_temp<0.0) x_temp = 0;
             if(x_temp>1.0) x_temp = 1;
             y[d] = (uint8_t)(x_temp * 255);
@@ -305,7 +303,6 @@ inline void encode_uint8(T* max_len, T* min_len, T* data, uint8_t* code, int64_t
 
 template<typename T>
 inline void decode_uint8(T* max_len, T* min_len, T* data, uint8_t* code, int64_t n, uint32_t dim)  {
-#pragma omp parallel for
     for (int64_t i = 0; i < n; i++) {
         auto * __restrict x = data + i * dim;
         auto * __restrict y = code + i * dim;
@@ -315,5 +312,37 @@ inline void decode_uint8(T* max_len, T* min_len, T* data, uint8_t* code, int64_t
     }
 }
 
+
+template<typename T>
+inline void encode_uint8_2(T* max_len, T* min_len, T* data, uint8_t* code, int64_t n, uint32_t dim)  {
+    for (int64_t i = 0; i < n; i++) {
+        auto * __restrict x = data + i * dim;
+        auto * __restrict y = code + i * dim;
+        for(int d = 0; d < dim; d++) {
+            y[d] = (uint8_t)((x[d] - min_len[d])/(max_len[d] - min_len[d] + 1) * 256);
+        }
+    }
+}
+template<typename T>
+inline void decode_uint8_2(T* max_len, T* min_len, T* data, uint8_t* code, int64_t n, uint32_t dim)  {
+    for (int64_t i = 0; i < n; i++) {
+        auto * __restrict x = data + i * dim;
+        auto * __restrict y = code + i * dim;
+        for(int d = 0; d < dim; d++) {
+            x[d] = y[d] * (max_len[d] - min_len[d] + 1) / 256 + min_len[d];
+        }
+    }
+}
+
+template<typename T>
+inline void train_code_2(T* max_len, T* min_len, T* data, int64_t n, uint32_t dim){
+    std::vector<T> tdata(dim * n);
+    transform_data(data, tdata, n, dim);
+    for (auto i = 0; i < dim; i++) {
+        auto * __restrict tx = tdata + i * n;
+        min_len[i] = std::min((float *)tx, (float*)(tx + n));
+        max_len[i] = std::max((float *)tx, (float*)(tx + n));
+    }
+}
 
 } // namespace bbann

@@ -53,7 +53,7 @@ void search_bbann_queryonly(
   const uint32_t vec_size = sizeof(DATAT) * dim;
   const uint32_t code_size = sizeof(uint8_t) * dim;
   const uint32_t entry_size = para.vector_use_sq ? code_size + sizeof(uint32_t) : vec_size + sizeof(uint32_t);
-  DATAT *vec;
+
 
   // read min/min value in earch vector from file
   std::vector<DATAT> min_len(dim);
@@ -266,6 +266,7 @@ void search_bbann_queryonly(
           std::vector<DISTT> diss(entry_num);
           std::vector<uint32_t> ids(entry_num);
           std::vector<DATAT> code_vec(dim);
+          DATAT *vec;
           for (uint32_t k = 0; k < entry_num; ++k) {
             char *entry_begin = buf_begin + entry_size * k;
             if (para.vector_use_sq) {
