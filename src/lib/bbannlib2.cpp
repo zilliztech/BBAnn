@@ -171,9 +171,12 @@ void search_bbann_queryonly(
         submitted += r_submit;
       }
 
-      auto pending = submitted - done;
+      auto pending = num - done;
+      if (wait_nr > pending) {
+        wait_nr = pending;
+      }
       auto r_done =
-          io_getevents(aio_ctx, pending < wait_nr ? pending : wait_nr, nr, events.data() + done, NULL);
+          io_getevents(aio_ctx, wait_nr, nr, events.data() + done, NULL);
       if (r_done < wait_nr) {
         std::cout << "io_getevents() failed, returned: " << r_done
                   << ", strerror(-): " << strerror(-r_done) << std::endl;
