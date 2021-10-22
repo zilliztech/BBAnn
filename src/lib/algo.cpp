@@ -280,11 +280,13 @@ void build_graph(const std::string &index_path, const int hnswM,
     }
     char *buf_begin = buf + sizeof(uint32_t);
 
+    std::cout<<"write to hnsw sample start, entry num" << entry_num<< std::endl
     // calculate all vectors distance to centroid
     DISTT* distance = new DISTT[entry_num];
     for (uint32_t j = 0; j < entry_num; ++j) {
         char *entry_begin = buf_begin + entry_size * j;
         distance[j] = dis_computer(reinterpret_cast<DATAT *>(entry_begin), pdata, ndim);
+        std::cout<<"calculate distance of " << j << "distnace" << distance[j]  << std::endl
     }
 
     // for top distance samples distance
@@ -294,9 +296,11 @@ void build_graph(const std::string &index_path, const int hnswM,
       for (uint32_t k = 0; k < entry_num; k++) {
           if (indices.find(k) != indices.end()) {
               //already picked
+              std::cout<<"continue"<<std::endl;
               continue;
           }
           if (picked == -1 || pickFurther? (distance[k] > distance[picked]) : (distance[k] < distance[picked])) {
+              std::cout<<"picked" << k<<std::endl;
               picked = k;
           }
       }
