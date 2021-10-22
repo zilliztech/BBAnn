@@ -1,0 +1,6 @@
+bbannpy.egg-info/*
+bbannpy.egg-info*
+dist/
+dist*
+*.log
+log/*

@@ -16,15 +16,6 @@ void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,
                   const int nq, const int dq, const int nprobe,
                   const int refine_nprobe, const DATAT *pquery,
                   uint32_t *buckets_label, float *centroids_dist) {
-
-  TimeRecorder rc("search graph");
-  std::cout << "search graph parameters:" << std::endl;
-  std::cout << " index_hnsw: " << index_hnsw << " nq: " << nq << " dq: " << dq
-            << " nprobe: " << nprobe << " refine_nprobe: " << refine_nprobe
-            << " pquery: " << static_cast<const void *>(pquery)
-            << " buckets_label: " << static_cast<void *>(buckets_label)
-            << std::endl;
-  index_hnsw->setEf(refine_nprobe);
   bool set_distance = centroids_dist != nullptr;
 #pragma omp parallel for
   for (int64_t i = 0; i < nq; i++) {
@@ -43,7 +34,6 @@ void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,
       reti.pop();
     }
   }
-  rc.ElapseFromBegin("search graph done.");
 }
 
 template <typename DATAT>
