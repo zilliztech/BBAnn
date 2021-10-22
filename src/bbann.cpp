@@ -343,7 +343,7 @@ void build_graph(const std::string &index_path, const int hnswM,
                     //already picked
                     continue;
                 }
-                if (picked == -1 || pickFurther? (distance[k] > distance[picked]) : (distance[k] < distance[picked])) {
+                if (picked == -1 || (distance[k] > distance[picked])) {
                     picked = k;
                 }
             }
@@ -395,7 +395,7 @@ void build_graph(const std::string &index_path, const int hnswM,
                      //already picked
                      continue;
                  }
-                 if (picked == -1 || pickFurther? (distance[k] > distance[picked]) : (distance[k] < distance[picked])) {
+                 if (picked == -1 || distance[k] > distance[picked]) {
                      picked = k;
                  }
              }
