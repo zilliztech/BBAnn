@@ -559,7 +559,7 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len) {
         }
       };
 
-      size_t number_workers = 6;
+      size_t number_workers = 32;
       std::vector<std::thread> workers;
       for (size_t i = 0; i < number_workers; ++i) {
         workers.push_back(std::thread(func));
