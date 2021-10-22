@@ -8,6 +8,6 @@ set -e
 pushd ../benchmark
 cp ../python/bbann.py benchmark/algorithms/bbann.py
 rm -rf results/ssnpp-1B*
-python3 run.py --definitions ../python/bbann-algo.yaml --nodocker --dataset ssnpp-1B --algorithm bbann --runs 1 # --force --rebuild
-python3 plot.py --definitions ../python/bbann-algo.yaml --dataset ssnpp-1B --recompute
+python3 run.py --definitions ../python/bbann-algo.yaml --nodocker --dataset ssnpp-1B --algorithm bbann --runs 1 --count 96237 # --force --rebuild
+python3 plot.py --definitions ../python/bbann-algo.yaml --dataset ssnpp-1B --recompute --count 96237
 popd
