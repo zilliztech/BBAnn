@@ -57,7 +57,7 @@ void search_bbann_queryonly(
   std::function<void(size_t, DISTT *, uint32_t *)> heap_heapify_func;
   std::function<bool(DISTT, DISTT)> cmp_func;
   std::function<void(size_t, DISTT *, uint32_t *, DISTT, uint32_t)>heap_swap_top_func;
-  std::function<void(size_t, DISTT *, uint32_t *, DISTT, uint32_t)> heap_order_func;
+  std::function<void(size_t, DISTT *, uint32_t *)> heap_order_func;
   if (para.metric == MetricType::L2) {
     heap_heapify_func = heap_heapify<CMax<DISTT, uint32_t>>;
     cmp_func = CMax<DISTT, uint32_t>::cmp;
@@ -313,6 +313,7 @@ void search_bbann_queryonly(
         answer_dists1[i] = answer_dists[i];
     }
 
+    std::cout<<"answer copy done" << answer_bin_file<<  std::endl;
 
     for (int i = 0; i < nq; i++) {
         auto ans_disi = answer_dists1 + topk * i;
@@ -320,6 +321,7 @@ void search_bbann_queryonly(
         heap_order_func(topk, ans_disi, ans_idsi);
     }
 
+    std::cout<<"answer reorder" << answer_bin_file<<  std::endl;
 
     answer_writer.write((char *)answer_ids1, tot * sizeof(uint32_t));
     answer_writer.write((char *)answer_dists1, tot * sizeof(DISTT));
