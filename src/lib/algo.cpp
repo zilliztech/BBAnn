@@ -286,7 +286,7 @@ void build_graph(const std::string &index_path, const int hnswM,
     for (uint32_t j = 0; j < entry_num; ++j) {
         char *entry_begin = buf_begin + entry_size * j;
         distance[j] = dis_computer(reinterpret_cast<DATAT *>(entry_begin), pdata, ndim);
-        std::cout<<"calculate distance of " << j << "distnace" << distance[j]  << std::endl
+        std::cout<<"calculate distance of " << j << "distnace" << distance[j]  << std::endl;
     }
 
     // for top distance samples distance
