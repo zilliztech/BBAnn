@@ -229,7 +229,7 @@ public:
       resId[i] = req.size();
       AIORequest r;
       r.fd = cid;
-      r.buf = reinterpret_cast<char *>(ans + req.size() * blockSize);
+      r.buf = reinterpret_cast<char *>(ans) + req.size() * blockSize;
       r.offset = bid * blockSize;
       r.size = blockSize;
       req.emplace_back(r);
