@@ -304,7 +304,7 @@ void search_bbann_queryonly(
     // cp
     uint32_t tot = nq * topk;
     uint32_t *answer_ids1 = new uint32_t[tot];
-    DISTT *answer_dists1 =  new DISTT[t];
+    DISTT *answer_dists1 =  new DISTT[tot];
 
     for (int i = 0; i < tot; i++) {
         answer_ids1[i] = answer_ids[i];
