@@ -362,9 +362,7 @@ void build_graph(const std::string &index_path, const int hnswM,
           index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin),bbann::util::gen_id(cid, bid, j + 1));
       }
       delete[] distance;
-
       delete[] buf;
-
       fh.close();
     }
   }
