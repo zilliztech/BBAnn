@@ -16,8 +16,7 @@ struct AIORequest {
 inline static void AIORead(
     io_context_t ctx, std::vector<AIORequest> &read_reqs,
     const std::vector<std::function<void(AIORequest)>> &callbacks,
-    int eventsPerBatch = 32) {
-  int maxEventsInQueue = 1023;
+    int eventsPerBatch = 32, int maxEventsInQueue = 1023) {
   std::vector<struct iocb> ios(read_reqs.size());
   std::vector<struct iocb *> cbs(read_reqs.size(), nullptr);
 
@@ -58,7 +57,8 @@ inline static void AIORead(
       if (submitted < 0) {
         std::cout << "io_submit() failed, returned: " << submitted
                   << ", strerror(-): " << strerror(-submitted) << std::endl;
-        exit(-1);
+        return;
+        // exit(-1);
       }
     }
 
@@ -67,7 +67,8 @@ inline static void AIORead(
     if (r < 0) {
       std::cout << "io_getevents() failed, returned: " << r
                 << ", strerror(-): " << strerror(-r) << std::endl;
-      exit(-1);
+      return;                
+      // exit(-1);
     }
 #ifdef CALLBACK_ENABLED
     for (auto en = 0; en < r; en++) {

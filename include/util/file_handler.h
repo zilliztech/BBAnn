@@ -107,7 +107,7 @@ public:
     assert(buff != nullptr);
     cur_pos_ += n_bytes;
 
-      if (n_bytes + cur_off_ <= cache_size_) {
+    if (n_bytes + cur_off_ <= cache_size_) {
       memcpy(cache_buf_ + cur_off_, buff, n_bytes);
       cur_off_ += n_bytes;
     } else {
@@ -138,7 +138,7 @@ private:
   uint64_t cur_off_ = 0;
   uint64_t cur_pos_ = 0;
 
-    // file size
+  // file size
   uint64_t fsize_ = 0;
 };
 
@@ -211,13 +211,14 @@ public:
   AIOBucketReader(std::string prefix, int eventsPerBatch)
       : eventsPerBatch_(eventsPerBatch), prefix_(prefix) {}
 
-  std::vector<uint32_t> ReadToBuf(std::vector<uint32_t> bucketIds,
+  std::vector<uint32_t> ReadToBuf(const std::vector<uint32_t> &bucketIds,
                                   int blockSize, void *ans) {
 
     int n = bucketIds.size();
     std::vector<AIORequest> req;
     std::vector<uint32_t> resId(n);
-    cid_to_fd.clear();
+    // FIXED BUG: we can not clear cid_to_fd here!!!!!!!!!! cid_to_fd can only
+    // be accessed from the critical section.
     for (int i = 0; i < n; i++) {
       uint32_t cid, bid;
       util::parse_global_block_id(bucketIds[i], cid, bid);
@@ -242,9 +243,9 @@ public:
         r.fd = getFd(r.fd);
       }
       io_context_t ctx = 0;
-      auto max_events_num = 1023;
+      auto max_events_num = 512;   //!!!!!!!!!TODO(AIO_PARAMETERS!)
       io_setup(max_events_num, &ctx);
-      AIORead(ctx, req,  {}, 32);
+      AIORead(ctx, req, {}, 32, max_events_num);
       io_destroy(ctx);
 
       for (const auto &[cid, fd] : cid_to_fd) {
