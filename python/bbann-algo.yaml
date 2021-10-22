@@ -769,6 +769,6 @@ text2image-10M:
       run-groups:
         base:
           args: |
-              [{"hnswM":32, "hnswefC":500, "K1":10, "blockSize":4096}]
+              [{"hnswM":32, "hnswefC":500, "K1":10, "blockSize":4096, "vector_use_sq":true}]
           query-args: |
-              [{"nProbe":50, "efSearch":250, "K1":10, "blockSize":4096}]
+              [{"nProbe":50, "efSearch":250, "K1":10, "blockSize":4096, "vector_use_sq":true}]

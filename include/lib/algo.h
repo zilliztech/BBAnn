@@ -17,7 +17,7 @@ void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,
 template <typename DATAT>
 void train_cluster(const std::string &raw_data_bin_file,
                    const std::string &output_path, const int32_t K1,
-                   float **centroids, double &avg_len);
+                   float **centroids, double &avg_len, bool vector_use_sq = false);
 
 template <typename DATAT, typename DISTT>
 void divide_raw_data(const BBAnnParameters para, const float *centroids);
