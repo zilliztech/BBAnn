@@ -422,44 +422,26 @@ BBAnnIndex2<dataT, distanceT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
   auto run_bucket_scan =
       [&, this, para, pquery](int l, int r) -> std::list<qidIdDistTupleType> {
     /* return a list of tuple <queryid, id, dist>:*/
-
-    // auto cachereader =
-    //    std::make_unique<CachedBucketReader>(para.indexPrefixPath);
-    // std::vector<char> buf_v(para.blockSize);
-    // char *buf = &buf_v[0];
-
     std::list<qidIdDistTupleType> ret;
 
     auto dis_computer = util::select_computer<dataT, dataT, distanceT>(para.metric);
-    // auto reader = std::make_unique<CachedBucketReader>(para.indexPrefixPath);
     std::vector<uint32_t> bucketIds;
     bucketIds.reserve(r - l);
     for (int i = l; i < r; i++) {
       bucketIds.emplace_back(bucketToQuery[i].first);
     }
-    // std::cout << std::endl;
     void *big_read_buf;
+#pragma omp critical
     if (posix_memalign(&big_read_buf, 512, para.blockSize * (r - l)) != 0) {
       std::cerr << " err allocating  buf" << std::endl;
       exit(-1);
     }
     std::vector<uint32_t> resIds;
-#pragma omp critical
     resIds = reader.ReadToBuf(bucketIds, para.blockSize, big_read_buf);
-    /*
-    std::cout << "res size" << res.first.size() << std::endl;
-    std::cout << "id size " << res.second.size() << std::endl;
-    for (const auto id : res.second) {
-      std::cout << id << " ";
-    }
-    std::cout << std::endl;
-    std::cout << " expected id size" << r - l << std::endl;*/
 
     for (int i = l; i < r; i++) {
       const auto qid = bucketToQuery[i].second;
       const dataT *q_idx = pquery + qid * dim;
-      // std::cout << "trying access" << res.second[i - l] << std::endl;
-      // char *buf = &res.first[res.second[i - l] * para.blockSize];
       char *buf = (char *)big_read_buf + resIds[i - l] * para.blockSize;
       const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
       char *data_begin = buf + sizeof(uint32_t);
