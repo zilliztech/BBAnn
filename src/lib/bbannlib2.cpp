@@ -235,7 +235,6 @@ void search_bbann_queryonly(
     auto max_events_num = 1023;
     auto nr = 32;
     std::vector<io_context_t> ctxs(num_jobs, 0);
-#pragma omp parallel for
     for (auto i = 0; i < num_jobs; i++) {
       if (io_setup(max_events_num, &ctxs[i])) {
         std::cout << "io_setup() failed !" << std::endl;
@@ -243,30 +242,22 @@ void search_bbann_queryonly(
       }
     }
 
-#pragma omp parallel for
     for (auto i = 0; i < num_jobs; i++) {
+      //l_ and r_ is nq level
       auto l_ = l + (r - l) * i / num_jobs;
       auto r_ = l + (r - l) * (i + 1) / num_jobs;
       if (r_ > r) {
         r_ = r;
       }
 
+      //begin and end is block level.
       auto begin = l_ * nprobe;
       auto end = r_ * nprobe;
-
-#if 0
-      std::string s;
-      s = s + "i: " + std::to_string(i) + ", l: " + std::to_string(l) +
-          ", r: " + std::to_string(r) + ", l_: " + std::to_string(l_) +
-          ", r_: " + std::to_string(r_) + "\n";
-      std::cout << s << std::endl;
-#endif
 
       // step 2: io.
       fio_way(ctxs[i], block_bufs, begin, end, max_events_num, 32);
 
       // step 3: compute distance && heap sort.
-#pragma omp parallel for
       for (auto j = l_; j < r_; j++) {
         compute(block_bufs, j);
       }
@@ -276,14 +267,6 @@ void search_bbann_queryonly(
     for (auto i = 0; i < num_jobs; i++) {
       io_destroy(ctxs[i]);
     }
-
-#if 0
-    // step 3: compute distance && heap sort.
-#pragma omp parallel for
-    for (auto i = l; i < r; i++) {
-      compute(block_bufs, i);
-    }
-#endif
   };
 
   auto n_batch = (nq * nprobe + max_blocks_num - 1) / max_blocks_num;
@@ -314,21 +297,8 @@ void search_bbann_queryonly(
 #endif
 
 #pragma omp parallel for
-    for (auto i = 0; i < threads_num; i++) {
-      auto l = q_begin + i * num / threads_num;
-      auto r = q_begin + (i + 1) * num / threads_num;
-      if (r > q_end) {
-        r = q_end;
-      }
-
-#if 0
-      std::string s;
-      s = s + "i: " + std::to_string(i) + ", l: " + std::to_string(l) +
-          ", r: " + std::to_string(r) + "\n";
-      std::cout << s << std::endl;
-#endif
-
-      run_query(l, r);
+    for (auto i = q_begin; i < q_end; i++) {
+      run_query(i, i + 1);
     }
   };
 
