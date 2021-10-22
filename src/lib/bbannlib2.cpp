@@ -298,7 +298,7 @@ void search_bbann_queryonly(
     std::cout<<"answer path" << answer_bin_file<<  std::endl;
     std::ofstream answer_writer(answer_bin_file, std::ios::binary |std::ios::in );
     answer_writer.write((char *)&nq, sizeof(uint32_t));
-    answer_writer.write((char *)&tok, sizeof(uint32_t));
+    answer_writer.write((char *)&topk, sizeof(uint32_t));
 
     for (int i = 0; i < nq; i++) {
         auto ans_disi = answer_dists + topk * i;
