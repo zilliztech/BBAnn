@@ -59,7 +59,7 @@ int main(int argc, char **argv) {
   get_bin_metadata(bucket_centroids_file, bucket_num, dim);
 
   if (argv[1] == std::string("float")) {
-    Computer<float, float, float> dis_computer; // refine computer
+    /*Computer<float, float, float> dis_computer; // refine computer
     hnswlib::SpaceInterface<float> *space = nullptr;
 
     if (MetricType::L2 == metric_type) {
@@ -79,12 +79,12 @@ int main(int argc, char **argv) {
       search_bbann<float, float, CMin<float, uint32_t>>(
           index_path, query_file, answer_file, nprobe, hnsw_ef, topk,
           index_hnsw, K1, block_size, dis_computer);
-    }
+    }*/
     // calculate_recall<float>(ground_truth_file, answer_file, topk);
     recall<float, uint32_t>(ground_truth_file, answer_file, metric_type, true,
                             false);
   } else if (argv[1] == std::string("uint8")) {
-    Computer<uint8_t, uint8_t, uint32_t> dis_computer; // refine computer
+    /*Computer<uint8_t, uint8_t, uint32_t> dis_computer; // refine computer
       hnswlib::SpaceInterface<uint32_t> *space = nullptr;
       if (MetricType::L2 == metric_type) {
           space = new hnswlib::L2Space<uint8_t, uint32_t>(dim);
@@ -99,13 +99,13 @@ int main(int argc, char **argv) {
       dis_computer = L2sqr<const uint8_t, const uint8_t, uint32_t>;
       search_bbann<uint8_t, uint32_t, CMax<uint32_t, uint32_t>>(
           index_path, query_file, answer_file, nprobe, hnsw_ef, topk,
-          index_hnsw, K1, block_size, dis_computer);
+          index_hnsw, K1, block_size, dis_computer);*/
 
     // calculate_recall<uint32_t>(ground_truth_file, answer_file, topk);
     recall<uint32_t, uint32_t>(ground_truth_file, answer_file, metric_type,
                                true, false);
   } else if (argv[1] == std::string("int8")) {
-      hnswlib::SpaceInterface<int> *space = nullptr;
+      /*hnswlib::SpaceInterface<int> *space = nullptr;
       if (MetricType::L2 == metric_type) {
           space = new hnswlib::L2Space<int8_t, int32_t>(dim);
       } else if (MetricType::IP == metric_type) {
@@ -120,7 +120,7 @@ int main(int argc, char **argv) {
       dis_computer = L2sqr<const int8_t, const int8_t, int32_t>;
       search_bbann<int8_t, int32_t, CMax<int32_t, uint32_t>>(
           index_path, query_file, answer_file, nprobe, hnsw_ef, topk,
-          index_hnsw, K1, block_size, dis_computer);
+          index_hnsw, K1, block_size, dis_computer);*/
 
     // calculate_recall<uint32_t>(ground_truth_file, answer_file, topk);
     recall<int32_t, uint32_t>(ground_truth_file, answer_file, metric_type, true,
