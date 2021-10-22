@@ -293,7 +293,27 @@ void search_bbann_queryonly(
 
   delete[] bucket_labels;
 
-  rc.ElapseFromBegin("search bigann totally done");
+
+   std::string answer_bin_file = para.indexPrefixPath + "a.answer";
+    std::cout<<"answer path" << answer_bin_file<<  std::endl;
+    std::ofstream answer_writer(answer_bin_file, std::ios::binary |std::ios::in );
+    answer_writer.write((char *)&nq, sizeof(uint32_t));
+    answer_writer.write((char *)&tok, sizeof(uint32_t));
+
+    for (int i = 0; i < nq; i++) {
+        auto ans_disi = answer_dists + topk * i;
+        auto ans_idsi = answer_ids + topk * i;
+        heap_heapify_func(topk, ans_disi, ans_idsi);
+    }
+
+    uint32_t tot = nq * topk;
+    answer_writer.write((char *)answer_ids, tot * sizeof(uint32_t));
+    answer_writer.write((char *)answer_dists, tot * sizeof(DISTT));
+
+    answer_writer.close();
+    rc.RecordSection("save answer done");
+
+    rc.ElapseFromBegin("search bigann totally done");
 }
 
 template <typename dataT, typename distanceT>
