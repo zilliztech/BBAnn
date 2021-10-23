@@ -197,7 +197,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
           long batchNum = end - begin;
           std::vector<char *> block_bufs;
           block_bufs.resize(batchNum);
-          for (int j = 0; j < block_nums; j++) {
+          for (int j = 0; j < batchNum; j++) {
               auto r = posix_memalign((void **) (&block_bufs[j]), 512, para.blockSize);
               if (r != 0) {
                   std::cout << "posix_memalign() failed, returned: " << r
