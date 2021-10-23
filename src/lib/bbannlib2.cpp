@@ -210,7 +210,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
               auto nq_idxs = labels_2_qidxs[locs[j + begin]];
               for (const auto curNq: nq_idxs) {
                   locks[curNq].lock();
-                  std::cout<<"entry num" << entry_num<< std::endl;
+                  std::cout<<"entry num" << std::endl;
                   const uint32_t entry_num = *reinterpret_cast<uint32_t *>(block_bufs[j]);
                   std::cout<<"entry num put" << entry_num<< std::endl;
                   taskQueues[curNq].push_back(block_bufs[j]);
