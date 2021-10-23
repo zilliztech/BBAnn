@@ -225,22 +225,21 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
     std::atomic<bool> stop (false);
     auto computer = [&](io_context_t aio_ctx,  std::vector<std::vector<char *>> taskQueues, int nqStart, int nqEnd) {
 
-        const uint32_t vec_size = sizeof(dataT) * dim;
+        const uint32_t vec_size = sizeof(DATAT) * dim;
         const uint32_t entry_size = vec_size + sizeof(uint32_t);
+        bool localStop = false;
+
         while (true) {
-            boolean empty = true;
-            for (int nq_idx = nqStart; nq_idx < nqEnd) {
-                if(locks[nq_idx].try_lock()) {
+            for (int nq_idx = nqStart; nq_idx < nqEnd; nq_idx++) {
+                if(locks[nq_idx].lock()) {
                     std::vector<char *> localTask;
                     localTask.insert(taskQueues[nq_idx]);
                     taskQueues[nq_idx].clear();
                     locks[nq_idx].unlock();
 
                     if (localTask.empty()) {
-                        empty = false;
                         continue;
                     }
-
                     // do the real caculation
                     const DATAT *q_idx = pquery + nq_idx * dim;
 
@@ -273,15 +272,14 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                             }
                         }
                     }
-                } else {
-                    empty == false
                 }
             }
-
-            if (stop && empty) {
-                std::cout<< "thread is stopped without any task todo" << "nq start" << nqStart << "nq end" << nqEnd << std::endl;
+            // last round
+            if (localStop) {
                 break;
             }
+            // make sure this happens after break, we need a final round to sweep out all the exist tasks
+            localStop = stop;
         }
     };
 
