@@ -266,6 +266,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                 for (char* block : localTask) {
                     processed++;
                     const uint32_t entry_num = *reinterpret_cast<uint32_t *>(block);
+                    std::cout<<"entrynum " << entry_num << std::endl;
                     char *buf_begin = block + sizeof(uint32_t);
                     for (uint32_t k = 0; k < entry_num; ++k) {
                         char *entry_begin = buf_begin + entry_size * k;
@@ -279,11 +280,14 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                             vec = reinterpret_cast<DATAT *>(entry_begin);
                             id = *reinterpret_cast<uint32_t *>(entry_begin + vec_size);
                         }
+                        std::cout<<"id " << id << std::endl;
                         auto dis = dis_computer(vec, q_idx, dim);
+                        std::cout<<"dis " << dis << std::endl;
                         if (cmp_func(answer_dists[topk * nq_idx], dis)) {
                             heap_swap_top_func(topk, answer_dists + topk * nq_idx,
                                                answer_ids + topk * nq_idx, dis, id);
                         }
+                        std::cout<<"heap done " << std::endl;
                     }
                     delete[] block;
                 }
