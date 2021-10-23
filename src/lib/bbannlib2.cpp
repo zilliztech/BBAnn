@@ -149,9 +149,6 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
         auto label = locs[begin + i];
         uint32_t cid, bid;
         util::parse_global_block_id(label, cid, bid);
-        if(cid >= 128) {
-            std::cout<<"invalid cid" << cid << "bid" << bid << std::endl;
-        }
         io_prep_pread(ios.data() + i, fds[cid], bufs[num], para.blockSize, bid * para.blockSize);
         cbs[i] = ios.data() + i;
     }
@@ -202,8 +199,9 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
           fio_way(aio_ctx, block_bufs, begin, end);
           for (int j = begin; j < end; j++) {
               auto nq_idxs = labels_2_qidxs[locs[j]];
-              for(set<int_64t>::iterator iter = nq_idxs.begin(); iter != nq_idxs.end(); iter++) {}
-                  curNq = *iter;
+              //for(unordered_set<int64_t>::iterator iter = nq_idxs.begin(); iter != nq_idxs.end(); iter++) {
+              for (const auto curNq: nq_idxs) {
+                  //curNq = *iter;
                   locks[curNq].lock();
                   taskQueues[curNq].emplace(locs[j], block_bufs[i]);
                   locks[curNq].unlock();
