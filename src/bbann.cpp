@@ -289,10 +289,10 @@ void build_graph(const std::string &index_path, const int hnswM,
     bool pickFurther = true;
     if (metric_type == MetricType::L2) {
         pickFurther=true;
-        dis_computer =  return L2sqr<const T1, const T2, R>;
+        dis_computer = return L2sqr<const DATAT, const DATAT, DISTT>;
     } else if (metric_type == MetricType::IP) {
         pickFurther = false;
-        dis_computer = return IP<const T1, const T2, R>;
+        dis_computer = return IP<const DATAT, const DATAT, DATAT>;
     }
 
     DATAT *pdata = nullptr;
