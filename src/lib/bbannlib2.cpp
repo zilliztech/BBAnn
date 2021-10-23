@@ -226,6 +226,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
     auto computer = [&](std::vector<std::vector<char *>> taskQueues, int nqStart, int nqEnd) {
         const uint32_t vec_size = sizeof(DATAT) * dim;
         const uint32_t entry_size = vec_size + sizeof(uint32_t);
+        bool localStop = false;
         while (true) {
             for (int nq_idx = nqStart; nq_idx < nqEnd; nq_idx++) {
                 locks[nq_idx].lock();
