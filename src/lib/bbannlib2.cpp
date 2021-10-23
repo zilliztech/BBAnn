@@ -231,46 +231,46 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
 
         while (true) {
             for (int nq_idx = nqStart; nq_idx < nqEnd; nq_idx++) {
-                if(locks[nq_idx].lock()) {
-                    std::vector<char *> localTask;
-                    localTask.insert(localTask.begin(), taskQueues[nq_idx].begin(), taskQueues[nq_idx].end());
-                    taskQueues[nq_idx].clear();
-                    locks[nq_idx].unlock();
+                locks[nq_idx].lock())
+                std::vector<char *> localTask;
+                localTask.insert(localTask.begin(), taskQueues[nq_idx].begin(), taskQueues[nq_idx].end());
+                taskQueues[nq_idx].clear();
+                locks[nq_idx].unlock();
 
-                    if (localTask.empty()) {
-                        continue;
-                    }
-                    // do the real caculation
-                    const DATAT *q_idx = pquery + nq_idx * dim;
-                    DATAT *vec;
-                    for (auto block : localTask) {
-                        const uint32_t entry_num = *reinterpret_cast<uint32_t *>(block);
-                        char *buf_begin = block + sizeof(uint32_t);
-                        for (uint32_t k = 0; k < entry_num; ++k) {
-                            char *entry_begin = buf_begin + entry_size * k;
-                            if (para.vector_use_sq) {
-                                std::vector<DATAT> code_vec(dim);
-                                decode_uint8(max_len.data(), min_len.data(), code_vec.data(), reinterpret_cast<uint8_t *>(entry_begin), 1, dim);
-                                vec = code_vec.data();
-                            } else {
-                                vec = reinterpret_cast<DATAT *>(entry_begin);
-                            }
+                if (localTask.empty()) {
+                    continue;
+                }
+                // do the real caculation
+                const DATAT *q_idx = pquery + nq_idx * dim;
+                DATAT *vec;
+                for (auto block : localTask) {
+                    const uint32_t entry_num = *reinterpret_cast<uint32_t *>(block);
+                    char *buf_begin = block + sizeof(uint32_t);
+                    for (uint32_t k = 0; k < entry_num; ++k) {
+                        char *entry_begin = buf_begin + entry_size * k;
+                        if (para.vector_use_sq) {
+                            std::vector<DATAT> code_vec(dim);
+                            decode_uint8(max_len.data(), min_len.data(), code_vec.data(), reinterpret_cast<uint8_t *>(entry_begin), 1, dim);
+                            vec = code_vec.data();
+                        } else {
+                            vec = reinterpret_cast<DATAT *>(entry_begin);
+                        }
 
-                            auto dis = dis_computer(vec, q_idx, dim);
-                            uint32_t id;
-                            if (para.vector_use_sq) {
-                                id = *reinterpret_cast<uint32_t *>(entry_begin + code_size);
-                            } else {
-                                id = *reinterpret_cast<uint32_t *>(entry_begin + vec_size);
-                            }
+                        auto dis = dis_computer(vec, q_idx, dim);
+                        uint32_t id;
+                        if (para.vector_use_sq) {
+                            id = *reinterpret_cast<uint32_t *>(entry_begin + code_size);
+                        } else {
+                            id = *reinterpret_cast<uint32_t *>(entry_begin + vec_size);
+                        }
 
-                            if (cmp_func(answer_dists[topk * nq_idx], dis)) {
-                                heap_swap_top_func(topk, answer_dists + topk * nq_idx,
-                                                   answer_ids + topk * nq_idx, dis, id);
-                            }
+                        if (cmp_func(answer_dists[topk * nq_idx], dis)) {
+                            heap_swap_top_func(topk, answer_dists + topk * nq_idx,
+                                               answer_ids + topk * nq_idx, dis, id);
                         }
                     }
                 }
+
             }
             // last round
             if (localStop) {
@@ -285,7 +285,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
     std::vector<std::thread> computers;
     computers.resize(num_computer_jobs);
     long nqPerThread = nq / num_computer_jobs + 1;
-    for (int i =0; i < num_computer_jobsm; i++) {
+    for (int i =0; i < num_computer_job; i++) {
         int threadStart = i * nqPerThread;
         int threadEnd = (i + 1) * nqPerThread;
         if (threadEnd > nq) {
