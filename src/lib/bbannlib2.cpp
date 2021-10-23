@@ -126,7 +126,6 @@ void search_bbann_queryonly(
   max_events_num = 1024;
 
 auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, int end) {
-
     auto num = end - begin;
     std::cout<<"fio read num" << num << "buf size" << bufs.size() << std::endl;
     std::vector<struct iocb> ios(num);
@@ -140,6 +139,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
         io_prep_pread(ios.data() + i, fds[cid], bufs[loc], para.blockSize, bid * para.blockSize);
         cbs[i] = ios.data() + i;
     }
+    std::cout<<"fio prepare done" << std::endl;
 
     auto submitted = 0;
 
@@ -154,6 +154,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
         }
         submitted += r_submit;
     }
+    std::cout<<"fio submit done" << std::endl;
 
     auto r_done = io_getevents(aio_ctx, num, num, events.data(), NULL);
     if (r_done < 0) {
@@ -181,11 +182,11 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
       int total = threadEnd - threadStart;
       int batch = total / max_events_num + 1;
       for (int i = 0; i < batch; i++) {
-          long begin = threadStart + i * batch;
-          long end = std::min(begin + batch , threadEnd);
+          long begin = threadStart + i * max_events_num;
+          long end = std::min(begin + max_events_num , threadEnd);
           long batchNum = end - begin;
           std::vector<char *> block_bufs;
-          block_bufs.resize(batchNum);
+          block_bufs.resize(max_events_num);
           fio_way(aio_ctx, block_bufs, begin, end);
           for (int j = begin; j < end; i++) {
               auto nq_idxs = labels_2_qidxs[j];
