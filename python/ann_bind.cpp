@@ -152,6 +152,7 @@ PYBIND11_MODULE(bbannpy, m) {
       .def_readwrite("efSearch", &BBAnnParameters::efSearch)
       .def_readwrite("K1", &BBAnnParameters::K1)
       .def_readwrite("K", &BBAnnParameters::K)
+      .def_readwrite("radiusFactor", &BBAnnParameters::radiusFactor)      
       .def_readwrite("nProbe", &BBAnnParameters::nProbe)
       .def_readwrite("aio_EventsPerBatch", &BBAnnParameters::aio_EventsPerBatch)
       .def_readwrite("rangeSearchProbeCount",&BBAnnParameters::rangeSearchProbeCount)

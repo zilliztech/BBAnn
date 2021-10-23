@@ -50,7 +50,7 @@ void search_bbann_queryonly(
 
   auto nprobe = para.nProbe;
 
-  auto bucket_labels = new uint32_t[(int64_t)nq * nprobe];  // 400K * nprobe
+  auto bucket_labels = new uint32_t[(int64_t)nq * nprobe]; // 400K * nprobe
 
   std::function<void(size_t, DISTT *, uint32_t *)> heap_heapify_func;
   std::function<bool(DISTT, DISTT)> cmp_func;
@@ -79,20 +79,21 @@ void search_bbann_queryonly(
   uint32_t gid;
   const uint32_t vec_size = sizeof(DATAT) * dim;
   const uint32_t code_size = sizeof(uint8_t) * dim;
-  const uint32_t entry_size = para.vector_use_sq ? code_size + sizeof(uint32_t) : vec_size + sizeof(uint32_t);
+  const uint32_t entry_size = para.vector_use_sq ? code_size + sizeof(uint32_t)
+                                                 : vec_size + sizeof(uint32_t);
 
   // read min/min value in earch vector from file
   std::vector<DATAT> min_len(dim);
   std::vector<DATAT> max_len(dim);
   if (para.vector_use_sq) {
-      std::string vector_sq_meta_file = getSQMetaFileName(para.indexPrefixPath);
-      IOReader meta_reader(vector_sq_meta_file);
-      meta_reader.read((char*)max_len.data(), sizeof(DATAT) * dim);
-      meta_reader.read((char*)min_len.data(), sizeof(DATAT) * dim);
+    std::string vector_sq_meta_file = getSQMetaFileName(para.indexPrefixPath);
+    IOReader meta_reader(vector_sq_meta_file);
+    meta_reader.read((char *)max_len.data(), sizeof(DATAT) * dim);
+    meta_reader.read((char *)min_len.data(), sizeof(DATAT) * dim);
   }
 
   uint32_t max_cid = 0xff;
-  std::unordered_map<uint32_t, int> fds;  // cid -> file descriptor
+  std::unordered_map<uint32_t, int> fds; // cid -> file descriptor
   for (uint32_t i = 0; i < max_cid; i++) {
     std::string cluster_file_path =
         getClusterRawDataFileName(para.indexPrefixPath, i);
@@ -211,14 +212,15 @@ void search_bbann_queryonly(
     const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
     char *buf_begin = buf + sizeof(uint32_t);
 
-    DATAT* vec;
+    DATAT *vec;
     std::vector<DATAT> code_vec(dim);
 
     for (uint32_t k = 0; k < entry_num; ++k) {
       char *entry_begin = buf_begin + entry_size * k;
 
       if (para.vector_use_sq) {
-        decode_uint8(max_len.data(), min_len.data(), code_vec.data(), reinterpret_cast<uint8_t *>(entry_begin), 1, dim);
+        decode_uint8(max_len.data(), min_len.data(), code_vec.data(),
+                     reinterpret_cast<uint8_t *>(entry_begin), 1, dim);
         vec = code_vec.data();
       } else {
         vec = reinterpret_cast<DATAT *>(entry_begin);
@@ -234,8 +236,8 @@ void search_bbann_queryonly(
       }
 
       if (cmp_func(answer_dists[topk * q], dis)) {
-        heap_swap_top_func(
-            topk, answer_dists + topk * q, answer_ids + topk * q, dis, id);
+        heap_swap_top_func(topk, answer_dists + topk * q, answer_ids + topk * q,
+                           dis, id);
       }
     }
   };
@@ -405,23 +407,10 @@ BBAnnIndex2<dataT, distanceT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
                                               const BBAnnParameters para) {
   TimeRecorder rc("range search bbann");
 
-  std::cout << "range search bigann parameters:" << std::endl;
-  std::cout << " index_path: " << para.indexPrefixPath
-            << " hnsw_ef: " << para.hnswefC << " radius: " << radius
-            << " K1: " << para.K1 << std::endl;
 
   std::cout << "query numbers: " << numQuery << " query dims: " << dim
             << std::endl;
-  /*
-  for (int i = 0 ; i < numQuery; i++) {
-    std::cout << "query " << i <<": ";
-    for (int j = 0; j < dim; j++) {
-      std::cout << pquery[i*dim + j] << " ";
-    }
-    std::cout << std::endl;
-  }
-   */
-  // std::vector<uint32_t> *bucket_labels = new std::vector<uint32_t>[numQuery];
+
   std::vector<std::pair<uint32_t, uint32_t>> qid_bucketLabel;
 
   // std::map<int, int> bucket_hit_cnt, hit_cnt_cnt, return_cnt;
@@ -433,17 +422,18 @@ BBAnnIndex2<dataT, distanceT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
     std::vector<std::pair<int, int>> ret;
     for (int i = l; i < r; i++) {
       const auto reti = index_hnsw_->searchRange(
-          pquery + i * dim, para.rangeSearchProbeCount, radius);
+          pquery + i * dim, para.rangeSearchProbeCount, radius*para.radiusFactor);
       for (auto const &[dist, bucket_label] : reti) {
-          // convert the bucket label from 64bit to 32 bit
-          uint32_t cid, bid, offset;
-          bbann::util::parse_id(bucket_label, cid, bid, offset);
-          auto bucket_label32 = bbann::util::gen_global_block_id(cid, bid);
-          ret.emplace_back(std::make_pair(bucket_label32, i));
+        // convert the bucket label from 64bit to 32 bit
+        uint32_t cid, bid, offset;
+        bbann::util::parse_id(bucket_label, cid, bid, offset);
+        auto bucket_label32 = bbann::util::gen_global_block_id(cid, bid);
+        ret.emplace_back(std::make_pair(bucket_label32, i));
       }
     }
     return ret;
   };
+  rc.RecordSection("prep query done");
   int nparts_hnsw = 128;
   std::vector<std::pair<int, int>> bucketToQuery;
 #pragma omp parallel for
@@ -469,7 +459,8 @@ BBAnnIndex2<dataT, distanceT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
     /* return a list of tuple <queryid, id, dist>:*/
     std::list<qidIdDistTupleType> ret;
 
-    auto dis_computer = util::select_computer<dataT, dataT, distanceT>(para.metric);
+    auto dis_computer =
+        util::select_computer<dataT, dataT, distanceT>(para.metric);
     std::vector<uint32_t> bucketIds;
     bucketIds.reserve(r - l);
     for (int i = l; i < r; i++) {
@@ -502,9 +493,7 @@ BBAnnIndex2<dataT, distanceT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
         }
       }
     }
-    std::cout << "Finished query number:" << r - l << std::endl;
     free(big_read_buf);
-    std::cout << " relleased big_read_buf" << std::endl;
     return ret;
   };
   // execute queries with "index mod (1<<shift) == thid".
@@ -525,8 +514,8 @@ BBAnnIndex2<dataT, distanceT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
 #pragma omp critical
     std::move(qid_id_dist.begin(), qid_id_dist.end(),
               std::back_inserter(ans_list));
-    std::cout << "finished " << totQuery << "queries, returned " << totReturn
-              << " answers" << std::endl;
+    rc.ElapseFromBegin("disk access part " + std::to_string(partID) +
+                       "out of " + std::to_string(nparts_block) + " done");
   }
   rc.RecordSection("scan blocks done");
   sort(ans_list.begin(), ans_list.end());

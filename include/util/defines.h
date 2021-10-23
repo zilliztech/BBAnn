@@ -49,6 +49,7 @@ struct BBAnnParameters {
   int aio_EventsPerBatch = 512;
   int sample = 1;
   bool vector_use_sq = false;
+  double radiusFactor = 1.0;
 };
 
 

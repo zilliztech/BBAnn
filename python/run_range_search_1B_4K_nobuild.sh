@@ -4,6 +4,8 @@
 # then,
 # python3 create_dataset.py --datset random-xs
 
+cp utils.py ../benchmark/benchmark/plotting/utils.py
+
 set -e
 pushd ../benchmark
 cp ../python/bbann.py benchmark/algorithms/bbann.py
