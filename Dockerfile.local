@@ -8,8 +8,8 @@ RUN pip3 install pybind11 numpy
 # RUN git clone --single-branch --branch bbann_docker --recurse-submodules https://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@github.com/PwzXxm/BigAnn.git
 RUN mkdir -p BigAnn
 COPY include BigAnn/include
-COPY python/*.py BigAnn/python
-COPY python/*.cpp BigAnn/python
+COPY python/*.py BigAnn/python/
+COPY python/*.cpp BigAnn/python/
 COPY src BigAnn/src
 COPY CMakeLists.txt BigAnn/
 RUN ls BigAnn
