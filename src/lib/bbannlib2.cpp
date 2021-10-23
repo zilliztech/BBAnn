@@ -139,7 +139,6 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
         io_prep_pread(ios.data() + i, fds[cid], bufs[num], para.blockSize, bid * para.blockSize);
         cbs[i] = ios.data() + i;
     }
-    std::cout<<"fio prepare done" << std::endl;
 
     auto submitted = 0;
 
@@ -154,7 +153,6 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
         }
         submitted += r_submit;
     }
-    std::cout<<"fio submit done" << std::endl;
 
     auto r_done = io_getevents(aio_ctx, num, num, events.data(), NULL);
     if (r_done < 0) {
@@ -162,7 +160,6 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
               << ", strerror(-): " << strerror(-r_done) << std::endl;
         exit(-1);
     }
-    std::cout<<"fio read done" << num << std::endl;
 };
 
    int num_jobs = 4;
@@ -189,6 +186,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
           fio_way(aio_ctx, block_bufs, begin, end);
           for (int j = begin; j < end; j++) {
               auto nq_idxs = labels_2_qidxs[j];
+              std::cout<< "size" << i << "Notify" << j << "nq idx" << nq_idxs.size << std::endl;
               for (auto iter = 0; iter < nq_idxs.size(); iter++) {
                   locks[iter].lock();
                   taskQueues[iter].push_back(block_bufs[i]);
@@ -213,6 +211,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
   for (auto& t: ioReaders) {
       t.join();
   }
+  std::cout<< "Thread join!!" < std::endl;
 
   for (auto i = 0; i < num_jobs; i++) {
       io_destroy(ctxs[i]);
