@@ -167,11 +167,15 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
         submitted += r_submit;
     }
 
-    auto r_done = io_getevents(aio_ctx, num, num, events.data(), NULL);
-    if (r_done < 0) {
-        std::cout << "io_getevents() failed, returned: " << r_done
-              << ", strerror(-): " << strerror(-r_done) << std::endl;
-        exit(-1);
+    auto done = 0;
+    while (done != num) {
+        auto r_done = io_getevents(aio_ctx, num, num, events.data(), NULL);
+        if (r_done < 0) {
+            std::cout << "io_getevents() failed, returned: " << r_done
+                      << ", strerror(-): " << strerror(-r_done) << std::endl;
+            exit(-1);
+        }
+        done += r_done;
     }
 };
 
@@ -235,7 +239,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
 
     std::atomic<bool> stop (false);
     auto computer = [&](std::vector<std::vector<char *>> taskQueues, int nqStart, int nqEnd) {
-        std::cout<<"computer start, start " << threadStart << "end " << threadEnd << std::endl;
+        std::cout<<"computer start, start " << nqStart << "end " << nqEnd << std::endl;
         const uint32_t vec_size = sizeof(DATAT) * dim;
         const uint32_t entry_size = vec_size + sizeof(uint32_t);
         bool localStop = false;
