@@ -8,11 +8,13 @@ cd src/
 make TimeRecorder
 cd lib
 make clean
-make BBAnnLib2_s
+make  -j 
 popd
 
 # sudo pip3 uninstall bbannpy -y
 rm -rf build/
+rm -rf dist/
+rm -rf bbannpy.egg-info
 sudo python3 setup.py install -f
 rm -rf /tmp/dat
 mkdir -p /tmp/dat

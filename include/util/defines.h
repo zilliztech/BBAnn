@@ -30,3 +30,27 @@ enum class LevelType {
     BALANCE_LEVEL = 3,
     FINAL_LEVEL =4,
 };
+
+namespace bbann {
+struct BBAnnParameters {
+  std::string dataFilePath;
+  std::string indexPrefixPath;
+  std::string queryPath;
+  std::string groundTruthFilePath;
+  MetricType metric;
+  int K = 20; // top k.
+  int hnswM = 32;
+  int hnswefC = 500;
+  int K1 = 20;
+  int blockSize = 1;
+  int nProbe = 2;
+  int efSearch = 250;
+  int rangeSearchProbeCount = 20;
+  int aio_EventsPerBatch = 512;
+  int sample = 1;
+  bool vector_use_sq = false;
+  double radiusFactor = 1.0;
+};
+
+
+}

@@ -45,6 +45,10 @@ class BbANN(BaseANN):
         """
         Return a folder name, in which we would store the index.
         """
+        print("trying to create index dir:", self.index_params)
+        if "overrideIndexPath" in self.index_params:
+            print("Override index path:", self.index_params["overrideIndexPath"])
+            return self.index_params["overrideIndexPath"]
         index_dir = os.path.join(os.getcwd(), "data", "indices")
         os.makedirs(index_dir, mode=0o777, exist_ok=True)
         index_dir = os.path.join(index_dir, "T2")
@@ -58,6 +62,9 @@ class BbANN(BaseANN):
         return index_dir
 
     def get_index_dir(self, dataset):
+        if "overrideIndexPath" in self.index_params:
+            print("Override index path:", self.index_params["overrideIndexPath"])
+            return self.index_params["overrideIndexPath"]
         index_dir = os.path.join(os.getcwd(), "data", "indices")
         index_dir = os.path.join(index_dir, "T2")
         index_dir = os.path.join(index_dir, self.__str__())
@@ -185,11 +192,9 @@ class BbANN(BaseANN):
         radius.
         """
         nq, dim = (np.shape(X))
+        print(f"Query index with para {self.para}")
         self.rangeres_lim, (self.rangeres_ids, self.rangeres_dists) = self.index.range_search(
             X, dim, nq, radius, self.para)
-        print(self.rangeres_lim[0:10])
-        print(self.rangeres_ids[self.rangeres_lim[0]:self.rangeres_lim[1]])
-        print(self.rangeres_dists[self.rangeres_lim[0]:self.rangeres_lim[1]])
 
     def get_results(self):
         """

@@ -29,7 +29,7 @@
 #include <string.h>
 
 namespace hnswlib {
-    typedef size_t labeltype;
+    typedef uint64_t labeltype;
 
     template <typename T>
     class pairGreater {

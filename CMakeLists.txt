@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(OpenMP REQUIRED)
-set (CMAKE_CXX_FLAGS "-g -O3 ${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+set (CMAKE_CXX_FLAGS "-O3 ${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS} -fPIC")
 find_package(Threads REQUIRED)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 
@@ -35,18 +35,13 @@ if (DIRECTIO)
     add_compile_options(-DDIRECTIO=1)
     message(STATUS "Optional Flag DIRECTIO is ON: to do DIRECT IO: O_DIRECT")
 endif(DIRECTIO)
+add_compile_options(-march=native -O3)
 
 include_directories(include)
+add_compile_options(-march=native)
 
 add_subdirectory(src)
 
-add_executable(build_bbann build_bbann.cpp)
-add_executable(search_bbann search_bbann.cpp)
+# add_subdirectory(test)
+# add_subdirectory(scripts)
 
-add_subdirectory(test)
-add_subdirectory(scripts)
-
-target_link_libraries(build_bbann BBAnn)
-target_link_libraries(search_bbann BBAnn)
-
-add_compile_options(-march=native)

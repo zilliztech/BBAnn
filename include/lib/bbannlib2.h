@@ -2,52 +2,24 @@
 #include "ann_interface.h"
 
 #include "hnswlib/hnswalg.h"
+#include "lib/algo.h"
 #include <iostream>
 #include <memory>
 #include <stdint.h>
 #include <string>
+#include <tuple>
 
 namespace bbann {
 
-namespace consts {
-// num of clusters in the first round k-means
-// constexpr static int K1 = 10;
-// sample rate of the first round k-means
-constexpr static float K1_SAMPLE_RATE = 0.01;
-// sample rate of the pq train set
-constexpr static float PQ_SAMPLE_RATE = 0.01;
-// the threshold of the second round k-means, if the size of cluster is larger
-// than this threshold, than do ((cluster size)/threshold)-means
-constexpr static int SPLIT_THRESHOLD = 500;
-// the max cluster number in hierarchical_cluster
-constexpr static int MAX_CLUSTER_K2 = 500;
-
-constexpr static int KMEANS_THRESHOLD = 2000;
-
-} // namespace consts
-struct BBAnnParameters {
-  std::string dataFilePath;
-  std::string indexPrefixPath;
-  std::string queryPath;
-  std::string groundTruthFilePath;
-  MetricType metric;
-  int K = 20; // top k.
-  int hnswM = 32;
-  int hnswefC = 500;
-  int K1 = 20;
-  int blockSize = 1;
-  int nProbe = 2;
-  int efSearch = 250;
-};
-
-template <typename dataT>
+template <typename dataT, typename distanceT>
 struct BBAnnIndex2
-    : public BuildIndexFactory<BBAnnIndex2<dataT>, BBAnnParameters>,
+    : public BuildIndexFactory<BBAnnIndex2<dataT,distanceT>, BBAnnParameters>,
       public AnnIndexInterface<dataT, BBAnnParameters> {
 
   using parameterType = BBAnnParameters;
   using dataType = dataT;
-  using distanceT = typename TypeWrapper<dataT>::distanceT;
+  // using distanceT = typename TypeWrapper<dataT>::distanceT;
+  using qidIdDistTupleType = std::tuple<uint32_t, uint32_t, distanceT>;
 
 public:
   BBAnnIndex2(MetricType metric) : metric_(metric) {
@@ -61,12 +33,11 @@ public:
                       uint64_t knn, const BBAnnParameters para,
                       uint32_t *answer_ids, distanceT *answer_dists) override;
 
-  void RangeSearchCpp(const dataT *pquery, uint64_t dim, uint64_t numQuery,
-                      double radius, const BBAnnParameters para,
-                      std::vector<std::vector<uint32_t>> &ids,
-                      std::vector<std::vector<float>> &dists,
-                      std::vector<uint64_t> &lims) override;
-  std::shared_ptr<hnswlib::HierarchicalNSW<float>> index_hnsw_;
+  std::tuple<std::vector<uint32_t>, std::vector<distanceT>, std::vector<uint64_t>>
+  RangeSearchCpp(const dataT *pquery, uint64_t dim, uint64_t numQuery,
+                      double radius, const BBAnnParameters para) override;
+  std::shared_ptr<hnswlib::HierarchicalNSW<distanceT>> index_hnsw_;
+
   std::string indexPrefix_;
   std::string dataFilePath_;
 
