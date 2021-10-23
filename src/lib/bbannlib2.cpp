@@ -188,8 +188,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
         }
    }
 
-  std::vector<std::vector<char *>> taskQueues;
-  taskQueues.resize(nq);
+  std::vector<char *>* taskQueues = new std::vector<char *>[nq];
   std::mutex* locks = new std::mutex[nq];
 
   std::mutex memLock;
@@ -205,7 +204,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
           std::vector<char *> block_bufs;
           block_bufs.resize(batchNum);
           for (int j = 0; j < batchNum; j++) {
-              //memLock.lock();
+              memLock.lock();
               auto r = posix_memalign((void **) (&block_bufs[j]), 4096, para.blockSize);
               if (r != 0) {
                   std::cout << "posix_memalign() failed, returned: " << r
@@ -213,17 +212,21 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                             << std::endl;
                   exit(-1);
               }
-              //memLock.unlock();
+              memLock.unlock();
           }
           fio_way(aio_ctx, block_bufs, begin, end);
           for (int j = 0; j < batchNum; j++) {
               auto nq_idxs = labels_2_qidxs[locs[j + begin]];
               for (const auto curNq: nq_idxs) {
                   locks[curNq].lock();
-                  taskQueues[curNq].push_back(block_bufs[j]);
+                  char * buf = new char[para.blockSize];
+                  memcpy(buf, block_bufs[j], para.blockSize);
+                  taskQueues[curNq].push_back(buf);
                   locks[curNq].unlock();
+
                   insert++;
               }
+              free(block_bufs[j]);
           }
       }
       std::cout<<"Stop with io inserted "<< insert << std::endl;
@@ -264,7 +267,8 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                 // do the real caculation
                 const DATAT *q_idx = pquery + nq_idx * dim;
 
-                /*for (char* block : localTask) {
+                for (int j =0; j < localTask.size(); j++) {
+                    char * block = localTask[j];
                     processed++;
                     const uint32_t entry_num = *reinterpret_cast<uint32_t *>(block);
                     char *buf_begin = block + sizeof(uint32_t);
@@ -289,10 +293,9 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                                                answer_ids + topk * nq_idx, dis, id);
                         }
                     }
-                    free(block);
-                }*/
+                   free(block);
+                }
             }
-            std::cout<<"loop done"<<std::endl;
             loop++;
             // last round
             if (localStop) {
