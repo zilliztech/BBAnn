@@ -233,7 +233,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
             for (int nq_idx = nqStart; nq_idx < nqEnd; nq_idx++) {
                 if(locks[nq_idx].lock()) {
                     std::vector<char *> localTask;
-                    localTask.insert(taskQueues[nq_idx]);
+                    localTask.insert(localTask.begin(), taskQueues[nq_idx].begin(), taskQueues[nq_idx].end());
                     taskQueues[nq_idx].clear();
                     locks[nq_idx].unlock();
 
