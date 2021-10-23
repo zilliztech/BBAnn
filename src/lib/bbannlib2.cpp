@@ -249,9 +249,8 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
         int loop = 0;
         while (true) {
             // random is for more load balance
-            int32_t pivot = rand() % num;
             for (int i = 0; i < num; i++) {
-                int32_t nq_idx = (i + pivot) % num + nqStart;
+                int32_t nq_idx = i + nqStart;
                 locks[nq_idx].lock();
                 std::vector<char *> localTask;
                 localTask.insert(localTask.begin(), taskQueues[nq_idx].begin(), taskQueues[nq_idx].end());
@@ -266,7 +265,9 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                 for (char* block : localTask) {
                     processed++;
                     const uint32_t entry_num = *reinterpret_cast<uint32_t *>(block);
-                    std::cout<<"entrynum " << entry_num << std::endl;
+                    if (entry_num > 40) {
+                        std::cout<<"block is crashsed"<< std:endl;
+                    }
                     char *buf_begin = block + sizeof(uint32_t);
                     for (uint32_t k = 0; k < entry_num; ++k) {
                         char *entry_begin = buf_begin + entry_size * k;
@@ -280,14 +281,11 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                             vec = reinterpret_cast<DATAT *>(entry_begin);
                             id = *reinterpret_cast<uint32_t *>(entry_begin + vec_size);
                         }
-                        std::cout<<"id " << id << std::endl;
                         auto dis = dis_computer(vec, q_idx, dim);
-                        std::cout<<"dis " << dis << std::endl;
                         if (cmp_func(answer_dists[topk * nq_idx], dis)) {
                             heap_swap_top_func(topk, answer_dists + topk * nq_idx,
                                                answer_ids + topk * nq_idx, dis, id);
                         }
-                        std::cout<<"heap done " << std::endl;
                     }
                     delete[] block;
                 }
