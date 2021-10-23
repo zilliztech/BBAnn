@@ -104,7 +104,7 @@ void search_bbann_queryonly(
       fds[i] = fd;
   }
 
-  std::unordered_map<uint32_t, std::vector<int64_t>> labels_2_qidxs; // label -> query idxs
+  std::unordered_map<uint32_t, std::unordered_set<int64_t>> labels_2_qidxs; // label -> query idxs
   for (int64_t i = 0; i < nq; ++i) {
     const auto ii = i * para.nProbe;
     for (int64_t j = 0; j < para.nProbe; ++j) {
@@ -112,7 +112,7 @@ void search_bbann_queryonly(
       if (labels_2_qidxs.find(label) == labels_2_qidxs.end()) {
         labels_2_qidxs[label] = std::vector<int64_t>{i};
       } else {
-        labels_2_qidxs[label].push_back(i);
+        labels_2_qidxs[label].insert(i);
       }
     }
   }
@@ -202,8 +202,9 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
           fio_way(aio_ctx, block_bufs, begin, end);
           for (int j = begin; j < end; j++) {
               auto nq_idxs = labels_2_qidxs[locs[j]];
-              for (int i = 0; i < nq_idxs.size(); i++) {
-                  int_64t nq = nq_idxs[i];
+
+              for (auto nqIter= nq_idxs.begin(); nq != nq_idxs.end(); nq++) {}
+                  int64_t nq = *nqIter;
                   locks[nq].lock();
                   taskQueues[nq].emplace(locs[j], block_bufs[i]);
                   locks[nq].unlock();
