@@ -223,7 +223,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
 
 
     std::atomic<bool> stop (false);
-    auto computer = [&](io_context_t aio_ctx,  std::vector<std::vector<char *>> taskQueues, int nqStart, int nqEnd) {
+    auto computer = [&](std::vector<std::vector<char *>> taskQueues, int nqStart, int nqEnd) {
 
         const uint32_t vec_size = sizeof(DATAT) * dim;
         const uint32_t entry_size = vec_size + sizeof(uint32_t);
