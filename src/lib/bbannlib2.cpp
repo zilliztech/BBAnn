@@ -309,7 +309,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
         if (threadEnd > nq) {
             threadEnd = nq;
         }
-        computers[i] = std::thread(computer, taskQueues, threadStart, threadEnd);
+        computers[i] = std::thread(computer, threadStart, threadEnd);
     }
 
     for (auto& t: ioReaders) {
