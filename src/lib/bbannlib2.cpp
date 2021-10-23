@@ -118,11 +118,13 @@ void search_bbann_queryonly(
   }
 
   int total = 0;
-  vector<uint32_t> locs;
+  std::vector<uint32_t> locs;
   locs.resize(labels_2_qidxs.size());
+  int i = 0;
   for (auto iter : labels_2_qidxs) {
     total += iter.second.size();
     locs[i] = iter.first;
+    i++;
   }
 
   rc.RecordSection("calculate block position done");
