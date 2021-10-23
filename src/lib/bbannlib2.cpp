@@ -78,7 +78,18 @@ void search_bbann_queryonly(
   uint32_t cid, bid;
   uint32_t gid;
   const uint32_t vec_size = sizeof(DATAT) * dim;
-  const uint32_t entry_size = vec_size + sizeof(uint32_t);
+  const uint32_t code_size = sizeof(uint8_t) * dim;
+  const uint32_t entry_size = para.vector_use_sq ? code_size + sizeof(uint32_t) : vec_size + sizeof(uint32_t);
+
+  // read min/min value in earch vector from file
+  std::vector<DATAT> min_len(dim);
+  std::vector<DATAT> max_len(dim);
+  if (para.vector_use_sq) {
+      std::string vector_sq_meta_file = getSQMetaFileName(para.indexPrefixPath);
+      IOReader meta_reader(vector_sq_meta_file);
+      meta_reader.read((char*)max_len.data(), sizeof(DATAT) * dim);
+      meta_reader.read((char*)min_len.data(), sizeof(DATAT) * dim);
+  }
 
   uint32_t max_cid = 0xff;
   std::unordered_map<uint32_t, int> fds;  // cid -> file descriptor
@@ -200,14 +211,31 @@ void search_bbann_queryonly(
     const uint32_t entry_num = *reinterpret_cast<uint32_t *>(buf);
     char *buf_begin = buf + sizeof(uint32_t);
 
+    DATAT* vec;
+    std::vector<DATAT> code_vec(dim);
+
     for (uint32_t k = 0; k < entry_num; ++k) {
       char *entry_begin = buf_begin + entry_size * k;
-      auto vec = reinterpret_cast<DATAT *>(entry_begin);
+
+      if (para.vector_use_sq) {
+        decode_uint8(max_len.data(), min_len.data(), code_vec.data(), reinterpret_cast<uint8_t *>(entry_begin), 1, dim);
+        vec = code_vec.data();
+      } else {
+        vec = reinterpret_cast<DATAT *>(entry_begin);
+      }
+
       auto dis = dis_computer(vec, q_idx, dim);
+
+      uint32_t id;
+      if (para.vector_use_sq) {
+        id = *reinterpret_cast<uint32_t *>(entry_begin + code_size);
+      } else {
+        id = *reinterpret_cast<uint32_t *>(entry_begin + vec_size);
+      }
+
       if (cmp_func(answer_dists[topk * q], dis)) {
         heap_swap_top_func(
-            topk, answer_dists + topk * q, answer_ids + topk * q, dis,
-            *reinterpret_cast<uint32_t *>(entry_begin + vec_size));
+            topk, answer_dists + topk * q, answer_ids + topk * q, dis, id);
       }
     }
   };
