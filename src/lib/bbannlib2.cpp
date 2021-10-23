@@ -239,7 +239,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
 
 
     std::atomic<bool> stop (false);
-    auto computer = [&](std::vector<std::vector<char *>> taskQueues, int nqStart, int nqEnd) {
+    auto computer = [&](std::vector<std::vector<char *>>& taskQueues, int nqStart, int nqEnd) {
         std::cout<<"computer start, start " << nqStart << "end " << nqEnd << std::endl;
         const uint32_t vec_size = sizeof(DATAT) * dim;
         const uint32_t entry_size = vec_size + sizeof(uint32_t);
@@ -249,15 +249,14 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
         int loop = 0;
         while (true) {
             // random is for more load balance
-            int32_t  pivot = rand() % num;
+            int32_t pivot = rand() % num;
             for (int i = 0; i < num; i++) {
-                int32_t  nq_idx = (i + pivot) % num + nqStart;
+                int32_t nq_idx = (i + pivot) % num + nqStart;
                 locks[nq_idx].lock();
                 std::vector<char *> localTask;
                 localTask.insert(localTask.begin(), taskQueues[nq_idx].begin(), taskQueues[nq_idx].end());
                 taskQueues[nq_idx].clear();
                 locks[nq_idx].unlock();
-                std::cout<<" handle " << nq_idx << "with " << localTask.size() << "loop" << loop << "Stop" << stop<< std::endl;
                 if (localTask.empty()) {
                     continue;
                 }
@@ -267,7 +266,6 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                 for (char* block : localTask) {
                     processed++;
                     const uint32_t entry_num = *reinterpret_cast<uint32_t *>(block);
-                    std::cout<<"entry num " << entry_num << std::endl;
                     char *buf_begin = block + sizeof(uint32_t);
                     for (uint32_t k = 0; k < entry_num; ++k) {
                         char *entry_begin = buf_begin + entry_size * k;
