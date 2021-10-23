@@ -266,7 +266,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                     processed++;
                     const uint32_t entry_num = *reinterpret_cast<uint32_t *>(block);
                     if (entry_num > 40) {
-                        std::cout<<"block is crashsed"<< std:endl;
+                        std::cout<<"block is crashsed"<< std::endl;
                     }
                     char *buf_begin = block + sizeof(uint32_t);
                     for (uint32_t k = 0; k < entry_num; ++k) {
