@@ -45,7 +45,7 @@ void search_bbann_queryonly(
   uint32_t *bucket_labels = new uint32_t[(int64_t)nq * para.nProbe];
   auto dis_computer = util::select_computer<DATAT, DATAT, DISTT>(para.metric);
 
-  index_hnsw->setEf(refine_nprobe);
+  index_hnsw->setEf(para.efSearch);
   search_graph<DATAT>(index_hnsw, nq, dim, para.nProbe, para.efSearch, pquery,
                       bucket_labels, nullptr);
   rc.RecordSection("search buckets done.");
@@ -220,14 +220,12 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
           fio_way(aio_ctx, block_bufs, begin, end);
           for (int j = 0; j < batchNum; j++) {
               auto nq_idxs = labels_2_qidxs[locs[j + begin]];
-              char * buf = new char[nq_idxs.size() * para.blockSize];
-              int handled = 0;
               for (const auto curNq: nq_idxs) {
-                  memcpy(buf + handled * para.blockSize, block_bufs[j], para.blockSize);
+                  char * buf = new char[para.blockSize];
+                  memcpy(buf, block_bufs[j], para.blockSize);
                   locks[curNq].lock();
-                  taskQueues[curNq].push_back(buf + handled * para.blockSize);
+                  taskQueues[curNq].push_back(buf);
                   locks[curNq].unlock();
-                  handled++;
               }
           }
       }
@@ -297,7 +295,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                                                answer_ids + topk * nq_idx, dis, id);
                         }
                     }
-                   free(block);
+                    delete[] block;
                 }
             }
             // last round
