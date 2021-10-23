@@ -118,7 +118,7 @@ void search_bbann_queryonly(
   }
 
   int total = 0;
-  // relations between indices to lebel
+  // relations between postion to bucket label
   std::vector<uint32_t> locs;
   locs.resize(labels_2_qidxs.size());
   int i = 0;
@@ -171,10 +171,8 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                 auto label = locs[begin + i];
                 uint32_t cid, bid;
                 util::parse_global_block_id(label, cid, bid);
-                std::cout<< "i" << i << "cid" << cid << ", bid" << bid << std::endl;
+                std::cout<< "Fail i" << i << "cid" << cid << ", bid" << bid << std::endl;
             }
-
-
             exit(-1);
         }
         submitted += r_submit;
@@ -212,6 +210,9 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
           fio_way(aio_ctx, block_bufs, begin, end);
           for (int j = begin; j < end; j++) {
               auto nq_idxs = labels_2_qidxs[locs[j]];
+              if (nq_idxs.empty()) {
+                  std::cout << "FATAL" << "j" << j <<"locsj" << locs[j] << "related query is empty" << std::endl;
+              }
               for (auto iter = 0; iter < nq_idxs.size(); iter++) {
                   locks[iter].lock();
                   taskQueues[iter].push_back(block_bufs[i]);
@@ -219,7 +220,6 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
               }
           }
       }
-      std::cout<< "iotask done" << std::endl;
   };
 
   std::vector<std::thread> ioReaders;
@@ -243,8 +243,9 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
       io_destroy(ctxs[i]);
   }
 
+
   for (int i = 0; i < nq; i++) {
-      std::cout << "nq" << nq << "taskQueue size" << taskQueues[i].size() <<std::endl;
+      std::cout << "nq" << i << "taskQueue size" << taskQueues[i].size() <<std::endl;
   }
   /*for (auto& t: threads) {
       t.join();
