@@ -241,6 +241,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
         const uint32_t vec_size = sizeof(DATAT) * dim;
         const uint32_t entry_size = vec_size + sizeof(uint32_t);
         bool localStop = false;
+        int processed = 0;
         while (true) {
             for (int nq_idx = nqStart; nq_idx < nqEnd; nq_idx++) {
                 locks[nq_idx].lock();
@@ -256,6 +257,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                 const DATAT *q_idx = pquery + nq_idx * dim;
                 DATAT *vec;
                 for (char* block : localTask) {
+                    processed++;
                     const uint32_t entry_num = *reinterpret_cast<uint32_t *>(block);
                     std::cout<<"entry num " << entry_num << std::endl;
                     char *buf_begin = block + sizeof(uint32_t);
@@ -279,11 +281,10 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                     }
                     delete[] block;
                 }
-
             }
             // last round
             if (localStop) {
-                std::cout<<"Stop with the last round, exit "<< std::endl;
+                std::cout<<"Stop with the last round, exit with processed "<< processed << std::endl;
                 break;
             }
             // make sure this happens after break, we need a final round to sweep out all the exist tasks
