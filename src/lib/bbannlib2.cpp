@@ -110,20 +110,19 @@ void search_bbann_queryonly(
     for (int64_t j = 0; j < para.nProbe; ++j) {
       auto label = bucket_labels[ii + j];
       if (labels_2_qidxs.find(label) == labels_2_qidxs.end()) {
-          std::cout<<"not find"<<std::endl;
         labels_2_qidxs[label] = std::vector<int64_t>{i};
       } else {
-          std::cout<<"find"<<std::endl;
         labels_2_qidxs[label].push_back(i);
       }
     }
   }
 
-  int total = 0;
-  for (int i = 0; i < labels_2_qidxs.size(); i++) {
-      std::cout<<"label" << i << "size"<<  labels_2_qidxs[i].size() <<std::endl;
+    int total = 0;
+  for (auto iter : labels_2_qidxs) {
+    std::cout<<"iter" << iter.first << "size" << iter.second.size() << std::endl;
       total +=  labels_2_qidxs[i].size();
   }
+  
   std::cout<<"total size" << total << std::endl;
   rc.RecordSection("calculate block position done");
 
