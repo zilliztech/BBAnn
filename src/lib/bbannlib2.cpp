@@ -245,8 +245,6 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
     std::atomic<bool> stop (false);
     auto computer = [&](int nqStart, int nqEnd) {
         std::cout<<"computer start, start " << nqStart << "end " << nqEnd << std::endl;
-        const uint32_t vec_size = sizeof(DATAT) * dim;
-        const uint32_t entry_size = vec_size + sizeof(uint32_t);
         uint32_t num = nqEnd - nqStart;
         bool localStop = false;
         int processed = 0;
@@ -254,7 +252,6 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
         while (true) {
             // random is for more load balance
             for (int i = 0; i < num; i++) {
-                std::cout<<"process" << i <<std::endl;
                 int32_t nq_idx = i + nqStart;
                 locks[nq_idx].lock();
                 std::vector<char *> localTask;
@@ -283,13 +280,13 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                             vec = reinterpret_cast<DATAT *>(entry_begin);
                             id = *reinterpret_cast<uint32_t *>(entry_begin + vec_size);
                         }
-                        auto dis = dis_computer(vec, q_idx, dim);
+                        /*auto dis = dis_computer(vec, q_idx, dim);
                         if (cmp_func(answer_dists[topk * nq_idx], dis)) {
                             heap_swap_top_func(topk, answer_dists + topk * nq_idx,
                                                answer_ids + topk * nq_idx, dis, id);
-                        }
+                        }*/
                     }
-                    free(block);
+                    //free(block);
                 }
             }
             std::cout<<"loop done"<<std::endl;
