@@ -231,7 +231,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
 
         while (true) {
             for (int nq_idx = nqStart; nq_idx < nqEnd; nq_idx++) {
-                locks[nq_idx].lock())
+                locks[nq_idx].lock();
                 std::vector<char *> localTask;
                 localTask.insert(localTask.begin(), taskQueues[nq_idx].begin(), taskQueues[nq_idx].end());
                 taskQueues[nq_idx].clear();
@@ -285,7 +285,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
     std::vector<std::thread> computers;
     computers.resize(num_computer_jobs);
     long nqPerThread = nq / num_computer_jobs + 1;
-    for (int i =0; i < num_computer_job; i++) {
+    for (int i =0; i < num_computer_jobs; i++) {
         int threadStart = i * nqPerThread;
         int threadEnd = (i + 1) * nqPerThread;
         if (threadEnd > nq) {
