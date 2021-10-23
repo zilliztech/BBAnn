@@ -55,6 +55,7 @@ class BbANN(BaseANN):
         os.makedirs(index_dir, mode=0o777, exist_ok=True)
         index_dir = os.path.join(index_dir, self.index_name())
         os.makedirs(index_dir, mode=0o777, exist_ok=True)
+        print(index_dir)
         return index_dir
 
     def get_index_dir(self, dataset):
