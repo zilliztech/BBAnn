@@ -199,7 +199,6 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
           fio_way(aio_ctx, block_bufs, begin, end);
           for (int j = begin; j < end; j++) {
               auto nq_idxs = labels_2_qidxs[locs[j]];
-              //for(unordered_set<int64_t>::iterator iter = nq_idxs.begin(); iter != nq_idxs.end(); iter++) {
               for (const auto curNq: nq_idxs) {
                   locks[curNq].lock();
                   taskQueues[curNq].push_back(block_bufs[i]);
@@ -238,14 +237,13 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                 if (localTask.empty()) {
                     continue;
                 }
-
-                std::cout<<"Fetch local task " << localTask.size() << std::endl;
                 // do the real caculation
                 const DATAT *q_idx = pquery + nq_idx * dim;
                 DATAT *vec;
-                for (auto block : localTask) {
+                for (char* block : localTask) {
                     std::cout<<"block in" << std::endl;
                     const uint32_t entry_num = *reinterpret_cast<uint32_t *>(block);
+                    std::cout<<"entry num" << std::endl;
                     char *buf_begin = block + sizeof(uint32_t);
                     std::cout<<"buf begin" << std::endl;
                     for (uint32_t k = 0; k < entry_num; ++k) {
