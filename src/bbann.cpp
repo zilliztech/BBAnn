@@ -285,6 +285,16 @@ void build_graph(const std::string &index_path, const int hnswM,
               << " hnsw.efConstruction: " << hnswefC
               << " metric_type: " << (int) metric_type << std::endl;
 
+    Computer<T1, T2, R> dis_computer;
+    bool pickFurther = true;
+    if (metric_type == MetricType::L2) {
+        pickFurther=true;
+        dis_computer =  return L2sqr<const T1, const T2, R>;
+    } else if (metric_type == MetricType::IP) {
+        pickFurther = false;
+        dis_computer = return IP<const T1, const T2, R>;
+    }
+
     DATAT *pdata = nullptr;
     uint32_t *pids = nullptr;
     uint32_t nblocks, ndim, nids, nidsdim;
@@ -334,6 +344,13 @@ void build_graph(const std::string &index_path, const int hnswM,
         }
         char *buf_begin = buf + sizeof(uint32_t);
 
+        // calculate all distance to centroid
+        DISTT* distance = new DISTT[entry_num];
+        for (uint32_t j = 0; j < entry_num; ++j) {
+            char *entry_begin = buf_begin + entry_size * j;
+            distance[j] = dis_computer(reinterpret_cast<DATAT *>(entry_begin), pdata, ndim);
+        }
+
         // for top distance samples distance
         std::unordered_set<int> indices;
         for (uint32_t j = 0; j < bucketSample; ++j) {
@@ -352,7 +369,7 @@ void build_graph(const std::string &index_path, const int hnswM,
             }
             indices.insert(picked);
             char *entry_begin = buf_begin + entry_size * picked;
-            index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin),bbann::util::gen_id(cid0, bid0, j + 1));
+            index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin), gen_id(cid0, bid0, j + 1));
         }
         delete[] distance;
 
@@ -366,7 +383,8 @@ void build_graph(const std::string &index_path, const int hnswM,
      index_hnsw->addPoint(pdata + i * ndim, gen_id(cid, bid, 0));
      if (sample != 1) {
          // add sample data
-         std::string cluster_file_path = index_path + CLUSTER + std::to_string(cid) + "-" + RAWDATA + BIN;
+         std::string cluster_file_path =
+                 index_path + CLUSTER + std::to_string(cid) + "-" + RAWDATA + BIN;
          auto fh = std::ifstream(cluster_file_path, std::ios::binary);
          assert(!fh.fail());
          char *buf = new char[block_size];
@@ -378,6 +396,7 @@ void build_graph(const std::string &index_path, const int hnswM,
              bucketSample = entry_num;
          }
          char *buf_begin = buf + sizeof(uint32_t);
+
          // calculate all distance to centroid
          DISTT* distance = new DISTT[entry_num];
          for (uint32_t j = 0; j < entry_num; ++j) {
@@ -387,7 +406,7 @@ void build_graph(const std::string &index_path, const int hnswM,
 
          // for top distance samples distance
          std::unordered_set<int> indices;
-         for (uint32_t j = 0; j < bucketSample; ++j) {
+         for (uint32_t j = 0; j < bucketSample; j++) {
              int32_t picked = -1;
              DISTT pickedDistance;
              for (uint32_t k = 0; k < entry_num; k++) {
@@ -395,7 +414,7 @@ void build_graph(const std::string &index_path, const int hnswM,
                      //already picked
                      continue;
                  }
-                 if (picked == -1 || distance[k] > distance[picked]) {
+                 if (picked == -1 || pickFurther? (distance[k] > distance[picked]) : (distance[k] < distance[picked])) {
                      picked = k;
                  }
              }
@@ -404,7 +423,7 @@ void build_graph(const std::string &index_path, const int hnswM,
              }
              indices.insert(picked);
              char *entry_begin = buf_begin + entry_size * picked;
-             index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin),bbann::util::gen_id(cid, bid, j + 1));
+             index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin), gen_id(cid, bid, j + 1));
          }
          delete[] distance;
          delete[] buf;
