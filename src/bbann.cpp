@@ -285,7 +285,7 @@ void build_graph(const std::string &index_path, const int hnswM,
               << " hnsw.efConstruction: " << hnswefC
               << " metric_type: " << (int) metric_type << std::endl;
 
-    Computer<T1, T2, R> dis_computer;
+    Computer<DATAT, DATAT, DISST> dis_computer;
     bool pickFurther = true;
     if (metric_type == MetricType::L2) {
         pickFurther=true;
