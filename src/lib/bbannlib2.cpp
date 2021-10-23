@@ -247,11 +247,13 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
         int processed = 0;
         while (true) {
             for (int nq_idx = nqStart; nq_idx < nqEnd; nq_idx++) {
+                std::cout<<" handle " << nq_idx << std::endl;
                 locks[nq_idx].lock();
                 std::vector<char *> localTask;
                 localTask.insert(localTask.begin(), taskQueues[nq_idx].begin(), taskQueues[nq_idx].end());
                 taskQueues[nq_idx].clear();
                 locks[nq_idx].unlock();
+                std::cout<<" handle " << nq_idx << "with " << localTask.size()<< std::endl;
 
                 if (localTask.empty()) {
                     continue;
