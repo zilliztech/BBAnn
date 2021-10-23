@@ -157,11 +157,12 @@ class BbANN(BaseANN):
             return False
         self.para.indexPrefixPath = index_dir + "/"
 
+        index_components = self.get_index_components(dataset)
         for component in index_components:
             index_file = self.para.indexPrefixPath + component
             if not (os.path.exists(index_file)):
-                if 'url' in self._index_params:
-                    index_file_source = self._index_params['url'] + '/' + component
+                if 'url' in self.index_params:
+                    index_file_source = self.index_params['url'] + '/' + component
                     print(f"Downloading index in background. This can take a while.")
                     download_accelerated(index_file_source, index_file, quiet=True)
                 else:
