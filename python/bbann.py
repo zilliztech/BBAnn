@@ -156,6 +156,17 @@ class BbANN(BaseANN):
         if not self.set_index_type(ds.distance(), ds.dtype):
             return False
         self.para.indexPrefixPath = index_dir + "/"
+
+        for component in index_components:
+            index_file = self.para.indexPrefixPath + component
+            if not (os.path.exists(index_file)):
+                if 'url' in self._index_params:
+                    index_file_source = self._index_params['url'] + '/' + component
+                    print(f"Downloading index in background. This can take a while.")
+                    download_accelerated(index_file_source, index_file, quiet=True)
+                else:
+                    return False
+
         print(f"Loading index from {self.para.indexPrefixPath}")
         self.index.load_index(self.para.indexPrefixPath)
         return True
