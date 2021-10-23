@@ -184,7 +184,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
         }
    }
 
-  std::vector<std::unordered_map<int32_t, char *>> taskQueues;
+  std::vector<std::vector<char *>> taskQueues;
   taskQueues.resize(nq);
   std::mutex* locks = new std::mutex[nq];
   auto ioTask = [&](io_context_t aio_ctx, long threadStart, long threadEnd, int max_events_num) {
@@ -201,9 +201,8 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
               auto nq_idxs = labels_2_qidxs[locs[j]];
               //for(unordered_set<int64_t>::iterator iter = nq_idxs.begin(); iter != nq_idxs.end(); iter++) {
               for (const auto curNq: nq_idxs) {
-                  //curNq = *iter;
                   locks[curNq].lock();
-                  taskQueues[curNq].emplace(locs[j], block_bufs[i]);
+                  taskQueues[curNq].push_back(block_bufs[i]);
                   locks[curNq].unlock();
               }
           }
@@ -222,30 +221,94 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
       ioReaders[i] = std::thread(ioTask, ctxs[i], threadStart, threadEnd, max_events_num);
   }
 
-  for (auto& t: ioReaders) {
-      t.join();
-  }
-  std::cout<< "Thread join!!" << std::endl;
 
-    for (int64_t i = 0; i < nq; ++i) {
-        const auto ii = i * para.nProbe;
-        for (int64_t j = 0; j < para.nProbe; ++j) {
-            auto label = bucket_labels[ii + j];
-            if (taskQueues[i].find(label) == taskQueues[i].end()) {
-                std::cout<<"NQ " << i << "LABEL " << label << ", not find" << std::endl;
+    std::atomic<bool> stop (false);
+    auto computer = [&](io_context_t aio_ctx,  std::vector<std::vector<char *>> taskQueues, int nqStart, int nqEnd) {
+
+        const uint32_t vec_size = sizeof(dataT) * dim;
+        const uint32_t entry_size = vec_size + sizeof(uint32_t);
+        while (true) {
+            boolean empty = true;
+            for (int nq_idx = nqStart; nq_idx < nqEnd) {
+                if(locks[nq_idx].try_lock()) {
+                    std::vector<char *> local;
+                    local.insert(taskQueues[nq_idx]);
+                    taskQueues[nq_idx].clear();
+                    locks[nq_idx].unlock();
+
+                    if (local.empty()) {
+                        empty = false;
+                    }
+
+                    // do the real caculation
+                    const DATAT *q_idx = pquery + nq_idx * dim;
+
+                    for (auto block : taskQueues) {
+                        const uint32_t entry_num = *reinterpret_cast<uint32_t *>(block);
+                        char *buf_begin = block + sizeof(uint32_t);
+                        for (uint32_t k = 0; k < entry_num; ++k) {
+                            char *entry_begin = buf_begin + entry_size * k;
+                            if (para.vector_use_sq) {
+                                decode_uint8(max_len.data(), min_len.data(), code_vec.data(), reinterpret_cast<uint8_t *>(entry_begin), 1, dim);
+                                vec = code_vec.data();
+                            } else {
+                                vec = reinterpret_cast<DATAT *>(entry_begin);
+                            }
+
+                            auto dis = dis_computer(vec, q_idx, dim);
+                            uint32_t id;
+                            if (para.vector_use_sq) {
+                                id = *reinterpret_cast<uint32_t *>(entry_begin + code_size);
+                            } else {
+                                id = *reinterpret_cast<uint32_t *>(entry_begin + vec_size);
+                            }
+
+                            diss[k] = dis;
+                            ids[k] = id;
+
+                            if (cmp_func(answer_dists[topk * nq_idx], dis)) {
+                                heap_swap_top_func(topk, answer_dists + topk * nq_idx,
+                                                   answer_ids + topk * nq_idx, dis, id);
+                            }
+                        }
+                    }
+                } else {
+                    empty == false
+                }
+            }
+
+            if (stop && empty) {
+                std::cout<< "thread is stopped without any task todo" << "nq start" << nqStart << "nq end" << nqEnd << std::endl;
+                break;
             }
         }
+    };
+
+    int32_t num_computer_jobs = 8;
+    std::vector<std::thread> computers;
+    computers.resize(num_computer_jobs);
+    long nqPerThread = nq / num_computer_jobs + 1;
+    for (int i =0; i < num_computer_jobsm; i++) {
+        int threadStart = i * nqPerThread;
+        int threadEnd = (i + 1) * nqPerThread;
+        if (threadEnd > nq) {
+            threadEnd = nq;
+        }
+        computers[i] = std::thread(computer, taskQueues, threadStart, threadEnd);
     }
 
-
-
+    for (auto& t: ioReaders) {
+      t.join();
+    }
+    std::cout<< "IO Thread join!!" << std::endl;
+    stop = true;
+    for (auto& t: computers) {
+        t.join();
+    }
+    std::cout<< "CPU Thread join!!" << std::endl;
   for (auto i = 0; i < num_jobs; i++) {
       io_destroy(ctxs[i]);
   }
-
-  /*for (auto& t: threads) {
-      t.join();
-  }*/
 
   rc.RecordSection("async io/calculation done");
 
