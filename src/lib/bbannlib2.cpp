@@ -354,7 +354,7 @@ void BBAnnIndex2<dataT, distanceT>::BatchSearchCpp(
 
 
   auto run_hnsw_search = [&](int offset, int queryNum, sem_t* iodone) {
-      search_bbann_queryonly<dataT, distanceT>(index_hnsw_, para, knn, pquery + offset * dim, answer_ids + topk * offset, answer_dists + topk * offset, queryNum, dim, iodone);
+      search_bbann_queryonly<dataT, distanceT>(index_hnsw_, para, knn, pquery + offset * dim, answer_ids + knn * offset, answer_dists + knn * offset, queryNum, dim, iodone);
   };
 
   int num_jobs = 8;
