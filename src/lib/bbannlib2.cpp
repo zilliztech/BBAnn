@@ -192,10 +192,19 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
       int batch = total / max_events_num + 1;
       for (int i = 0; i < batch; i++) {
           long begin = threadStart + i * max_events_num;
-          long end = std::min(begin + max_events_num , threadEnd);
+          long end = std::min(begin + max_events_num, threadEnd);
           long batchNum = end - begin;
           std::vector<char *> block_bufs;
           block_bufs.resize(batchNum);
+          for (int j = 0; j < block_nums; j++) {
+              auto r = posix_memalign((void **) (&block_bufs[j]), 512, para.blockSize);
+              if (r != 0) {
+                  std::cout << "posix_memalign() failed, returned: " << r
+                            << ", errno: " << errno << ", error: " << strerror(errno)
+                            << std::endl;
+                  exit(-1);
+              }
+          }
           fio_way(aio_ctx, block_bufs, begin, end);
           for (int j = 0; j < batchNum; j++) {
               auto nq_idxs = labels_2_qidxs[locs[j + begin]];
