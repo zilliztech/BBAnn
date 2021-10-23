@@ -149,7 +149,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
         auto label = locs[begin + i];
         uint32_t cid, bid;
         util::parse_global_block_id(label, cid, bid);
-        io_prep_pread(ios.data() + i, fds[cid], bufs[num], para.blockSize, bid * para.blockSize);
+        io_prep_pread(ios.data() + i, fds[cid], bufs[i], para.blockSize, bid * para.blockSize);
         cbs[i] = ios.data() + i;
     }
 
@@ -188,7 +188,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
   taskQueues.resize(nq);
   std::mutex* locks = new std::mutex[nq];
   auto ioTask = [&](io_context_t aio_ctx, long threadStart, long threadEnd, int max_events_num) {
-      std::cout<<"iotask start" << std::endl;
+      std::cout<<"io task start, start " << threadStart << "end " << threadEnd << std::endl;
       int total = threadEnd - threadStart;
       int batch = (total + max_events_num - 1) / max_events_num ;
       for (int i = 0; i < batch; i++) {
@@ -235,6 +235,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
 
     std::atomic<bool> stop (false);
     auto computer = [&](std::vector<std::vector<char *>> taskQueues, int nqStart, int nqEnd) {
+        std::cout<<"computer start, start " << threadStart << "end " << threadEnd << std::endl;
         const uint32_t vec_size = sizeof(DATAT) * dim;
         const uint32_t entry_size = vec_size + sizeof(uint32_t);
         bool localStop = false;
@@ -267,7 +268,6 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                             vec = reinterpret_cast<DATAT *>(entry_begin);
                             id = *reinterpret_cast<uint32_t *>(entry_begin + vec_size);
                         }
-
                         auto dis = dis_computer(vec, q_idx, dim);
                         if (cmp_func(answer_dists[topk * nq_idx], dis)) {
                             heap_swap_top_func(topk, answer_dists + topk * nq_idx,
