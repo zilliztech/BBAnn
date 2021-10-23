@@ -203,7 +203,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
           for (int j = begin; j < end; j++) {
               auto nq_idxs = labels_2_qidxs[locs[j]];
 
-              for (auto nqIter= nq_idxs.begin(); nq != nq_idxs.end(); nq++) {}
+              for (auto nqIter= nq_idxs.begin(); nqIter != nq_idxs.end(); nqIter++) {}
                   int64_t nq = *nqIter;
                   locks[nq].lock();
                   taskQueues[nq].emplace(locs[j], block_bufs[i]);
