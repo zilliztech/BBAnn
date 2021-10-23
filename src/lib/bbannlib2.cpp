@@ -118,6 +118,7 @@ void search_bbann_queryonly(
   }
 
   int total = 0;
+  // relations between indices to lebel
   std::vector<uint32_t> locs;
   locs.resize(labels_2_qidxs.size());
   int i = 0;
@@ -149,6 +150,9 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
         auto label = locs[begin + i];
         uint32_t cid, bid;
         util::parse_global_block_id(label, cid, bid);
+        if(cid >= 128) {
+            std::cout<<"invalid cid" << cid << "bid" << bid << std::endl;
+        }
         io_prep_pread(ios.data() + i, fds[cid], bufs[num], para.blockSize, bid * para.blockSize);
         cbs[i] = ios.data() + i;
     }
@@ -199,7 +203,6 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
           fio_way(aio_ctx, block_bufs, begin, end);
           for (int j = begin; j < end; j++) {
               auto nq_idxs = labels_2_qidxs[locs[j]];
-              std::cout<< "batch" << i << "Notify" << j << "nq idx" << nq_idxs.size() << std::endl;
               for (auto iter = 0; iter < nq_idxs.size(); iter++) {
                   locks[iter].lock();
                   taskQueues[iter].push_back(block_bufs[i]);
