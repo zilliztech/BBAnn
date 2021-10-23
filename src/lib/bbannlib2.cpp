@@ -251,7 +251,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
             // random is for more load balance
             int32_t  pivot = rand() % num;
             for (int i = 0; i < num; i++) {
-                nq_idx = (i + pivot) % num + nqStart;
+                int32_t  nq_idx = (i + pivot) % num + nqStart;
                 locks[nq_idx].lock();
                 std::vector<char *> localTask;
                 localTask.insert(localTask.begin(), taskQueues[nq_idx].begin(), taskQueues[nq_idx].end());
