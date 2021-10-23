@@ -115,6 +115,13 @@ void search_bbann_queryonly(
       }
     }
   }
+
+  int total = 0;
+  for (int i = 0; i < labels_2_qidxs.size(); i++) {
+      std::cout<<"label" << i << labels_2_qidxs[i].size() <<std::endl;
+      total +=  labels_2_qidxs[i].size();
+  }
+  std::cout<<"total size" << total << std::endl;
   rc.RecordSection("calculate block position done");
 
   auto block_nums = labels_2_qidxs.size();
@@ -186,7 +193,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
           fio_way(aio_ctx, block_bufs, begin, end);
           for (int j = begin; j < end; j++) {
               auto nq_idxs = labels_2_qidxs[j];
-              std::cout<< "size" << i << "Notify" << j << "nq idx" << nq_idxs.size() << std::endl;
+              std::cout<< "batch" << i << "Notify" << j << "nq idx" << nq_idxs.size() << std::endl;
               for (auto iter = 0; iter < nq_idxs.size(); iter++) {
                   locks[iter].lock();
                   taskQueues[iter].push_back(block_bufs[i]);
@@ -194,6 +201,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
               }
           }
       }
+      std::cout<< "iotask done" << std::endl;
   };
 
   std::vector<std::thread> ioReaders;
