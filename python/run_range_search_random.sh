@@ -24,6 +24,6 @@ set -e
 pushd ../benchmark
 cp ../python/bbann.py benchmark/algorithms/bbann.py
 rm -rf results/random-range-s/*
-python3 run.py --definitions ../python/bbann-algo.yaml --nodocker --dataset random-range-s --algorithm bbann --runs 2 --force --count 96237 # --rebuild 
-python3 plot.py --definitions ../python/bbann-algo.yaml --dataset random-range-s --recompute --count 96237
+python3 run.py --definitions ../python/bbann-algo.yaml --nodocker --dataset random-range-s --algorithm bbann --runs 2 --force 
+python3 plot.py --definitions ../python/bbann-algo.yaml --dataset random-range-s --recompute
 popd

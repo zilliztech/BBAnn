@@ -522,9 +522,9 @@ ssnpp-1B:
       run-groups:
         base:
           args: |
-              [{"hnswM":32, "hnswefC":500, "K1":128, "blockSize":8192, "overrideIndexPath": "/data/BBANN-ssnpp-t-32-500-128-2"}]
+              [{"hnswM":32, "hnswefC":500, "K1":128, "blockSize":4096, "overrideIndexPath": "/data/BBANN-SSNPP-24-500-128-1/BBANN-SSNPP-24-500-128-1"}]
           query-args: |
-              [{"nProbe":30, "efSearch":30, "K1":128, "blockSize":8192, "aio_EventsPerBatch": 512}
+              [{"nProbe":30, "efSearch":30, "K1":128, "blockSize":4096, "aio_EventsPerBatch": 512}
               ]
 text2image-1B:
     faiss-t1:
