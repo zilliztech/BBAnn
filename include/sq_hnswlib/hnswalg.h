@@ -604,7 +604,7 @@ namespace sq_hnswlib {
         void saveIndex(const std::string &location) {
             std::ofstream output(location, std::ios::binary);
             std::streampos position;
-            output.write((char*)codes_,sizeof(float)*256*(*(size_t*)dist_func_param_));
+
             writeBinaryPOD(output, offsetLevel0_);
             writeBinaryPOD(output, max_elements_);
             writeBinaryPOD(output, cur_element_count);
@@ -629,6 +629,10 @@ namespace sq_hnswlib {
                     output.write(linkLists_[i], linkListSize);
             }
             output.close();
+
+            std::ofstream codes_output(location + ".codes", std::ios::binary);
+            codes_output.write((char*)codes_, sizeof(float) * 256 * (*(size_t*)dist_func_param_));
+            codes_output.close();
         }
 
         void loadIndex(const std::string &location, SpaceInterface<dist_t> *s, size_t max_elements_i=0) {
@@ -643,7 +647,7 @@ namespace sq_hnswlib {
             input.seekg(0,input.end);
             std::streampos total_filesize=input.tellg();
             input.seekg(0,input.beg);
-            input.read((char*)codes_,sizeof(float)*256*(*(size_t*)dist_func_param_));
+
             readBinaryPOD(input, offsetLevel0_);
             readBinaryPOD(input, max_elements_);
             readBinaryPOD(input, cur_element_count);
@@ -668,6 +672,13 @@ namespace sq_hnswlib {
             data_size_ = s->get_data_size();
             fstdistfunc_ = s->get_dist_func();
             dist_func_param_ = s->get_dist_func_param();
+
+            // alloc memory and read codes from another file
+            codes_ = (float*)malloc(sizeof(float) * 256 * (*(size_t*)dist_func_param_));
+            std::ifstream codes_input(location + ".codes", std::ios::binary);
+            codes_input.read((char*)codes_, sizeof(float) * 256 * (*(size_t*)dist_func_param_));
+            codes_input.close();
+
 
             auto pos=input.tellg();
 
