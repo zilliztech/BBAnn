@@ -45,6 +45,7 @@ void search_bbann_queryonly(
   uint32_t *bucket_labels = new uint32_t[(int64_t)nq * para.nProbe];
   auto dis_computer = util::select_computer<DATAT, DATAT, DISTT>(para.metric);
 
+  index_hnsw->setEf(refine_nprobe);
   search_graph<DATAT>(index_hnsw, nq, dim, para.nProbe, para.efSearch, pquery,
                       bucket_labels, nullptr);
   rc.RecordSection("search buckets done.");
@@ -92,6 +93,7 @@ void search_bbann_queryonly(
 
   std::vector<int> fds; // file -> file descriptor
   fds.resize(para.K1);
+#pragma omp parallel for
   for (int i = 0; i < para.K1; i++) {
       std::string cluster_file_path = getClusterRawDataFileName(para.indexPrefixPath, i);
       auto fd = open(cluster_file_path.c_str(), O_RDONLY | O_DIRECT);
@@ -103,6 +105,7 @@ void search_bbann_queryonly(
       }
       fds[i] = fd;
   }
+  rc.RecordSection("open fd done");
 
   std::unordered_map<uint32_t, std::unordered_set<int64_t>> labels_2_qidxs; // label -> query idxs
   for (int64_t i = 0; i < nq; ++i) {
@@ -197,37 +200,41 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
       int total = threadEnd - threadStart;
       int batch = (total + max_events_num - 1) / max_events_num ;
       int insert = 0;
+
+      std::vector<char *> block_bufs;
+      block_bufs.resize(max_events_num);
+      for (int j = 0; j < max_events_num; j++) {
+          auto r = posix_memalign((void **) (&block_bufs[j]), 4096, para.blockSize);
+          if (r != 0) {
+              std::cout << "posix_memalign() failed, returned: " << r
+                        << ", errno: " << errno << ", error: " << strerror(errno)
+                        << std::endl;
+              exit(-1);
+          }
+      }
+
       for (int i = 0; i < batch; i++) {
           long begin = threadStart + i * max_events_num;
           long end = std::min(begin + max_events_num, threadEnd);
           long batchNum = end - begin;
-          std::vector<char *> block_bufs;
-          block_bufs.resize(batchNum);
-          for (int j = 0; j < batchNum; j++) {
-              auto r = posix_memalign((void **) (&block_bufs[j]), 4096, para.blockSize);
-              if (r != 0) {
-                  std::cout << "posix_memalign() failed, returned: " << r
-                            << ", errno: " << errno << ", error: " << strerror(errno)
-                            << std::endl;
-                  exit(-1);
-              }
-          }
           fio_way(aio_ctx, block_bufs, begin, end);
           for (int j = 0; j < batchNum; j++) {
               auto nq_idxs = labels_2_qidxs[locs[j + begin]];
+              char * buf = new char[nq_idxs.size() * para.blockSize];
+              int handled = 0;
               for (const auto curNq: nq_idxs) {
+                  memcpy(buf + handled * para.blockSize, block_bufs[j], para.blockSize);
                   locks[curNq].lock();
-                  char * buf = new char[para.blockSize];
-                  memcpy(buf, block_bufs[j], para.blockSize);
-                  taskQueues[curNq].push_back(buf);
+                  taskQueues[curNq].push_back(buf + handled * para.blockSize);
                   locks[curNq].unlock();
-
-                  insert++;
+                  handled++;
               }
-              free(block_bufs[j]);
           }
       }
-      std::cout<<"Stop with io inserted "<< insert << std::endl;
+
+      for (int j = 0; j < max_events_num; j++) {
+          free(block_bufs[j]);
+      }
   };
 
   std::vector<std::thread> ioReaders;
@@ -249,7 +256,6 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
         uint32_t num = nqEnd - nqStart;
         bool localStop = false;
         int processed = 0;
-        int loop = 0;
         while (true) {
             // random is for more load balance
             for (int i = 0; i < num; i++) {
@@ -294,10 +300,8 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                    free(block);
                 }
             }
-            loop++;
             // last round
             if (localStop) {
-                std::cout<<"Stop with the last round, exit with processed "<< processed << std::endl;
                 break;
             }
             // make sure this happens after break, we need a final round to sweep out all the exist tasks
@@ -321,12 +325,10 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
     for (auto& t: ioReaders) {
       t.join();
     }
-    std::cout<< "IO Thread join!!" << std::endl;
     stop = true;
     for (auto& t: computers) {
         t.join();
     }
-    std::cout<< "CPU Thread join!!" << std::endl;
   for (auto i = 0; i < num_jobs; i++) {
       io_destroy(ctxs[i]);
   }

@@ -24,7 +24,6 @@ void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,
             << " pquery: " << static_cast<const void *>(pquery)
             << " buckets_label: " << static_cast<void *>(buckets_label)
             << std::endl;
-  index_hnsw->setEf(refine_nprobe);
   bool set_distance = centroids_dist != nullptr;
 #pragma omp parallel for
   for (int64_t i = 0; i < nq; i++) {
