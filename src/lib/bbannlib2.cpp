@@ -187,7 +187,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
         }
    }
 
-  std::vector<std::vector<char *>> taskQueues;
+  std::vector<std::unordered_map<int32_t, char *>> taskQueues;
   taskQueues.resize(nq);
   std::mutex* locks = new std::mutex[nq];
   auto ioTask = [&](io_context_t aio_ctx, long threadStart, long threadEnd, int max_events_num) {
@@ -202,12 +202,9 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
           fio_way(aio_ctx, block_bufs, begin, end);
           for (int j = begin; j < end; j++) {
               auto nq_idxs = labels_2_qidxs[locs[j]];
-              if (nq_idxs.empty()) {
-                  std::cout << "FATAL" << "j" << j <<"locsj" << locs[j] << "related query is empty" << std::endl;
-              }
               for (auto iter = 0; iter < nq_idxs.size(); iter++) {
                   locks[iter].lock();
-                  taskQueues[iter].push_back(block_bufs[i]);
+                  taskQueues[iter].emplace(locs[j], block_bufs[i]);
                   locks[iter].unlock();
               }
           }
@@ -230,6 +227,18 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
       t.join();
   }
   std::cout<< "Thread join!!" << std::endl;
+
+    for (int64_t i = 0; i < nq; ++i) {
+        const auto ii = i * para.nProbe;
+        for (int64_t j = 0; j < para.nProbe; ++j) {
+            auto label = bucket_labels[ii + j];
+            if (taskQueues[i].find(label) == taskQueues[i].end()) {
+                std::cout<<"NQ " << i << "LABEL " << label << ", not find" << std::endl;
+            }
+        }
+    }
+
+
 
   for (auto i = 0; i < num_jobs; i++) {
       io_destroy(ctxs[i]);
