@@ -366,11 +366,12 @@ void BBAnnIndex2<dataT, distanceT>::BatchSearchCpp(
     int threadStart = i * threadQuery;
     int threadEnd = (i + 1) * threadQuery;
     if (threadEnd > numQuery) {
-        threadEnd = threadQuery;
+        threadEnd = numQuery;
     }
     sem_init(&iodone[i], 0, 0);
     batchExecutor[i] = std::thread(run_hnsw_search, threadStart, threadEnd - threadStart, &iodone[i]);
     sem_wait(&iodone[i]);
+    std::cout << "batch" + i << "done" << std::endl;
   }
 
   for (auto& t: batchExecutor) {
