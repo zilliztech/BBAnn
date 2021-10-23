@@ -250,6 +250,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
         int processed = 0;
         int loop = 0;
         while (true) {
+            break;
             // random is for more load balance
             for (int i = 0; i < num; i++) {
                 int32_t nq_idx = i + nqStart;
@@ -262,7 +263,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                     continue;
                 }
                 // do the real caculation
-                /*const DATAT *q_idx = pquery + nq_idx * dim;
+                const DATAT *q_idx = pquery + nq_idx * dim;
                 DATAT *vec;
                 for (char* block : localTask) {
                     processed++;
@@ -286,7 +287,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                                                answer_ids + topk * nq_idx, dis, id);
                         }
                     }
-                    free(block);*/
+                    free(block);
                 }
             }
             std::cout<<"loop done"<<std::endl;
