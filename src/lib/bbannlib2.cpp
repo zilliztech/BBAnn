@@ -195,6 +195,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
       std::cout<<"io task start, start " << threadStart << "end " << threadEnd << std::endl;
       int total = threadEnd - threadStart;
       int batch = (total + max_events_num - 1) / max_events_num ;
+      int insert = 0;
       for (int i = 0; i < batch; i++) {
           long begin = threadStart + i * max_events_num;
           long end = std::min(begin + max_events_num, threadEnd);
@@ -217,9 +218,11 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                   locks[curNq].lock();
                   taskQueues[curNq].push_back(block_bufs[j]);
                   locks[curNq].unlock();
+                  insert++;
               }
           }
       }
+      std::cout<<"Stop with io inserted "<< insert << std::endl;
   };
 
   std::vector<std::thread> ioReaders;
