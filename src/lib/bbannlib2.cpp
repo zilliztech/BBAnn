@@ -200,8 +200,6 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
       std::cout<<"io task start, start " << threadStart << "end " << threadEnd << std::endl;
       int total = threadEnd - threadStart;
       int batch = (total + max_events_num - 1) / max_events_num ;
-      int insert = 0;
-
       std::vector<char *> block_bufs;
       block_bufs.resize(max_events_num);
       for (int j = 0; j < max_events_num; j++) {
@@ -362,7 +360,7 @@ void BBAnnIndex2<dataT, distanceT>::BatchSearchCpp(
   int num_jobs = 8;
   std::vector<std::thread> batchExecutor;
   batchExecutor.resize(num_jobs);
-  set_t * iodone = new sem_t[num_jobs];
+  sem_t * iodone = new sem_t[num_jobs];
   long threadQuery = (numQuery + num_jobs -1) / num_jobs;
   for (int i =0; i < num_jobs; i++) {
     int threadStart = i * threadQuery;
