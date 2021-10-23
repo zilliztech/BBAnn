@@ -202,16 +202,6 @@ void divide_raw_data(const BBAnnParameters para, const float *centroids) {
   rc.ElapseFromBegin("split_raw_data totally done");
 }
 
-template<typename T>
-inline void transform_data(T* data, T* tdata, int64_t n, uint32_t dim) {
-#pragma omp parallel for
-  for (auto i = 0; i < n; i++) {
-    for (auto j = 0; j < dim; j++) {
-      tdata[n * j + i] = data[i * dim + j];
-    }
-  }
-}
-
 template <typename DATAT, typename DISTT>
 hnswlib::SpaceInterface<DISTT> *getDistanceSpace(MetricType metric_type,
                                                  uint32_t ndim) {

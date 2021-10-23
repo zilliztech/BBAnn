@@ -277,8 +277,14 @@ void search_bbann_queryonly(
 
   auto run_query = [&](int l, int r) {
     // step 1: search graph.
-    search_graph<DATAT>(index_hnsw, r - l, dim, nprobe, para.efSearch,
-                        pquery + l * dim, bucket_labels + l * nprobe, nullptr);
+   if (para.use_hnsw_sq) {
+     const float* pq = (float*)const_cast<DATAT*>(pquery);
+     search_graph_hnsw_sq(index_sq_hnsw, r - l, dim, nprobe, para.efSearch, pq + l * dim,
+                          bucket_labels + l * nprobe, nullptr);
+   } else {
+     search_graph<DATAT, DISTT>(index_hnsw, r - l, dim, nprobe, para.efSearch, pquery + l * dim,
+                         bucket_labels + l * nprobe, nullptr);
+   }
 
     auto num_jobs = 4;
     auto max_events_num = 1023;
