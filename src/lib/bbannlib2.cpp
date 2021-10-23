@@ -191,6 +191,8 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
   std::vector<std::vector<char *>> taskQueues;
   taskQueues.resize(nq);
   std::mutex* locks = new std::mutex[nq];
+
+  std::mutex memLock;
   auto ioTask = [&](io_context_t aio_ctx, long threadStart, long threadEnd, int max_events_num) {
       std::cout<<"io task start, start " << threadStart << "end " << threadEnd << std::endl;
       int total = threadEnd - threadStart;
@@ -203,6 +205,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
           std::vector<char *> block_bufs;
           block_bufs.resize(batchNum);
           for (int j = 0; j < batchNum; j++) {
+              memLock.lock()
               auto r = posix_memalign((void **) (&block_bufs[j]), 4096, para.blockSize);
               if (r != 0) {
                   std::cout << "posix_memalign() failed, returned: " << r
@@ -210,6 +213,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                             << std::endl;
                   exit(-1);
               }
+              memLock.unlock()
           }
           fio_way(aio_ctx, block_bufs, begin, end);
           for (int j = 0; j < batchNum; j++) {
@@ -265,9 +269,6 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                 for (char* block : localTask) {
                     processed++;
                     const uint32_t entry_num = *reinterpret_cast<uint32_t *>(block);
-                    if (entry_num > 40) {
-                        std::cout<<"block is crashsed"<< std::endl;
-                    }
                     char *buf_begin = block + sizeof(uint32_t);
                     for (uint32_t k = 0; k < entry_num; ++k) {
                         char *entry_begin = buf_begin + entry_size * k;
