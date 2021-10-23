@@ -9,6 +9,8 @@ pushd ../
 docker build --rm -f Dockerfile.local -t billion-scale-benchmark-bbann .
 popd
 
+cp utils.py ../benchmark/benchmark/plotting/utils.py
+ 
 set -e
 pushd ../benchmark
 cp ../python/bbann.py benchmark/algorithms/bbann.py

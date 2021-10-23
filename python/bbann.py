@@ -142,11 +142,9 @@ class BbANN(BaseANN):
         radius.
         """
         nq, dim = (np.shape(X))
+        print(f"Query index with para {self.para}")
         self.rangeres_lim, (self.rangeres_ids, self.rangeres_dists) = self.index.range_search(
             X, dim, nq, radius, self.para)
-        print(self.rangeres_lim[-100:-1])
-        print(self.rangeres_ids)
-        print(self.rangeres_dists)
 
     def get_results(self):
         """
