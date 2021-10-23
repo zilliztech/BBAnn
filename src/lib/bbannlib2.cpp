@@ -231,19 +231,20 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
             boolean empty = true;
             for (int nq_idx = nqStart; nq_idx < nqEnd) {
                 if(locks[nq_idx].try_lock()) {
-                    std::vector<char *> local;
-                    local.insert(taskQueues[nq_idx]);
+                    std::vector<char *> localTask;
+                    localTask.insert(taskQueues[nq_idx]);
                     taskQueues[nq_idx].clear();
                     locks[nq_idx].unlock();
 
-                    if (local.empty()) {
+                    if (localTask.empty()) {
                         empty = false;
+                        continue;
                     }
 
                     // do the real caculation
                     const DATAT *q_idx = pquery + nq_idx * dim;
 
-                    for (auto block : taskQueues) {
+                    for (auto block : localTask) {
                         const uint32_t entry_num = *reinterpret_cast<uint32_t *>(block);
                         char *buf_begin = block + sizeof(uint32_t);
                         for (uint32_t k = 0; k < entry_num; ++k) {
