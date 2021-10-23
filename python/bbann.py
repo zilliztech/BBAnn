@@ -10,6 +10,7 @@ import bbannpy
 
 class BbANN(BaseANN):
     def __init__(self, metric, index_params):
+        self.name = "BBANN"
         self.metric = metric
         self.index_params = index_params
         self.identifier = index_params.get("identifier")
@@ -30,6 +31,9 @@ class BbANN(BaseANN):
 
     def done(self):
         pass
+
+    def track(self):
+        return "T2"
 
     def index_name(self):
         """
@@ -68,6 +72,40 @@ class BbANN(BaseANN):
         index_dir = os.path.join(index_dir, dataset.short_name())
         index_dir = os.path.join(index_dir, self.index_name())
         return index_dir
+
+    def get_index_components(self, dataset):
+        index_components = [
+            'bucket-centroids.bin', 'hnsw-index.bin', 'cluster-combine_ids.bin'
+        ]
+
+        K1 = self.index_params.get("K1")
+        for i in range(K1):
+            raw_data = 'cluster-' + str(i) + '-global_ids.bin'
+            global_ids = 'cluster-' + str(i) + '-raw_data.bin'
+            index_components = index_components + [raw_data, global_ids]
+
+        ds = DATASETS[dataset]()
+        if ds.distance() == "ip":
+            index_components = index_components + [
+                'meta' # SQ Codebook for TextToImage IP
+            ]
+        return index_components
+
+    def index_files_to_store(self, dataset):
+        """
+        Specify a triplet with the local directory path of index files,
+        the common prefix name of index component(s) and a list of
+        index components that need to be uploaded to (after build)
+        or downloaded from (for search) cloud storage.
+        For local directory path under docker environment, please use
+        a directory under
+        data/indices/track(T1 or T2)/algo.__str__()/DATASETS[dataset]().short_name()
+        """
+
+        return [self.create_index_dir(DATASETS[dataset]()) # local_dir
+                , ""                                       # index_prefix
+                , self.get_index_components(dataset)       # components
+                ]
 
     def set_index_type(self, ds_distance, ds_dtype):
         if ds_distance == "euclidean":
@@ -126,6 +164,18 @@ class BbANN(BaseANN):
         if not self.set_index_type(ds.distance(), ds.dtype):
             return False
         self.para.indexPrefixPath = index_dir + "/"
+
+        index_components = self.get_index_components(dataset)
+        for component in index_components:
+            index_file = self.para.indexPrefixPath + component
+            if not (os.path.exists(index_file)):
+                if 'url' in self.index_params:
+                    index_file_source = self.index_params['url'] + '/' + component
+                    print(f"Downloading index in background. This can take a while.")
+                    download_accelerated(index_file_source, index_file, quiet=True)
+                else:
+                    return False
+
         print(f"Loading index from {self.para.indexPrefixPath}")
         self.index.load_index(self.para.indexPrefixPath)
         return True
@@ -183,7 +233,7 @@ class BbANN(BaseANN):
         return {}
 
     def __str__(self):
-        return "BBANN"
+        return self.name
 
     def get_memory_usage(self):
         """Return the current memory usage of this algorithm instance
