@@ -285,14 +285,12 @@ void build_graph(const std::string &index_path, const int hnswM,
               << " hnsw.efConstruction: " << hnswefC
               << " metric_type: " << (int) metric_type << std::endl;
 
-    Computer<DATAT, DATAT, DISST> dis_computer;
+    Computer<DATAT, DATAT, DISST> dis_computer = utils.select_computer<DATAT, DATAT, DISTT>(metric_type)
     bool pickFurther = true;
     if (metric_type == MetricType::L2) {
         pickFurther=true;
-        dis_computer = return L2sqr<const DATAT, const DATAT, DISTT>;
     } else if (metric_type == MetricType::IP) {
         pickFurther = false;
-        dis_computer = return IP<const DATAT, const DATAT, DATAT>;
     }
 
     DATAT *pdata = nullptr;
