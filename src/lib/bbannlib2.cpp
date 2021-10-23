@@ -197,15 +197,16 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
           std::vector<char *> block_bufs;
           block_bufs.resize(batchNum);
           fio_way(aio_ctx, block_bufs, begin, end);
+          int k = 0;
           for (int j = begin; j < end; j++) {
               auto nq_idxs = labels_2_qidxs[locs[j]];
               for (const auto curNq: nq_idxs) {
                   locks[curNq].lock();
-                  const uint32_t entry_num = *reinterpret_cast<uint32_t *>(block);
+                  const uint32_t entry_num = *reinterpret_cast<uint32_t *>(block_bufs[k]);
                   std::cout<<"entry num put" << entry_num<< std::endl;
-
-                  taskQueues[curNq].push_back(block_bufs[i]);
+                  taskQueues[curNq].push_back(block_bufs[k]);
                   locks[curNq].unlock();
+                  k++;
               }
           }
       }
