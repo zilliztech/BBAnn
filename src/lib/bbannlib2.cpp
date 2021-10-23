@@ -175,7 +175,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
     }
 };
 
-   int num_jobs = 4;
+   int num_jobs = 1;
    std::vector<io_context_t> ctxs(num_jobs, 0);
    for (auto i = 0; i < num_jobs; i++) {
         if (io_setup(max_events_num, &ctxs[i])) {
@@ -190,7 +190,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
   auto ioTask = [&](io_context_t aio_ctx, long threadStart, long threadEnd, int max_events_num) {
       std::cout<<"iotask start" << std::endl;
       int total = threadEnd - threadStart;
-      int batch = total / max_events_num + 1;
+      int batch = (total + max_events_num - 1) / max_events_num ;
       for (int i = 0; i < batch; i++) {
           long begin = threadStart + i * max_events_num;
           long end = std::min(begin + max_events_num, threadEnd);
@@ -211,7 +211,6 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
               auto nq_idxs = labels_2_qidxs[locs[j + begin]];
               for (const auto curNq: nq_idxs) {
                   locks[curNq].lock();
-                  std::cout<<"entry num" << std::endl;
                   const uint32_t entry_num = *reinterpret_cast<uint32_t *>(block_bufs[j]);
                   std::cout<<"entry num put" << entry_num<< std::endl;
                   taskQueues[curNq].push_back(block_bufs[j]);
@@ -223,7 +222,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
 
   std::vector<std::thread> ioReaders;
   ioReaders.resize(num_jobs);
-  long threadBatch = block_nums / num_jobs + 1;
+  long threadBatch = (block_nums + num_jobs -1) / num_jobs;
   for (int i =0; i < num_jobs; i++) {
       int threadStart = i * threadBatch;
       int threadEnd = (i + 1) * threadBatch;
@@ -236,7 +235,6 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
 
     std::atomic<bool> stop (false);
     auto computer = [&](std::vector<std::vector<char *>> taskQueues, int nqStart, int nqEnd) {
-        std::cout<<"computer task start" << std::endl;
         const uint32_t vec_size = sizeof(DATAT) * dim;
         const uint32_t entry_size = vec_size + sizeof(uint32_t);
         bool localStop = false;
@@ -255,16 +253,8 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                 const DATAT *q_idx = pquery + nq_idx * dim;
                 DATAT *vec;
                 for (char* block : localTask) {
-                    std::cout<<"block in" << std::endl;
-                    std::cout<<"block0" << block[0] << std::endl;
-                    std::cout<<"block1" << block[1] << std::endl;
-                    std::cout<<"block2" << block[2] << std::endl;
-                    std::cout<<"block3" << block[3] << std::endl;
-
                     const uint32_t entry_num = *reinterpret_cast<uint32_t *>(block);
-                    std::cout<<"entry num" << std::endl;
                     char *buf_begin = block + sizeof(uint32_t);
-                    std::cout<<"buf begin" << std::endl;
                     for (uint32_t k = 0; k < entry_num; ++k) {
                         char *entry_begin = buf_begin + entry_size * k;
                         uint32_t id;
@@ -277,15 +267,12 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                             vec = reinterpret_cast<DATAT *>(entry_begin);
                             id = *reinterpret_cast<uint32_t *>(entry_begin + vec_size);
                         }
-                        std::cout<<"id" << id << std::endl;
 
                         auto dis = dis_computer(vec, q_idx, dim);
-                        std::cout<<"dis" << dis << std::endl;
                         if (cmp_func(answer_dists[topk * nq_idx], dis)) {
                             heap_swap_top_func(topk, answer_dists + topk * nq_idx,
                                                answer_ids + topk * nq_idx, dis, id);
                         }
-                        std::cout<< "done"<< std::endl;
                     }
                     delete[] block;
                 }
@@ -301,11 +288,11 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
         }
     };
 
-    int32_t num_computer_jobs = 8;
+    int32_t num_computer_jobs = 1;
     std::vector<std::thread> computers;
     computers.resize(num_computer_jobs);
-    long nqPerThread = nq / num_computer_jobs + 1;
-    for (int i =0; i < num_computer_jobs; i++) {
+    long nqPerThread =(nq + num_computer_jobs - 1)/ num_computer_jobs ;
+    for (int i = 0; i < num_computer_jobs; i++) {
         int threadStart = i * nqPerThread;
         int threadEnd = (i + 1) * nqPerThread;
         if (threadEnd > nq) {
