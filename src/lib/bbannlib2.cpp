@@ -249,7 +249,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
         int loop = 0;
         while (true) {
             // random is for more load balance
-            pivot = rand() % num;
+            int32_t  pivot = rand() % num;
             for (int i = 0; i < num; i++) {
                 nq_idx = (i + pivot) % num + nqStart;
                 locks[nq_idx].lock();
