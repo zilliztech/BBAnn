@@ -234,9 +234,9 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
       io_destroy(ctxs[i]);
   }
 
-  /*for (int i = 0; i < nq; i++) {
+  for (int i = 0; i < nq; i++) {
       std::cout << "nq" << nq << "taskQueue size" << taskQueues[i].size() <<std::endl;
-  }*/
+  }
   /*for (auto& t: threads) {
       t.join();
   }*/
