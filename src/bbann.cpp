@@ -337,7 +337,7 @@ void build_graph(const std::string &index_path, const int hnswM,
         // for top distance samples distance
         std::unordered_set<int> indices;
         for (uint32_t j = 0; j < bucketSample; ++j) {
-            uint32_t picked = -1;
+            int32_t picked = -1;
             for (uint32_t k = 0; k < entry_num; k++) {
                 if (indices.find(k) != indices.end()) {
                     //already picked
@@ -388,7 +388,7 @@ void build_graph(const std::string &index_path, const int hnswM,
          // for top distance samples distance
          std::unordered_set<int> indices;
          for (uint32_t j = 0; j < bucketSample; ++j) {
-             uint32_t picked = -1;
+             int32_t picked = -1;
              DISTT pickedDistance;
              for (uint32_t k = 0; k < entry_num; k++) {
                  if (indices.find(k) != indices.end()) {
