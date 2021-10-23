@@ -123,7 +123,7 @@ void search_bbann_queryonly(
             << "\tblock_size: " << para.blockSize << std::endl;
 
   auto max_events_num = util::get_max_events_num_of_aio();
-  max_events_num = 1024;
+  max_events_num = 512;
 
 auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, int end) {
     auto num = end - begin;
@@ -187,7 +187,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
           std::vector<char *> block_bufs;
           block_bufs.resize(batchNum);
           fio_way(aio_ctx, block_bufs, begin, end);
-          for (int j = begin; j < end; i++) {
+          for (int j = begin; j < end; j++) {
               auto nq_idxs = labels_2_qidxs[j];
               for (auto iter = 0; iter < nq_idxs.size(); iter++) {
                   locks[iter].lock();
