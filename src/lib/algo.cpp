@@ -306,78 +306,58 @@ void build_hnsw_sq(const std::string &index_path,
   std::cout << " index_path: " << index_path << " hnsw.M: " << hnswM
             << " hnsw.efConstruction: " << hnswefC
             << " metric_type: " << (int)metric_type << std::endl;
-  float *pdata = nullptr;
   uint32_t *pids = nullptr;
-  uint32_t npts, ndim, nids, nidsdim,npts2;
-  uint32_t total_n=0;
+  uint32_t npts, ndim, nids, nidsdim, npts2;
+  uint32_t total_n = 0;
+  float *pdata = nullptr; 
+  util::read_bin_file(index_path+BUCKET+CENTROIDS+BIN, pdata, total_n, ndim);
 
-  auto read_meta = [](const std::string& file_name, uint32_t& n, uint32_t& dim) {
-      std::ifstream reader(file_name, std::ios::binary);
-      reader.read((char*)&n, sizeof(uint32_t));
-      reader.read((char*)&dim, sizeof(uint32_t));
-      reader.close();
-  };
-  read_meta(index_path+BUCKET+CENTROIDS+BIN,total_n,ndim);
-  std::cout<<"after reading meta data"<<std::endl;
-  uint32_t half_dim=ndim/2;
-  pdata=new float[(uint64_t)total_n*(uint64_t)half_dim];
-  float *codes=new float[256*ndim];
-  auto *codebook=new uint8_t [(uint64_t)total_n*(uint64_t)ndim];
-  memset(codebook,0,sizeof(uint8_t)*(uint64_t)total_n*(uint64_t)ndim);
-  std::cout<<"start sq"<<std::endl;
-  read_bin_file_half_dimension(index_path+BUCKET+CENTROIDS+BIN,pdata,npts,ndim,0);
-  std::cout<<"first pdata  initialized"<<std::endl;
-#pragma omp parallel for
-  for (uint32_t i=0;i<half_dim;++i){
-    float *centers=new float[256];
-    kmeans(total_n,pdata+i*total_n,1,256,centers);
-    for (int j=0;j<256;j++){
-      codes[j*ndim+i]=centers[j];
-    }
-    for (uint32_t j=0;j<total_n;++j){
-      float min_dis = std::numeric_limits<float>::max();
-      for (uint32_t k=0;k<256;++k){
-        float diff=codes[k*ndim+i]-pdata[i*total_n+j];
-        float now_dis=diff*diff;
-        if (now_dis<min_dis){
-          min_dis=now_dis;
-          uint32_t* p32=&k;
-          uint8_t* p8=(uint8_t*)p32;
-          codebook[j*ndim+i]=(uint8_t)(*(p8));
-        }
+  
+  float *codes = new float[256 * ndim];
+  uint8_t *codebook = new uint8_t[(uint64_t)total_n * (uint64_t)ndim];
+  memset(codebook, 0, sizeof(uint8_t) * (uint64_t)total_n * (uint64_t)ndim);
+  uint64_t sample_size = total_n * 0.01;
+  float * sample_data = new float [ndim * sample_size];
+  random_sampling_k2(pdata, total_n, ndim, sample_size, sample_data);
+  float temp ;
+  // #pragma omp parallel for
+  for (int i = 0; i < sample_size; i++) {
+      for(int j = i; j < ndim; j++) {
+          temp = sample_data[sample_size * j + i];
+          sample_data[sample_size * j + i] = sample_data[i * ndim + j];
+          sample_data[i * ndim + j] = temp;
       }
-    }
   }
-  std::cout<<"first part code computed"<<std::endl;
 
-  delete[] pdata;
-  pdata=nullptr;
-  read_bin_file_half_dimension(index_path+BUCKET+CENTROIDS+BIN,pdata,npts,ndim,half_dim);
-  std::cout<<"second pdata of second part initialized"<<std::endl;
-#pragma omp parallel for
-  for (uint32_t i=half_dim;i<ndim;++i){
-    float *centers=new float[256];
-    kmeans(total_n,pdata+(i-half_dim)*total_n,1,256,centers);
-    for (int j=0;j<256;j++){
-      codes[j*ndim+i]=centers[j];
-    }
-    for (uint32_t j=0;j<total_n;++j){
-      float min_dis = std::numeric_limits<float>::max();
-      for (uint32_t k=0;k<256;++k){
-        float diff=codes[k*ndim+i]-pdata[(i-half_dim)*total_n+j];
-        float now_dis=diff*diff;
-        if (now_dis<min_dis){
-          min_dis=now_dis;
-          uint32_t* p32=&k;
-          uint8_t* p8=(uint8_t*)p32;
-          codebook[j*ndim+i]=(uint8_t)(*(p8));
-        }
-      }
-    }
+  for (uint32_t i = 0; i < ndim; ++i) {
+      std::cout<<"training the dim :     "<<i<<std::endl;
+      kmeans(sample_size, sample_data + i * sample_size, 1, 256, (float*)(codes + i * 256));
   }
-  std::cout<<"second part code computed"<<std::endl;
+  std::cout<<"training kmeans down    "<<std::endl;
+  delete [] sample_data;
+
+  #pragma omp parallel for      
+  for (auto d = 0; d < ndim; d++) {
+        auto * x_code = codes + 256 * d;
+        auto * x_codebook = codebook + d * total_n;
+        std::sort(x_code , x_code + 256 );
+        for (int i = 0; i < total_n; i++) {
+          auto pos = std::lower_bound(x_code, x_code + 256, pdata[i*ndim + d]) - x_code;
+          if(pos == 256) { x_codebook[i] = 255; }
+          else if(pos == 0) {x_codebook[i] = 0; }
+          else {
+              x_codebook[i] = (
+              std::abs(x_code[pos-1] - pdata[i*ndim + d]) <
+              std::abs(x_code[pos] - pdata[i*ndim + d]) ? 
+              pos-1 : pos
+              );
+          }
+        }  
+      std::cout<<"assign d:"<<d<<std::endl;
+  }
   delete[] pdata;
-  pdata= nullptr;
+  pdata = nullptr;
+
 
   rc.RecordSection("load centroids of buckets and compute SQ done");
   rc.RecordSection("load centroids of buckets and compute SQ done");

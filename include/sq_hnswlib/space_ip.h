@@ -1,49 +1,26 @@
 #pragma once
 #include "hnswlib.h"
+#include <vector>
 
 namespace sq_hnswlib {
 
     static float
-    InnerProduct(const void *pVect1, const void *pVect2, const void *qty_ptr,const float* codes,bool both_codes) {
+    InnerProduct_float(const void *pVect1, const void *pVect2, const void *qty_ptr) {
         size_t qty = *((size_t *) qty_ptr);
         float res = 0;
-        if (both_codes) {
-            for (unsigned i = 0; i < qty; i++) {
-                res += codes[(*(uint8_t*)(pVect1))*qty+i] * codes[(*(uint8_t*)(pVect2))*qty+i];
-            }
-        }
-        else{
-            for (unsigned i = 0; i < qty; i++) {
-                res += ((float*)(pVect1))[i] * codes[(*(uint8_t*)(pVect2))*qty+i];
-            }
+        for (unsigned i = 0; i < qty; i++) {
+            res += ((float *) pVect1)[i] * ((float *) pVect2)[i];
         }
         return (1.0f - res);
-
     }
 
-
 #if defined(USE_AVX)
-//// Favor using AVX if available.
-    static float
-    InnerProductSIMD4Ext(const void *pVect1v, const void *pVect2v, const void *qty_ptr, const float* codes, bool both_codes) {
-
-        size_t qty = *((size_t *) qty_ptr);
-        float *pVect1 = new float [qty];
-        float *pVect2 = new float [qty];
-        if(both_codes) {
-            for (unsigned i = 0; i < qty; i++) {
-                pVect1[i] = codes[(*(uint8_t*)(pVect1v))*qty+i];
-                pVect2[i] = codes[(*(uint8_t*)(pVect2v))*qty+i];
-            }
-        } else {
-            for (unsigned i = 0; i < qty; i++) {
-                pVect1[i] = (*(uint8_t*)(pVect1v))*qty+i;
-                pVect2[i] = codes[(*(uint8_t*)(pVect2v))*qty+i];
-            }
-        }
-
+     static float
+    InnerProductSIMD4Ext(const void *pVect1v, const void *pVect2v, const void *qty_ptr) {
         float PORTABLE_ALIGN32 TmpRes[8];
-
+        float *pVect1 = (float *) pVect1v;
+        float *pVect2 = (float *) pVect2v;
+        size_t qty = *((size_t *) qty_ptr);
 
         size_t qty16 = qty / 16;
         size_t qty4 = qty / 4;
@@ -54,7 +31,7 @@ namespace sq_hnswlib {
         __m256 sum256 = _mm256_set1_ps(0);
 
         while (pVect1 < pEnd1) {
-            //_mm_prefetch((char*)(pVect2 + 16), _MM_HINT_T0);
+            _mm_prefetch((char*)(pVect2 + 16), _MM_HINT_T0);
 
             __m256 v1 = _mm256_loadu_ps(pVect1);
             pVect1 += 8;
@@ -81,30 +58,79 @@ namespace sq_hnswlib {
         }
 
         _mm_store_ps(TmpRes, sum_prod);
-        float sum = TmpRes[0] + TmpRes[1] + TmpRes[2] + TmpRes[3];
-        delete [] pVect1;
-        delete [] pVect2;
+        float sum = TmpRes[0] + TmpRes[1] + TmpRes[2] + TmpRes[3];;
         return 1.0f - sum;
     }
 
 
+#elif defined(USE_SSE)
+
     static float
-    InnerProductSIMD16Ext(const void *pVect1v, const void *pVect2v, const void *qty_ptr, const float* codes, bool both_codes) {
-        size_t qty = *((size_t *) qty_ptr);
-        float *pVect1 = new float [qty];
-        float *pVect2 = new float [qty];
-        if(both_codes) {
-            for (unsigned i = 0; i < qty; i++) {
-                pVect1[i] = codes[(*(uint8_t*)(pVect1v))*qty+i];
-                pVect2[i] = codes[(*(uint8_t*)(pVect2v))*qty+i];
-            }
-        } else {
-            for (unsigned i = 0; i < qty; i++) {
-                pVect1[i] = (*(uint8_t*)(pVect1v))*qty+i;
-                pVect2[i] = codes[(*(uint8_t*)(pVect2v))*qty+i];
-            }
-        }
+    InnerProductSIMD4Ext(const void *pVect1v, const void *pVect2v, const void *qty_ptr) {
         float PORTABLE_ALIGN32 TmpRes[8];
+        float *pVect1 = (float *) pVect1v;
+        float *pVect2 = (float *) pVect2v;
+        size_t qty = *((size_t *) qty_ptr);
+
+        size_t qty16 = qty / 16;
+        size_t qty4 = qty / 4;
+
+        const float *pEnd1 = pVect1 + 16 * qty16;
+        const float *pEnd2 = pVect1 + 4 * qty4;
+
+        __m128 v1, v2;
+        __m128 sum_prod = _mm_set1_ps(0);
+
+        while (pVect1 < pEnd1) {
+            v1 = _mm_loadu_ps(pVect1);
+            pVect1 += 4;
+            v2 = _mm_loadu_ps(pVect2);
+            pVect2 += 4;
+            sum_prod = _mm_add_ps(sum_prod, _mm_mul_ps(v1, v2));
+
+            v1 = _mm_loadu_ps(pVect1);
+            pVect1 += 4;
+            v2 = _mm_loadu_ps(pVect2);
+            pVect2 += 4;
+            sum_prod = _mm_add_ps(sum_prod, _mm_mul_ps(v1, v2));
+
+            v1 = _mm_loadu_ps(pVect1);
+            pVect1 += 4;
+            v2 = _mm_loadu_ps(pVect2);
+            pVect2 += 4;
+            sum_prod = _mm_add_ps(sum_prod, _mm_mul_ps(v1, v2));
+
+            v1 = _mm_loadu_ps(pVect1);
+            pVect1 += 4;
+            v2 = _mm_loadu_ps(pVect2);
+            pVect2 += 4;
+            sum_prod = _mm_add_ps(sum_prod, _mm_mul_ps(v1, v2));
+        }
+
+        while (pVect1 < pEnd2) {
+            v1 = _mm_loadu_ps(pVect1);
+            pVect1 += 4;
+            v2 = _mm_loadu_ps(pVect2);
+            pVect2 += 4;
+            sum_prod = _mm_add_ps(sum_prod, _mm_mul_ps(v1, v2));
+        }
+
+        _mm_store_ps(TmpRes, sum_prod);
+        float sum = TmpRes[0] + TmpRes[1] + TmpRes[2] + TmpRes[3];
+
+        return 1.0f - sum;
+    }
+
+#endif
+
+#if defined(USE_AVX)
+
+    static float
+    InnerProductSIMD16Ext(const void *pVect1v, const void *pVect2v, const void *qty_ptr) {
+        float PORTABLE_ALIGN32 TmpRes[8];
+        float *pVect1 = (float *) pVect1v;
+        float *pVect2 = (float *) pVect2v;
+        size_t qty = *((size_t *) qty_ptr);
 
         size_t qty16 = qty / 16;
 
@@ -131,52 +157,130 @@ namespace sq_hnswlib {
 
         _mm256_store_ps(TmpRes, sum256);
         float sum = TmpRes[0] + TmpRes[1] + TmpRes[2] + TmpRes[3] + TmpRes[4] + TmpRes[5] + TmpRes[6] + TmpRes[7];
-        delete [] pVect1;
-        delete [] pVect2;
+
         return 1.0f - sum;
     }
 
+#elif defined(USE_SSE)
 
+      static float
+      InnerProductSIMD16Ext(const void *pVect1v, const void *pVect2v, const void *qty_ptr) {
+        float PORTABLE_ALIGN32 TmpRes[8];
+        float *pVect1 = (float *) pVect1v;
+        float *pVect2 = (float *) pVect2v;
+        size_t qty = *((size_t *) qty_ptr);
+
+        size_t qty16 = qty / 16;
+
+        const float *pEnd1 = pVect1 + 16 * qty16;
+
+        __m128 v1, v2;
+        __m128 sum_prod = _mm_set1_ps(0);
+
+        while (pVect1 < pEnd1) {
+            v1 = _mm_loadu_ps(pVect1);
+            pVect1 += 4;
+            v2 = _mm_loadu_ps(pVect2);
+            pVect2 += 4;
+            sum_prod = _mm_add_ps(sum_prod, _mm_mul_ps(v1, v2));
+
+            v1 = _mm_loadu_ps(pVect1);
+            pVect1 += 4;
+            v2 = _mm_loadu_ps(pVect2);
+            pVect2 += 4;
+            sum_prod = _mm_add_ps(sum_prod, _mm_mul_ps(v1, v2));
+
+            v1 = _mm_loadu_ps(pVect1);
+            pVect1 += 4;
+            v2 = _mm_loadu_ps(pVect2);
+            pVect2 += 4;
+            sum_prod = _mm_add_ps(sum_prod, _mm_mul_ps(v1, v2));
+
+            v1 = _mm_loadu_ps(pVect1);
+            pVect1 += 4;
+            v2 = _mm_loadu_ps(pVect2);
+            pVect2 += 4;
+            sum_prod = _mm_add_ps(sum_prod, _mm_mul_ps(v1, v2));
+        }
+        _mm_store_ps(TmpRes, sum_prod);
+        float sum = TmpRes[0] + TmpRes[1] + TmpRes[2] + TmpRes[3];
+
+        return 1.0f - sum;
+    }
+
+#endif
+
+#if defined(USE_SSE) || defined(USE_AVX)
     static float
-    InnerProductSIMD16ExtResiduals(const void *pVect1v, const void *pVect2v, const void *qty_ptr, const float* codes, bool both_codes) {
+    InnerProductSIMD16ExtResiduals(const void *pVect1v, const void *pVect2v, const void *qty_ptr) {
         size_t qty = *((size_t *) qty_ptr);
         size_t qty16 = qty >> 4 << 4;
-        float res = InnerProductSIMD16Ext(pVect1v, pVect2v, &qty16, codes, both_codes);
-        void *pVect1;
-        void *pVect2;
-        if(both_codes) {
-            pVect1 = (uint8_t*)pVect1v + qty16;
-        } else {
-            pVect1 = (float*)pVect1v + qty16;
-        }
-        pVect2 = (uint8_t*)pVect2v + qty16;
+        float res = InnerProductSIMD16Ext(pVect1v, pVect2v, &qty16);
+        float *pVect1 = (float *) pVect1v + qty16;
+        float *pVect2 = (float *) pVect2v + qty16;
 
         size_t qty_left = qty - qty16;
-        float res_tail = InnerProduct(pVect1, pVect2, &qty_left, codes, both_codes);
+        float res_tail = InnerProduct_float(pVect1, pVect2, &qty_left);
         return res + res_tail - 1.0f;
     }
 
     static float
-    InnerProductSIMD4ExtResiduals(const void *pVect1v, const void *pVect2v, const void *qty_ptr, const float* codes, bool both_codes) {
+    InnerProductSIMD4ExtResiduals(const void *pVect1v, const void *pVect2v, const void *qty_ptr) {
         size_t qty = *((size_t *) qty_ptr);
         size_t qty4 = qty >> 2 << 2;
-        void *pVect1;
-        void *pVect2;
-        float res = InnerProductSIMD4Ext(pVect1v, pVect2v, &qty4, codes, both_codes);
+
+        float res = InnerProductSIMD4Ext(pVect1v, pVect2v, &qty4);
         size_t qty_left = qty - qty4;
 
-        if(both_codes) {
-            pVect1 = (uint8_t*)pVect1v + qty4;
-        } else {
-            pVect1 = (float*)pVect1v + qty4;
-        }
-        pVect2 = (uint8_t*)pVect2v + qty4;
-
-        float res_tail = InnerProduct(pVect1, pVect2, &qty_left, codes, both_codes);
+        float *pVect1 = (float *) pVect1v + qty4;
+        float *pVect2 = (float *) pVect2v + qty4;
+        float res_tail = InnerProduct_float(pVect1, pVect2, &qty_left);
 
         return res + res_tail - 1.0f;
     }
 #endif
+
+
+    static float
+    InnerProduct(const void *pVect1, const void *pVect2, const void *qty_ptr, const float* codes, bool both_codes) {
+        size_t dim = *((size_t *) qty_ptr);
+        std::vector<float> vec1(dim);
+        std::vector<float> vec2(dim);
+        if(both_codes) {
+            for (auto i = 0; i < dim; ++i) {
+                //vec1 decode:
+                uint8_t vec_code1 = *((uint8_t *)(pVect1) + i);
+                uint32_t code_offest1 = i * 256 + vec_code1;
+                vec1[i] = codes[code_offest1]; 
+                //vec2 decode:
+                uint8_t vec_code2 = *((uint8_t *)(pVect2) + i);
+                uint32_t code_offest2 = i * 256 + vec_code2;
+                vec2[i] = codes[code_offest2]; 
+            }
+        } else {
+            vec1.assign((float*)pVect1, (float*)pVect1 + dim);
+            for (auto i = 0; i < dim; ++i) {
+                //vec2 decode:
+                uint8_t vec_code2 = *((uint8_t *)(pVect2) + i);
+                uint32_t code_offest2 = i * 256 + vec_code2;
+                vec2[i] = codes[code_offest2]; 
+            }
+        }
+
+       #if defined(USE_AVX)
+            if (dim % 16 == 0)
+                InnerProductSIMD16Ext((void*)vec1.data(), (void*)vec2.data(), qty_ptr);
+            else if (dim % 4 == 0)
+                InnerProductSIMD4Ext((void*)vec1.data(), (void*)vec2.data(), qty_ptr);
+            else if (dim > 16)
+                InnerProductSIMD16ExtResiduals((void*)vec1.data(), (void*)vec2.data(), qty_ptr);
+            else if (dim > 4)
+                InnerProductSIMD4ExtResiduals((void*)vec1.data(), (void*)vec2.data(), qty_ptr);
+       #else
+            InnerProduct_float((void*)vec1.data(), (void*)vec2.data(), qty_ptr);
+       #endif 
+
+    }
 
     class InnerProductSpace : public SpaceInterface<float> {
 
@@ -186,16 +290,6 @@ namespace sq_hnswlib {
     public:
         InnerProductSpace(size_t dim) {
             fstdistfunc_ = InnerProduct;
-    #if defined(USE_AVX)
-            if (dim % 16 == 0)
-                fstdistfunc_ = InnerProductSIMD16Ext;
-            else if (dim % 4 == 0)
-                fstdistfunc_ = InnerProductSIMD4Ext;
-            else if (dim > 16)
-                fstdistfunc_ = InnerProductSIMD16ExtResiduals;
-            else if (dim > 4)
-                fstdistfunc_ = InnerProductSIMD4ExtResiduals;
-    #endif
             dim_ = dim;
             data_size_ = dim * sizeof(uint8_t);
         }
