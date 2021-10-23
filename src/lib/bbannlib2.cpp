@@ -224,11 +224,10 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
 
     std::atomic<bool> stop (false);
     auto computer = [&](std::vector<std::vector<char *>> taskQueues, int nqStart, int nqEnd) {
-
         const uint32_t vec_size = sizeof(DATAT) * dim;
         const uint32_t entry_size = vec_size + sizeof(uint32_t);
         bool localStop = false;
-
+        std::cout<<"Computer start " << "nq start" << nqStart <<"nq end" << "nqEnd" << std::endl;
         while (true) {
             for (int nq_idx = nqStart; nq_idx < nqEnd; nq_idx++) {
                 locks[nq_idx].lock();
@@ -240,6 +239,8 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                 if (localTask.empty()) {
                     continue;
                 }
+
+                std::cout<<"Fetch local task " << localTask.size() << std::endl;
                 // do the real caculation
                 const DATAT *q_idx = pquery + nq_idx * dim;
                 DATAT *vec;
@@ -248,22 +249,18 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                     char *buf_begin = block + sizeof(uint32_t);
                     for (uint32_t k = 0; k < entry_num; ++k) {
                         char *entry_begin = buf_begin + entry_size * k;
+                        uint32_t id;
                         if (para.vector_use_sq) {
                             std::vector<DATAT> code_vec(dim);
                             decode_uint8(max_len.data(), min_len.data(), code_vec.data(), reinterpret_cast<uint8_t *>(entry_begin), 1, dim);
                             vec = code_vec.data();
-                        } else {
-                            vec = reinterpret_cast<DATAT *>(entry_begin);
-                        }
-
-                        auto dis = dis_computer(vec, q_idx, dim);
-                        uint32_t id;
-                        if (para.vector_use_sq) {
                             id = *reinterpret_cast<uint32_t *>(entry_begin + code_size);
                         } else {
+                            vec = reinterpret_cast<DATAT *>(entry_begin);
                             id = *reinterpret_cast<uint32_t *>(entry_begin + vec_size);
                         }
 
+                        auto dis = dis_computer(vec, q_idx, dim);
                         if (cmp_func(answer_dists[topk * nq_idx], dis)) {
                             heap_swap_top_func(topk, answer_dists + topk * nq_idx,
                                                answer_ids + topk * nq_idx, dis, id);
@@ -274,6 +271,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
             }
             // last round
             if (localStop) {
+                std::cout<<"Stop with the last round, exit "<< std::endl;
                 break;
             }
             // make sure this happens after break, we need a final round to sweep out all the exist tasks
