@@ -110,7 +110,7 @@ void search_bbann_queryonly(
     for (int64_t j = 0; j < para.nProbe; ++j) {
       auto label = bucket_labels[ii + j];
       if (labels_2_qidxs.find(label) == labels_2_qidxs.end()) {
-        labels_2_qidxs[label] = std::vector<int64_t>{i};
+        labels_2_qidxs[label] = std::unordered_set<int64_t>{i};
       } else {
         labels_2_qidxs[label].insert(i);
       }
