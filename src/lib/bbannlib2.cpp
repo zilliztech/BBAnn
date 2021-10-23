@@ -249,6 +249,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                         for (uint32_t k = 0; k < entry_num; ++k) {
                             char *entry_begin = buf_begin + entry_size * k;
                             if (para.vector_use_sq) {
+                                std::vector<DATAT> code_vec(dim);
                                 decode_uint8(max_len.data(), min_len.data(), code_vec.data(), reinterpret_cast<uint8_t *>(entry_begin), 1, dim);
                                 vec = code_vec.data();
                             } else {
