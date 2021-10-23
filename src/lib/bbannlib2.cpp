@@ -89,7 +89,7 @@ void search_bbann_queryonly(
   rc.RecordSection("heapify answers heaps");
 
   // step1
-  std::unordered_map<uint32_t, std::vector<int64_t>> labels_2_qidxs; // label -> query idxs
+
   std::vector<int> fds; // file -> file descriptor
   fds.resize(para.K1);
   for (int i = 0; i < para.K1; i++) {
@@ -104,13 +104,16 @@ void search_bbann_queryonly(
       fds[i] = fd;
   }
 
+  std::unordered_map<uint32_t, std::vector<int64_t>> labels_2_qidxs; // label -> query idxs
   for (int64_t i = 0; i < nq; ++i) {
     const auto ii = i * para.nProbe;
     for (int64_t j = 0; j < para.nProbe; ++j) {
       auto label = bucket_labels[ii + j];
       if (labels_2_qidxs.find(label) == labels_2_qidxs.end()) {
+          std::cout<<"not find"<<std::endl;
         labels_2_qidxs[label] = std::vector<int64_t>{i};
       } else {
+          std::cout<<"find"<<std::endl;
         labels_2_qidxs[label].push_back(i);
       }
     }
@@ -118,7 +121,7 @@ void search_bbann_queryonly(
 
   int total = 0;
   for (int i = 0; i < labels_2_qidxs.size(); i++) {
-      std::cout<<"label" << i << labels_2_qidxs[i].size() <<std::endl;
+      std::cout<<"label" << i << "size"<<  labels_2_qidxs[i].size() <<std::endl;
       total +=  labels_2_qidxs[i].size();
   }
   std::cout<<"total size" << total << std::endl;
