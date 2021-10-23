@@ -186,7 +186,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
           fio_way(aio_ctx, block_bufs, begin, end);
           for (int j = begin; j < end; j++) {
               auto nq_idxs = labels_2_qidxs[j];
-              std::cout<< "size" << i << "Notify" << j << "nq idx" << nq_idxs.size << std::endl;
+              std::cout<< "size" << i << "Notify" << j << "nq idx" << nq_idxs.size() << std::endl;
               for (auto iter = 0; iter < nq_idxs.size(); iter++) {
                   locks[iter].lock();
                   taskQueues[iter].push_back(block_bufs[i]);
@@ -211,7 +211,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
   for (auto& t: ioReaders) {
       t.join();
   }
-  std::cout<< "Thread join!!" < std::endl;
+  std::cout<< "Thread join!!" << std::endl;
 
   for (auto i = 0; i < num_jobs; i++) {
       io_destroy(ctxs[i]);
