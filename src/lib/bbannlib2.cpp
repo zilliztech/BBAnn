@@ -166,6 +166,15 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                       << ", strerror(-r): " << strerror(-r_submit)
                       << ", begin: " << begin << ", end: " << end
                       << ", submitted: " << submitted << std::endl;
+
+            for (int i = 0; i < num; i++) {
+                auto label = locs[begin + i];
+                uint32_t cid, bid;
+                util::parse_global_block_id(label, cid, bid);
+                std::cout<< "i" << i << "cid" << cid << ", bid" << bid << std::endl;
+            }
+
+
             exit(-1);
         }
         submitted += r_submit;
