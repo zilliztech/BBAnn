@@ -179,7 +179,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
     }
 };
 
-   int num_jobs = 1;
+   int num_jobs = 4;
    std::vector<io_context_t> ctxs(num_jobs, 0);
    for (auto i = 0; i < num_jobs; i++) {
         if (io_setup(max_events_num, &ctxs[i])) {
@@ -191,7 +191,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
   std::vector<char *>* taskQueues = new std::vector<char *>[nq];
   std::mutex* locks = new std::mutex[nq];
 
-  std::mutex memLock;
+  //std::mutex memLock;
   auto ioTask = [&](io_context_t aio_ctx, long threadStart, long threadEnd, int max_events_num) {
       std::cout<<"io task start, start " << threadStart << "end " << threadEnd << std::endl;
       int total = threadEnd - threadStart;
@@ -204,7 +204,6 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
           std::vector<char *> block_bufs;
           block_bufs.resize(batchNum);
           for (int j = 0; j < batchNum; j++) {
-              memLock.lock();
               auto r = posix_memalign((void **) (&block_bufs[j]), 4096, para.blockSize);
               if (r != 0) {
                   std::cout << "posix_memalign() failed, returned: " << r
@@ -212,7 +211,6 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                             << std::endl;
                   exit(-1);
               }
-              memLock.unlock();
           }
           fio_way(aio_ctx, block_bufs, begin, end);
           for (int j = 0; j < batchNum; j++) {
@@ -307,7 +305,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
         }
     };
 
-    int32_t num_computer_jobs = 1;
+    int32_t num_computer_jobs = 8;
     std::vector<std::thread> computers;
     computers.resize(num_computer_jobs);
     long nqPerThread =(nq + num_computer_jobs - 1)/ num_computer_jobs ;
