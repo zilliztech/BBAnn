@@ -250,7 +250,6 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
         int processed = 0;
         int loop = 0;
         while (true) {
-            break;
             // random is for more load balance
             for (int i = 0; i < num; i++) {
                 int32_t nq_idx = i + nqStart;
@@ -264,31 +263,34 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                 }
                 // do the real caculation
                 const DATAT *q_idx = pquery + nq_idx * dim;
-                DATAT *vec;
-                for (char* block : localTask) {
+
+                /*for (char* block : localTask) {
                     processed++;
                     const uint32_t entry_num = *reinterpret_cast<uint32_t *>(block);
                     char *buf_begin = block + sizeof(uint32_t);
                     for (uint32_t k = 0; k < entry_num; ++k) {
                         char *entry_begin = buf_begin + entry_size * k;
                         uint32_t id;
+                        DISTT dis;
                         if (para.vector_use_sq) {
                             std::vector<DATAT> code_vec(dim);
                             decode_uint8(max_len.data(), min_len.data(), code_vec.data(), reinterpret_cast<uint8_t *>(entry_begin), 1, dim);
-                            vec = code_vec.data();
+                            const DATAT *vec = code_vec.data();
                             id = *reinterpret_cast<uint32_t *>(entry_begin + code_size);
+                            dis = dis_computer(vec, q_idx, dim);
                         } else {
-                            vec = reinterpret_cast<DATAT *>(entry_begin);
+                            const DATAT *vec = reinterpret_cast<DATAT *>(entry_begin);
                             id = *reinterpret_cast<uint32_t *>(entry_begin + vec_size);
+                            dis = dis_computer(vec, q_idx, dim);
                         }
-                        auto dis = dis_computer(vec, q_idx, dim);
+
                         if (cmp_func(answer_dists[topk * nq_idx], dis)) {
                             heap_swap_top_func(topk, answer_dists + topk * nq_idx,
                                                answer_ids + topk * nq_idx, dis, id);
                         }
                     }
                     free(block);
-                }
+                }*/
             }
             std::cout<<"loop done"<<std::endl;
             loop++;
