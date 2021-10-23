@@ -242,7 +242,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                     }
                     // do the real caculation
                     const DATAT *q_idx = pquery + nq_idx * dim;
-
+                    DATAT *vec;
                     for (auto block : localTask) {
                         const uint32_t entry_num = *reinterpret_cast<uint32_t *>(block);
                         char *buf_begin = block + sizeof(uint32_t);
@@ -263,9 +263,6 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                             } else {
                                 id = *reinterpret_cast<uint32_t *>(entry_begin + vec_size);
                             }
-
-                            diss[k] = dis;
-                            ids[k] = id;
 
                             if (cmp_func(answer_dists[topk * nq_idx], dis)) {
                                 heap_swap_top_func(topk, answer_dists + topk * nq_idx,
