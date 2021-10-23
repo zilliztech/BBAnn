@@ -118,17 +118,19 @@ void search_bbann_queryonly(
   }
 
   int total = 0;
+  vector<uint32_t> locs;
+  locs.resize(labels_2_qidxs.size());
   for (auto iter : labels_2_qidxs) {
-    std::cout<<"iter" << iter.first << "size" << iter.second.size() << std::endl;
     total += iter.second.size();
+    locs[i] = iter.first;
   }
 
-  std::cout<<"total size" << total << std::endl;
   rc.RecordSection("calculate block position done");
 
   auto block_nums = labels_2_qidxs.size();
   std::cout << "block num: " << block_nums
             << "\tnq: " << nq << "\tnprobe: " << para.nProbe
+            << "\ttotal: " << total
             << "\tblock_size: " << para.blockSize << std::endl;
 
   auto max_events_num = util::get_max_events_num_of_aio();
@@ -141,8 +143,8 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
     std::vector<struct iocb *> cbs(num, nullptr);
     std::vector<struct io_event> events(num);
     for (auto i = 0; i < num; i++) {
-        auto loc = begin + i;
-        auto label = bucket_labels[loc];
+        // find the correct position
+        auto label = locs[begin + i];
         uint32_t cid, bid;
         util::parse_global_block_id(label, cid, bid);
         io_prep_pread(ios.data() + i, fds[cid], bufs[num], para.blockSize, bid * para.blockSize);
@@ -194,7 +196,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
           block_bufs.resize(batchNum);
           fio_way(aio_ctx, block_bufs, begin, end);
           for (int j = begin; j < end; j++) {
-              auto nq_idxs = labels_2_qidxs[j];
+              auto nq_idxs = labels_2_qidxs[locs[j]];
               std::cout<< "batch" << i << "Notify" << j << "nq idx" << nq_idxs.size() << std::endl;
               for (auto iter = 0; iter < nq_idxs.size(); iter++) {
                   locks[iter].lock();
