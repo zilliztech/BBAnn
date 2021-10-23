@@ -5,7 +5,7 @@
 #include <stdlib.h> // posix_memalign
 #include <fcntl.h>  // open, pread
 #include <libaio.h>
-#include <util/utils.h>
+#include "util/utils.h"
 #include "bbann.h"
 
 template <typename DATAT>
@@ -286,7 +286,7 @@ void build_graph(const std::string &index_path, const int hnswM,
               << " hnsw.efConstruction: " << hnswefC
               << " metric_type: " << (int) metric_type << std::endl;
 
-    Computer<DATAT, DATAT, DISTT> dis_computer = utils.select_computer<DATAT, DATAT, DISTT>(metric_type)
+    Computer<DATAT, DATAT, DISTT> dis_computer = utils.select_computer<DATAT, DATAT, DISTT>(metric_type);
     bool pickFurther = true;
     if (metric_type == MetricType::L2) {
         pickFurther = true;
