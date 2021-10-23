@@ -91,8 +91,9 @@ void search_bbann_queryonly(
   // step1
   std::unordered_map<uint32_t, std::vector<int64_t>> labels_2_qidxs; // label -> query idxs
   std::vector<int> fds; // file -> file descriptor
+  fds.resize(para.K1);
   for (int i = 0; i < para.K1; i++) {
-      std::string cluster_file_path =getClusterRawDataFileName(para.indexPrefixPath, i);
+      std::string cluster_file_path = getClusterRawDataFileName(para.indexPrefixPath, i);
       auto fd = open(cluster_file_path.c_str(), O_RDONLY | O_DIRECT);
       if (fd == 0) {
           std::cout << "open() failed, fd: " << fd
@@ -124,21 +125,10 @@ void search_bbann_queryonly(
   auto max_events_num = util::get_max_events_num_of_aio();
   max_events_num = 1024;
 
-auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, int end, int nr, int wait_nr) {
+auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, int end) {
+
     auto num = end - begin;
-
-    if (num < nr) {
-        nr = num;
-    }
-
-    if (num < wait_nr) {
-        wait_nr = num;
-    }
-
-    if (nr < wait_nr) {
-        wait_nr = nr;
-    }
-
+    std::cout<<"fio read num" << num << "buf size" << bufs.size() << std::endl;
     std::vector<struct iocb> ios(num);
     std::vector<struct iocb *> cbs(num, nullptr);
     std::vector<struct io_event> events(num);
@@ -147,51 +137,31 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
         auto label = bucket_labels[loc];
         uint32_t cid, bid;
         util::parse_global_block_id(label, cid, bid);
-        io_prep_pread(ios.data() + i, fds[cid], bufs[loc],para.blockSize, bid * para.blockSize);
+        io_prep_pread(ios.data() + i, fds[cid], bufs[loc], para.blockSize, bid * para.blockSize);
         cbs[i] = ios.data() + i;
     }
 
-    auto done = 0;
     auto submitted = 0;
-    auto to_submit_num = nr;
 
-    while (done < num) {
-        auto uppper = num - submitted;
-        if (to_submit_num > uppper) {
-            to_submit_num = uppper;
-        }
-        if (to_submit_num > nr) {
-            to_submit_num = nr;
-        }
-
-        if (to_submit_num > 0) {
-            auto r_submit =
-                    io_submit(aio_ctx, to_submit_num, cbs.data() + submitted);
-            if (r_submit < 0) {
-                std::cout << "io_submit() failed, returned: " << r_submit
-                          << ", strerror(-r): " << strerror(-r_submit)
-                          << ", begin: " << begin << ", end: " << end
-                          << ", submitted: " << submitted << std::endl;
-                exit(-1);
-            }
-            submitted += r_submit;
-        }
-
-        auto pending = submitted - done;
-        if (wait_nr > pending) {
-            wait_nr = pending;
-        }
-        auto r_done =
-                io_getevents(aio_ctx, wait_nr, nr, events.data() + done, NULL);
-        if (r_done < wait_nr) {
-            std::cout << "io_getevents() failed, returned: " << r_done
-                      << ", strerror(-): " << strerror(-r_done) << std::endl;
+    while (submitted != num) {
+        auto r_submit = io_submit(aio_ctx, num - submitted, cbs.data() + submitted);
+        if (r_submit < 0) {
+            std::cout << "io_submit() failed, returned: " << r_submit
+                      << ", strerror(-r): " << strerror(-r_submit)
+                      << ", begin: " << begin << ", end: " << end
+                      << ", submitted: " << submitted << std::endl;
             exit(-1);
         }
-
-        to_submit_num = r_done; // nr - (submitted - done)
-        done += r_done;
+        submitted += r_submit;
     }
+
+    auto r_done = io_getevents(aio_ctx, num, num, events.data(), NULL);
+    if (r_done < 0) {
+        std::cout << "io_getevents() failed, returned: " << r_done
+              << ", strerror(-): " << strerror(-r_done) << std::endl;
+        exit(-1);
+    }
+    std::cout<<"fio read done" << num << std::endl;
 };
 
    int num_jobs = 4;
@@ -206,7 +176,6 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
   std::vector<std::vector<char *>> taskQueues;
   taskQueues.resize(nq);
   std::mutex* locks = new std::mutex[nq];
-
   auto ioTask = [&](io_context_t aio_ctx, long threadStart, long threadEnd, int max_events_num) {
       std::cout<<"start io handling"<<"Thread start" << threadStart << "Thread end" << threadEnd << std::endl;
       int total = threadEnd - threadStart;
@@ -217,7 +186,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
           long batchNum = end - begin;
           std::vector<char *> block_bufs;
           block_bufs.resize(batchNum);
-          fio_way(aio_ctx, block_bufs, begin, end, max_events_num, 32);
+          fio_way(aio_ctx, block_bufs, begin, end);
           for (int j = begin; j < end; i++) {
               auto nq_idxs = labels_2_qidxs[j];
               for (auto iter = 0; iter < nq_idxs.size(); iter++) {
@@ -238,6 +207,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
       if (threadEnd > block_nums) {
           threadEnd = block_nums;
       }
+      std::cout<<"start thread" << threadStart << threadEnd <<std::endl;
       ioReaders[i] = std::thread(ioTask, ctxs[i], threadStart, threadEnd, max_events_num);
   }
 
