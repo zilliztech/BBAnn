@@ -38,7 +38,7 @@ void search_bbann_queryonly(
     const BBAnnParameters para, const int topk, const DATAT *pquery,
     uint32_t *answer_ids, DISTT *answer_dists, uint32_t nq, uint32_t dim) {
   TimeRecorder rc("search bigann");
-  std::cout << " index_hnsw: " << index_hnsw << " num_query: " << nq
+  std::cout << " index_hnsw: " << index_hnsw->cur_element_count << " num_query: " << nq
             << " query dims: " << dim << " nprobe: " << para.nProbe
             << " refine_nprobe: " << para.efSearch << std::endl;
 
@@ -243,18 +243,21 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
         std::cout<<"computer start, start " << nqStart << "end " << nqEnd << std::endl;
         const uint32_t vec_size = sizeof(DATAT) * dim;
         const uint32_t entry_size = vec_size + sizeof(uint32_t);
+        uint32_t num = nqEnd - nqStart;
         bool localStop = false;
         int processed = 0;
+        int loop = 0;
         while (true) {
-            for (int nq_idx = nqStart; nq_idx < nqEnd; nq_idx++) {
-                std::cout<<" handle " << nq_idx << std::endl;
+            // random is for more load balance
+            pivot = rand() % num;
+            for (int i = 0; i < num; i++) {
+                nq_idx = (i + pivot) % num + nqStart;
                 locks[nq_idx].lock();
                 std::vector<char *> localTask;
                 localTask.insert(localTask.begin(), taskQueues[nq_idx].begin(), taskQueues[nq_idx].end());
                 taskQueues[nq_idx].clear();
                 locks[nq_idx].unlock();
-                std::cout<<" handle " << nq_idx << "with " << localTask.size()<< std::endl;
-
+                std::cout<<" handle " << nq_idx << "with " << localTask.size() << "loop" << loop << "Stop" << stop<< std::endl;
                 if (localTask.empty()) {
                     continue;
                 }
@@ -287,6 +290,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                     delete[] block;
                 }
             }
+            loop++;
             // last round
             if (localStop) {
                 std::cout<<"Stop with the last round, exit with processed "<< processed << std::endl;
