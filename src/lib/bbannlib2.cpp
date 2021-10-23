@@ -215,8 +215,6 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
               auto nq_idxs = labels_2_qidxs[locs[j + begin]];
               for (const auto curNq: nq_idxs) {
                   locks[curNq].lock();
-                  const uint32_t entry_num = *reinterpret_cast<uint32_t *>(block_bufs[j]);
-                  std::cout<<"entry num put" << entry_num<< std::endl;
                   taskQueues[curNq].push_back(block_bufs[j]);
                   locks[curNq].unlock();
               }
@@ -272,6 +270,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                             vec = reinterpret_cast<DATAT *>(entry_begin);
                             id = *reinterpret_cast<uint32_t *>(entry_begin + vec_size);
                         }
+                        std::cout<<"entry num " << id<< std::endl;
                         auto dis = dis_computer(vec, q_idx, dim);
                         if (cmp_func(answer_dists[topk * nq_idx], dis)) {
                             heap_swap_top_func(topk, answer_dists + topk * nq_idx,
