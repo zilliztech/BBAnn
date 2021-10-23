@@ -136,7 +136,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
         auto label = bucket_labels[loc];
         uint32_t cid, bid;
         util::parse_global_block_id(label, cid, bid);
-        io_prep_pread(ios.data() + i, fds[cid], bufs[loc], para.blockSize, bid * para.blockSize);
+        io_prep_pread(ios.data() + i, fds[cid], bufs[num], para.blockSize, bid * para.blockSize);
         cbs[i] = ios.data() + i;
     }
     std::cout<<"fio prepare done" << std::endl;
@@ -178,7 +178,6 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
   taskQueues.resize(nq);
   std::mutex* locks = new std::mutex[nq];
   auto ioTask = [&](io_context_t aio_ctx, long threadStart, long threadEnd, int max_events_num) {
-      std::cout<<"start io handling"<<"Thread start" << threadStart << "Thread end" << threadEnd << std::endl;
       int total = threadEnd - threadStart;
       int batch = total / max_events_num + 1;
       for (int i = 0; i < batch; i++) {
@@ -186,7 +185,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
           long end = std::min(begin + max_events_num , threadEnd);
           long batchNum = end - begin;
           std::vector<char *> block_bufs;
-          block_bufs.resize(max_events_num);
+          block_bufs.resize(batchNum);
           fio_way(aio_ctx, block_bufs, begin, end);
           for (int j = begin; j < end; i++) {
               auto nq_idxs = labels_2_qidxs[j];
@@ -208,7 +207,6 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
       if (threadEnd > block_nums) {
           threadEnd = block_nums;
       }
-      std::cout<<"start thread" << threadStart << threadEnd <<std::endl;
       ioReaders[i] = std::thread(ioTask, ctxs[i], threadStart, threadEnd, max_events_num);
   }
 
