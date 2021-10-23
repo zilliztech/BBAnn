@@ -188,6 +188,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
   taskQueues.resize(nq);
   std::mutex* locks = new std::mutex[nq];
   auto ioTask = [&](io_context_t aio_ctx, long threadStart, long threadEnd, int max_events_num) {
+      std::cout<<"iotask start" << std::endl;
       int total = threadEnd - threadStart;
       int batch = total / max_events_num + 1;
       for (int i = 0; i < batch; i++) {
@@ -235,6 +236,7 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
 
     std::atomic<bool> stop (false);
     auto computer = [&](std::vector<std::vector<char *>> taskQueues, int nqStart, int nqEnd) {
+        std::cout<<"computer task start" << std::endl;
         const uint32_t vec_size = sizeof(DATAT) * dim;
         const uint32_t entry_size = vec_size + sizeof(uint32_t);
         bool localStop = false;
