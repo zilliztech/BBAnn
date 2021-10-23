@@ -226,8 +226,6 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
     auto computer = [&](std::vector<std::vector<char *>> taskQueues, int nqStart, int nqEnd) {
         const uint32_t vec_size = sizeof(DATAT) * dim;
         const uint32_t entry_size = vec_size + sizeof(uint32_t);
-        bool localStop = false;
-        std::cout<<"Computer start " << "nq start" << nqStart <<"nq end" << "nqEnd" << std::endl;
         while (true) {
             for (int nq_idx = nqStart; nq_idx < nqEnd; nq_idx++) {
                 locks[nq_idx].lock();
@@ -245,8 +243,10 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                 const DATAT *q_idx = pquery + nq_idx * dim;
                 DATAT *vec;
                 for (auto block : localTask) {
+                    std::cout<<"block in" << std::endl;
                     const uint32_t entry_num = *reinterpret_cast<uint32_t *>(block);
                     char *buf_begin = block + sizeof(uint32_t);
+                    std::cout<<"buf begin" << std::endl;
                     for (uint32_t k = 0; k < entry_num; ++k) {
                         char *entry_begin = buf_begin + entry_size * k;
                         uint32_t id;
@@ -259,12 +259,15 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                             vec = reinterpret_cast<DATAT *>(entry_begin);
                             id = *reinterpret_cast<uint32_t *>(entry_begin + vec_size);
                         }
+                        std::cout<<"id" << id << std::endl;
 
                         auto dis = dis_computer(vec, q_idx, dim);
+                        std::cout<<"dis" << dis << std::endl;
                         if (cmp_func(answer_dists[topk * nq_idx], dis)) {
                             heap_swap_top_func(topk, answer_dists + topk * nq_idx,
                                                answer_ids + topk * nq_idx, dis, id);
                         }
+                        std::cout<< "done"<< std::endl;
                     }
                 }
 
