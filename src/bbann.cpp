@@ -475,16 +475,16 @@ void build_bbann(const std::string &raw_data_bin_file,
   float *centroids = nullptr;
   double avg_len;
   // sampling and do K1-means to get the first round centroids
-  train_cluster<DATAT>(raw_data_bin_file, output_path, K1, &centroids, avg_len);
+  //train_cluster<DATAT>(raw_data_bin_file, output_path, K1, &centroids, avg_len);
   assert(centroids != nullptr);
   rc.RecordSection("train cluster to get " + std::to_string(K1) +
                    " centroids done.");
 
-  divide_raw_data<DATAT, DISTT, HEAPT>(raw_data_bin_file, output_path,centroids, K1);
+  //divide_raw_data<DATAT, DISTT, HEAPT>(raw_data_bin_file, output_path,centroids, K1);
   rc.RecordSection("divide raw data into " + std::to_string(K1) +
                    " clusters done");
 
-  hierarchical_clusters<DATAT, DISTT, HEAPT>(output_path, K1, avg_len,block_size);
+  //hierarchical_clusters<DATAT, DISTT, HEAPT>(output_path, K1, avg_len,block_size);
   rc.RecordSection("conquer each cluster into buckets done");
 
   build_graph<DATAT, DISTT>(output_path, hnswM, hnswefC, metric_type, block_size);
