@@ -117,12 +117,12 @@ void search_bbann_queryonly(
     }
   }
 
-    int total = 0;
+  int total = 0;
   for (auto iter : labels_2_qidxs) {
     std::cout<<"iter" << iter.first << "size" << iter.second.size() << std::endl;
-      total +=  labels_2_qidxs[i].size();
+    total += iter.second.size();
   }
-  
+
   std::cout<<"total size" << total << std::endl;
   rc.RecordSection("calculate block position done");
 
