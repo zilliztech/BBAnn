@@ -202,12 +202,11 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
           fio_way(aio_ctx, block_bufs, begin, end);
           for (int j = begin; j < end; j++) {
               auto nq_idxs = labels_2_qidxs[locs[j]];
-
-              for (auto nqIter= nq_idxs.begin(); nqIter != nq_idxs.end(); nqIter++) {}
-                  int64_t nq = *nqIter;
-                  locks[nq].lock();
-                  taskQueues[nq].emplace(locs[j], block_bufs[i]);
-                  locks[nq].unlock();
+              for(set<int_64t>::iterator iter = nq_idxs.begin(); iter != nq_idxs.end(); iter++) {}
+                  curNq = *iter;
+                  locks[curNq].lock();
+                  taskQueues[curNq].emplace(locs[j], block_bufs[i]);
+                  locks[curNq].unlock();
               }
           }
       }
