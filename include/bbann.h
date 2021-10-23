@@ -35,3 +35,6 @@ void search_bbann(const std::string& index_path,
                    const int K1,
                    const uint64_t block_size,
                    Computer<DATAT, DATAT, DISTT>& dis_computer);
+
+void build_graph(const std::string &index_path, const int hnswM,
+                 const int hnswefC, MetricType metric_type);
