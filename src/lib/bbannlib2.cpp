@@ -14,6 +14,8 @@
 #include <fcntl.h> // open, pread
 #include <libaio.h>
 #include <stdlib.h> // posix_memalign
+
+#include <semaphore.h>
 namespace bbann {
 
 template <typename dataT, typename distanceT>
@@ -36,7 +38,7 @@ template <typename DATAT, typename DISTT>
 void search_bbann_queryonly(
     std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,
     const BBAnnParameters para, const int topk, const DATAT *pquery,
-    uint32_t *answer_ids, DISTT *answer_dists, uint32_t nq, uint32_t dim) {
+    uint32_t *answer_ids, DISTT *answer_dists, uint32_t nq, uint32_t dim, sem_t* iodone) {
   TimeRecorder rc("search bigann");
   std::cout << " index_hnsw: " << index_hnsw->cur_element_count << " num_query: " << nq
             << " query dims: " << dim << " nprobe: " << para.nProbe
@@ -49,6 +51,7 @@ void search_bbann_queryonly(
   search_graph<DATAT>(index_hnsw, nq, dim, para.nProbe, para.efSearch, pquery,
                       bucket_labels, nullptr);
   rc.RecordSection("search buckets done.");
+  sem_post(iodone);
 
   uint32_t cid, bid;
   const uint32_t vec_size = sizeof(DATAT) * dim;
@@ -88,8 +91,6 @@ void search_bbann_queryonly(
     heap_heapify_func(topk, ans_disi, ans_idsi);
   }
   rc.RecordSection("heapify answers heaps");
-
-  // step1
 
   std::vector<int> fds; // file -> file descriptor
   fds.resize(para.K1);
@@ -353,8 +354,31 @@ void BBAnnIndex2<dataT, distanceT>::BatchSearchCpp(
     const BBAnnParameters para, uint32_t *answer_ids, distanceT *answer_dists) {
   std::cout << "Query: " << std::endl;
 
-  search_bbann_queryonly<dataT, distanceT>(
-      index_hnsw_, para, knn, pquery, answer_ids, answer_dists, numQuery, dim);
+
+  auto run_hnsw_search = [&](int offset, int queryNum, sem_t* iodone) {
+      search_bbann_queryonly<dataT, distanceT>(index_hnsw_, para, knn, pquery + offset * dim, answer_ids + topk * offset, answer_dists + topk * offset, queryNum, dim, iodone);
+  };
+
+  int num_jobs = 8;
+  std::vector<std::thread> batchExecutor;
+  batchExecutor.resize(num_jobs);
+  set_t * iodone = new sem_t[num_jobs];
+  long threadQuery = (numQuery + num_jobs -1) / num_jobs;
+  for (int i =0; i < num_jobs; i++) {
+    int threadStart = i * threadQuery;
+    int threadEnd = (i + 1) * threadQuery;
+    if (threadEnd > numQuery) {
+        threadEnd = threadQuery;
+    }
+    sem_init(&iodone[i], 0, 0);
+    batchExecutor[i] = std::thread(run_hnsw_search, threadStart, threadEnd - threadStart, &iodone[i]);
+    sem_wait(&iodone[i]);
+  }
+
+  for (auto& t: batchExecutor) {
+      t.join();
+  }
+  delete[] iodone;
 }
 
 template <typename dataT, typename distanceT>
