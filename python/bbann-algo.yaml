@@ -676,6 +676,7 @@ msspacev-10M:
       base-args: ["@metric"]
       run-groups:
         base:
+              # [{"hnswM":32, "hnswefC":500, "K1":10, "blockSize":4096, "url":"https://zilliznfs.blob.core.windows.net/bbann/msspacev-10M-test"}]
           args: |
               [{"hnswM":32, "hnswefC":500, "K1":10, "blockSize":4096}]
           query-args: |
