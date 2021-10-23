@@ -245,10 +245,10 @@ auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin, i
                 DATAT *vec;
                 for (char* block : localTask) {
                     std::cout<<"block in" << std::endl;
-                    std::cout<<"block0" << block[0] << std::end;
-                    std::cout<<"block1" << block[1] << std::end;
-                    std::cout<<"block2" << block[2] << std::end;
-                    std::cout<<"block3" << block[3] << std::end;
+                    std::cout<<"block0" << block[0] << std::endl;
+                    std::cout<<"block1" << block[1] << std::endl;
+                    std::cout<<"block2" << block[2] << std::endl;
+                    std::cout<<"block3" << block[3] << std::endl;
 
                     const uint32_t entry_num = *reinterpret_cast<uint32_t *>(block);
                     std::cout<<"entry num" << std::endl;
