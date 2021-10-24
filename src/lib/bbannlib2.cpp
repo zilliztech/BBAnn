@@ -16,6 +16,30 @@
 #include <stdlib.h> // posix_memalign
 namespace bbann {
 
+struct AlignAllocator {
+	public:
+		AlignAllocator(int max_blocks_num, int blockSize) {
+			block_bufs.resize(max_blocks_num);
+  			for (auto i = 0; i < max_blocks_num; i++) {
+  			  auto r = posix_memalign((void **)(&block_bufs[i]), 512, blockSize);
+  			  if (r != 0) {
+  			    std::cout << "posix_memalign() failed, returned: " << r
+  			              << ", errno: " << errno << ", error: " << strerror(errno)
+  			              << std::endl;
+  			    exit(-1);
+  			  }
+  			}
+		}
+		~AlignAllocator() {
+  			for (auto i = 0; i < block_bufs.size(); i++) {
+  			  free(block_bufs[i]);
+  			}
+		}
+
+	public:
+		std::vector<char*> block_bufs;
+};
+
 template <typename dataT, typename distanceT>
 bool BBAnnIndex2<dataT, distanceT>::LoadIndex(std::string &indexPathPrefix) {
   indexPrefix_ = indexPathPrefix;
@@ -113,17 +137,9 @@ void search_bbann_queryonly(
   if (max_blocks_num > nq * nprobe) {
     max_blocks_num = nq * nprobe;
   }
-  std::vector<char *> block_bufs(max_blocks_num);
-  for (auto i = 0; i < max_blocks_num; i++) {
-    auto r = posix_memalign((void **)(&block_bufs[i]), 4096, para.blockSize);
-    if (r != 0) {
-      std::cout << "posix_memalign() failed, returned: " << r
-                << ", errno: " << errno << ", error: " << strerror(errno)
-                << std::endl;
-      exit(-1);
-    }
-  }
-  rc.RecordSection("allocate cache memory");
+  static AlignAllocator allocator(max_blocks_num, para.blockSize);
+  max_blocks_num = allocator.block_bufs.size();
+  auto block_bufs = allocator.block_bufs;
 
   auto fio_way = [&](io_context_t aio_ctx, std::vector<char *> &bufs, int begin,
                      int end, int nr, int wait_nr) {
@@ -327,11 +343,6 @@ void search_bbann_queryonly(
     run_batch_query(i);
   }
   rc.RecordSection("query done");
-
-  for (auto i = 0; i < max_blocks_num; i++) {
-    delete[] block_bufs[i];
-  }
-  rc.RecordSection("release cache buf");
 
   for (auto iter = fds.begin(); iter != fds.end(); iter++) {
     close(iter->second);
