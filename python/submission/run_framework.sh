@@ -17,6 +17,8 @@ if [[ "$DATASET" =~ .*"ssnpp".* ]]; then
 fi
 
 pushd big-ann-benchmarks
+python3 create_dataset.py --dataset $DATASET
+
 python install.py --algorithm $ALGORITHM
 python3 run.py $ARGS --timeout 345600 --runs 1 --algorithm $ALGORITHM # --force --rebuild
 python3 plot.py $ARGS --recompute
