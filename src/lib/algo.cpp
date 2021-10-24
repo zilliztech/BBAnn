@@ -33,9 +33,7 @@ void search_graph_hnsw_sq(std::shared_ptr<sq_hnswlib::HierarchicalNSW<float>> in
     auto reti = index_hnsw_sq->searchKnn(pquery + i * dq, nprobe);
     auto p_labeli = buckets_label + i * nprobe;
     while (!reti.empty()) {
-      uint32_t cid, bid, offset;
-      bbann::util::parse_id(reti.top().second, cid, bid, offset);
-      *p_labeli++ = bbann::util::gen_global_block_id(cid, bid);
+      *p_labeli++ = reti.top().second;
       if (set_distance) {
         *queryi_dist++ = reti.top().first;
       }
