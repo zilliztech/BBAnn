@@ -4,18 +4,16 @@ RUN apt-get update
 RUN apt-get install -y wget git cmake g++ libaio-dev libgoogle-perftools-dev libboost-dev python3 python3-setuptools python3-pip libomp-dev
 RUN pip3 install pybind11 numpy
 
-# FIXME: CHECK BEFORE DDL
-# RUN git clone --single-branch --branch bbann_docker --recurse-submodules https://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@github.com/PwzXxm/BigAnn.git
-RUN mkdir -p BigAnn
-COPY include BigAnn/include
-COPY python/*.py BigAnn/python/
-COPY python/*.cpp BigAnn/python/
-COPY src BigAnn/src
-COPY CMakeLists.txt BigAnn/
-RUN ls BigAnn
+RUN mkdir -p BBAnn
+COPY include BBAnn/include
+COPY python/*.py BBAnn/python/
+COPY python/*.cpp BBAnn/python/
+COPY src BBAnn/src
+COPY CMakeLists.txt BBAnn/
+RUN ls BBAnn
 
-RUN mkdir -p BigAnn/build
-RUN cd BigAnn/build && cmake -DCMAKE_BUILD_TYPE=Release ..
-RUN cd BigAnn/build && make -j
-RUN cd BigAnn/python && pip install -e .
+RUN mkdir -p BBAnn/build
+RUN cd BBAnn/build && cmake -DCMAKE_BUILD_TYPE=Release ..
+RUN cd BBAnn/build && make -j
+RUN cd BBAnn/python && pip install -e .
 RUN python3 -c 'import bbannpy'
