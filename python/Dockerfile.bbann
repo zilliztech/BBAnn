@@ -4,7 +4,7 @@ RUN apt-get update
 RUN apt-get install -y wget git cmake g++ libaio-dev libgoogle-perftools-dev libboost-dev python3 python3-setuptools python3-pip libomp-dev
 RUN pip3 install pybind11 numpy
 
-RUN git clone --single-branch --branch bbann_docker --recurse-submodules https://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@github.com/PwzXxm/BigAnn.git
+RUN git clone --single-branch --branch master --recurse-submodules https://github.com/zilliztech/BBAnn.git
 
 RUN mkdir -p BigAnn/build
 RUN cd BigAnn/build && cmake -DCMAKE_BUILD_TYPE=Release ..
