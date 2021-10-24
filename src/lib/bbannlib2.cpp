@@ -63,7 +63,12 @@ void search_bbann_queryonly(
     uint32_t *answer_ids, DISTT *answer_dists, uint32_t nq, uint32_t dim) {
   TimeRecorder rc("search bigann");
 
-  index_hnsw->setEf(para.efSearch);
+  if (index_hnsw) {
+  	index_hnsw->setEf(para.efSearch);
+  }
+  if (index_sq_hnsw) {
+  	index_sq_hnsw->setEf(para.efSearch);
+  }
 
   auto dis_computer = util::select_computer<DATAT, DATAT, DISTT>(para.metric);
 
