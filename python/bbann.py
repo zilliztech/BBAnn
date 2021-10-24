@@ -147,7 +147,7 @@ class BbANN(BaseANN):
         end = time.time()
         print("bbAnn index built in %.3f s" % (end - start))
         print(f"Loading index from {self.para.indexPrefixPath}")
-        self.index.load_index(self.para.indexPrefixPath)
+        self.index.load_index(self.para.indexPrefixPath, self.para)
 
     def load_index(self, dataset):
         """
@@ -177,7 +177,7 @@ class BbANN(BaseANN):
                     return False
 
         print(f"Loading index from {self.para.indexPrefixPath}")
-        self.index.load_index(self.para.indexPrefixPath)
+        self.index.load_index(self.para.indexPrefixPath, self.para)
         return True
 
     def query(self, X, k):

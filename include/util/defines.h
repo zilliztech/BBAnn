@@ -50,6 +50,7 @@ struct BBAnnParameters {
   int sample = 1;
   bool vector_use_sq = false;
   double radiusFactor = 1.0;
+  bool use_hnsw_sq = false;
 };
 
 

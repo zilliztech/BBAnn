@@ -4,6 +4,7 @@
 #include "util/file_handler.h"
 #include "util/heap.h"
 #include "util/utils_inline.h"
+#include "sq_hnswlib/hnswalg.h"
 #include <iostream>
 #include <memory>
 #include <omp.h>
@@ -46,17 +47,39 @@ struct AlignAllocator {
 };
 
 template <typename dataT, typename distanceT>
-bool BBAnnIndex2<dataT, distanceT>::LoadIndex(std::string &indexPathPrefix) {
+bool BBAnnIndex2<dataT, distanceT>::LoadIndex(std::string &indexPathPrefix, const BBAnnParameters para) {
   indexPrefix_ = indexPathPrefix;
   std::cout << "Loading: " << indexPrefix_;
   uint32_t bucket_num, dim;
   util::get_bin_metadata(getBucketCentroidsFileName(), bucket_num, dim);
 
-  // hnswlib::SpaceInterface<distanceT> *space =
-  auto *space = getDistanceSpace<dataT, distanceT>(metric_, dim);
-  // load hnsw
-  index_hnsw_ = std::make_shared<hnswlib::HierarchicalNSW<distanceT>>(
-      space, getHnswIndexFileName());
+  std::cout << "BBAnnIndex2::LoadIndex: "
+            << "use_hnsw_sq: " << (para.use_hnsw_sq ? std::string("true") : std::string("false"))
+            << std::endl;
+
+  if (para.use_hnsw_sq) {
+
+    sq_hnswlib::SpaceInterface<float> *space = nullptr;
+    if (MetricType::L2 == metric_) {
+      space = new sq_hnswlib::L2Space(dim);
+    } else if (MetricType::IP == metric_) {
+      space = new sq_hnswlib::InnerProductSpace(dim);
+    } else {
+      return false;
+    }
+
+    index_hnsw_ = nullptr;
+    index_sq_hnsw_ = std::make_shared<sq_hnswlib::HierarchicalNSW<float>>(space, getHnswIndexFileName());
+  } else {
+    // hnswlib::SpaceInterface<distanceT> *space =
+    auto *space = getDistanceSpace<dataT, distanceT>(metric_, dim);
+    // load hnsw
+    index_hnsw_ = std::make_shared < hnswlib::HierarchicalNSW < distanceT >> (
+            space, getHnswIndexFileName());
+    index_sq_hnsw_ = nullptr;
+  }
+
+
   indexPrefix_ = indexPathPrefix;
   return true;
 }
@@ -64,11 +87,17 @@ bool BBAnnIndex2<dataT, distanceT>::LoadIndex(std::string &indexPathPrefix) {
 template <typename DATAT, typename DISTT>
 void search_bbann_queryonly(
     std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,
+    std::shared_ptr<sq_hnswlib::HierarchicalNSW<float>> index_sq_hnsw,
     const BBAnnParameters para, const int topk, const DATAT *pquery,
     uint32_t *answer_ids, DISTT *answer_dists, uint32_t nq, uint32_t dim) {
   TimeRecorder rc("search bigann");
 
-  index_hnsw->setEf(para.efSearch);
+  if (index_hnsw) {
+  	index_hnsw->setEf(para.efSearch);
+  }
+  if (index_sq_hnsw) {
+  	index_sq_hnsw->setEf(para.efSearch);
+  }
 
   auto dis_computer = util::select_computer<DATAT, DATAT, DISTT>(para.metric);
 
@@ -274,8 +303,14 @@ void search_bbann_queryonly(
 
   auto run_query = [&](int l, int r) {
     // step 1: search graph.
-    search_graph<DATAT>(index_hnsw, r - l, dim, nprobe, para.efSearch,
-                        pquery + l * dim, bucket_labels + l * nprobe, nullptr);
+   if (para.use_hnsw_sq) {
+     const float* pq = (float*)const_cast<DATAT*>(pquery);
+     search_graph_hnsw_sq(index_sq_hnsw, r - l, dim, nprobe, para.efSearch, pq + l * dim,
+                          bucket_labels + l * nprobe, nullptr);
+   } else {
+     search_graph<DATAT, DISTT>(index_hnsw, r - l, dim, nprobe, para.efSearch, pquery + l * dim,
+                         bucket_labels + l * nprobe, nullptr);
+   }
 
     auto num_jobs = 4;
     auto max_events_num = 1023;
@@ -365,8 +400,17 @@ void BBAnnIndex2<dataT, distanceT>::BatchSearchCpp(
     const BBAnnParameters para, uint32_t *answer_ids, distanceT *answer_dists) {
   std::cout << "Query: " << std::endl;
 
-  search_bbann_queryonly<dataT, distanceT>(
-      index_hnsw_, para, knn, pquery, answer_ids, answer_dists, numQuery, dim);
+  std::cout << "BBAnnIndex2::BatchSearchCpp: "
+            << "use_hnsw_sq: " << (para.use_hnsw_sq ? std::string("true") : std::string("false"))
+            << std::endl;
+  if (para.use_hnsw_sq) {
+    search_bbann_queryonly<dataT, distanceT>(
+            nullptr, index_sq_hnsw_, para, knn, pquery, answer_ids, answer_dists, numQuery, dim);
+  } else {
+    search_bbann_queryonly<dataT, distanceT>(
+            index_hnsw_, nullptr, para, knn, pquery, answer_ids, answer_dists, numQuery, dim);
+  }
+
 }
 
 template <typename dataT, typename distanceT>
@@ -404,8 +448,14 @@ void BBAnnIndex2<dataT, distanceT>::BuildWithParameter(
   hierarchical_clusters<dataT, distanceT>(para, avg_len);
   rc.RecordSection("conquer each cluster into buckets done");
 
-  build_graph<dataT, distanceT>(indexPrefix_, para.hnswM, para.hnswefC,
+  if (para.use_hnsw_sq) {
+    std::cout << "build graph type: HNSWSQ" << std::endl;
+    build_hnsw_sq(indexPrefix_, para.hnswM, para.hnswefC, para.metric);
+  } else {
+    std::cout << "build graph type: HNSW" << std::endl;
+    build_graph<dataT, distanceT>(indexPrefix_, para.hnswM, para.hnswefC,
                                 para.metric, para.blockSize, para.sample);
+  }
   rc.RecordSection("build hnsw done.");
 
   // TODO()!!!!!!!!!!!!!!!)
@@ -569,7 +619,7 @@ BBAnnIndex2<dataT, distanceT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
 
 #define BBANNLIB_DECL(dataT, distanceT)                                        \
   template bool BBAnnIndex2<dataT, distanceT>::LoadIndex(                      \
-      std::string &indexPathPrefix);                                           \
+      std::string &indexPathPrefix, const BBAnnParameters para);               \
   template void BBAnnIndex2<dataT, distanceT>::BatchSearchCpp(                 \
       const dataT *pquery, uint64_t dim, uint64_t numQuery, uint64_t knn,      \
       const BBAnnParameters para, uint32_t *answer_ids,                        \

@@ -11,6 +11,38 @@
 namespace bbann {
 std::string Hello() { return "Hello!!!!"; }
 
+
+void search_graph_hnsw_sq(std::shared_ptr<sq_hnswlib::HierarchicalNSW<float>> index_hnsw_sq,
+                          const int nq, const int dq, const int nprobe,
+                          const int refine_nprobe, const float *pquery,
+                          uint32_t *buckets_label, float *centroids_dist) {
+  TimeRecorder rc("search graph");
+  std::cout << "search graph parameters:" << std::endl;
+  std::cout << " index_hnsw_sq: " << index_hnsw_sq << " nq: " << nq << " dq: " << dq
+            << " nprobe: " << nprobe << " refine_nprobe: " << refine_nprobe
+            << " pquery: " << static_cast<const void *>(pquery)
+            << " buckets_label: " << static_cast<void *>(buckets_label)
+            << std::endl;
+  index_hnsw_sq->setEf(refine_nprobe);
+  bool set_distance = centroids_dist != nullptr;
+#pragma omp parallel for
+  for (int64_t i = 0; i < nq; i++) {
+    // move the duplicate logic into inner loop
+    // TODO optimize this
+    float *queryi_dist = set_distance ? centroids_dist + i * nprobe : nullptr;
+    auto reti = index_hnsw_sq->searchKnn(pquery + i * dq, nprobe);
+    auto p_labeli = buckets_label + i * nprobe;
+    while (!reti.empty()) {
+      *p_labeli++ = reti.top().second;
+      if (set_distance) {
+        *queryi_dist++ = reti.top().first;
+      }
+      reti.pop();
+    }
+  }
+  rc.ElapseFromBegin("search graph done.");
+}
+
 template <typename DATAT, typename DISTT>
 void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,
                   const int nq, const int dq, const int nprobe,
@@ -220,6 +252,148 @@ getDistanceSpace<uint8_t, uint32_t>(MetricType metric_type, uint32_t ndim) {
   return space;
 }
 
+
+template<typename T>
+inline void read_bin_file_half_dimension(const std::string& file_name, T*& data,uint32_t& n,
+                                             uint32_t& dim,const uint32_t& begin_dim){
+  std::ifstream reader(file_name, std::ios::binary);
+
+  reader.read((char*)&n, sizeof(uint32_t));
+  reader.read((char*)&dim, sizeof(uint32_t));
+  if (begin_dim==0){
+    uint32_t new_dim=dim/2;
+    if (data== nullptr) {
+      data = new T[(uint64_t) n * (uint64_t) new_dim];
+    }
+    T* buf=new T[(uint64_t)(dim-new_dim)];
+    for (uint32_t i=0;i<n;++i){
+      for (uint32_t j=0;j<new_dim;j++){
+        reader.read((char*)(data+j*n+i),sizeof(T));
+      }
+      reader.read((char*)buf,sizeof(T)*(dim-new_dim));
+    }
+    delete [] buf;
+    buf= nullptr;
+    std::cout << "read binary file from " << file_name << " done in ... seconds, n = "
+                  << n << ", dim = " << new_dim << std::endl;
+  } else{
+    if (data== nullptr){
+      data=new T[(uint64_t)n*(uint64_t)(dim-begin_dim)];
+    }
+    T* buf=new T[(uint64_t)begin_dim];
+    uint32_t offset=dim-begin_dim;
+    for (uint32_t i=0;i<n;++i){
+      reader.read((char*)buf,sizeof(T)*begin_dim);
+      for (uint32_t j=0;j<offset;++j){
+        reader.read((char*)(data+j*n+i),sizeof(T));
+      }
+    }
+    delete [] buf;
+    buf= nullptr;
+    std::cout << "read binary file from " << file_name << " done in ... seconds, n = "
+                  << n << ", dim = " << offset << std::endl;
+  }
+}
+
+void build_hnsw_sq(const std::string &index_path,
+                   const int hnswM,
+                   const int hnswefC,
+                   MetricType metric_type) {
+  TimeRecorder rc("create_graph_index");
+  std::cout << "build hnsw parameters:" << std::endl;
+  std::cout << " index_path: " << index_path << " hnsw.M: " << hnswM
+            << " hnsw.efConstruction: " << hnswefC
+            << " metric_type: " << (int)metric_type << std::endl;
+  uint32_t *pids = nullptr;
+  uint32_t npts, ndim, nids, nidsdim, npts2;
+  uint32_t total_n = 0;
+  float *pdata = nullptr; 
+  util::read_bin_file(index_path+BUCKET+CENTROIDS+BIN, pdata, total_n, ndim);
+
+  
+  float *codes = new float[256 * ndim];
+  uint8_t *codebook = new uint8_t[(uint64_t)total_n * (uint64_t)ndim];
+  memset(codebook, 0, sizeof(uint8_t) * (uint64_t)total_n * (uint64_t)ndim);
+  uint64_t sample_size = total_n * 0.01;
+  float * sample_data = new float [ndim * sample_size];
+  random_sampling_k2(pdata, total_n, ndim, sample_size, sample_data);
+  float temp ;
+  // #pragma omp parallel for
+  for (int i = 0; i < sample_size; i++) {
+      for(int j = i; j < ndim; j++) {
+          temp = sample_data[sample_size * j + i];
+          sample_data[sample_size * j + i] = sample_data[i * ndim + j];
+          sample_data[i * ndim + j] = temp;
+      }
+  }
+
+  for (uint32_t i = 0; i < ndim; ++i) {
+      std::cout<<"training the dim :     "<<i<<std::endl;
+      kmeans(sample_size, sample_data + i * sample_size, 1, 256, (float*)(codes + i * 256));
+  }
+  std::cout<<"training kmeans down    "<<std::endl;
+  delete [] sample_data;
+
+  #pragma omp parallel for    
+  for (auto d = 0; d < ndim; d++) {
+      auto * d_code = codes + 256 * d;
+      std::sort(d_code , d_code + 256); 
+  }
+
+  #pragma omp parallel for        
+  for (auto i = 0; i < total_n; i++) {           
+    auto * x_codebook = codebook + i  * ndim;
+    for (auto d = 0; d < ndim; d++) {
+      auto * x_code = codes + 256 * d;
+      auto pos = std::lower_bound(x_code, x_code + 256, pdata[i * ndim + d]) - x_code;
+      if(pos == 256) { x_codebook[d] = 255; }
+      else if(pos == 0) {x_codebook[d] = 0; }
+      else {
+        x_codebook[d] = (
+        std::abs(x_code[pos-1] - pdata[i * ndim + d]) <
+        std::abs(x_code[pos] - pdata[i * ndim + d]) ? 
+        pos-1 : pos
+        );
+        }
+    }  
+  }
+  delete[] pdata;
+  pdata = nullptr;
+
+
+  rc.RecordSection("load centroids of buckets and compute SQ done");
+  rc.RecordSection("load centroids of buckets and compute SQ done");
+
+
+  sq_hnswlib::SpaceInterface<float> *space= nullptr;
+  if (MetricType::L2==metric_type){
+    space=new sq_hnswlib::L2Space(ndim);
+  }
+  else if (MetricType::IP==metric_type) {
+    space = new sq_hnswlib::InnerProductSpace(ndim);
+  } else{
+    std::cout << "invalid metric_type = " << (int)metric_type << std::endl;
+    return;
+  }
+  util::read_bin_file<uint32_t>(index_path + CLUSTER + COMBINE_IDS + BIN, pids, nids,
+                          nidsdim);
+
+  auto index_hnsw = std::make_shared<sq_hnswlib::HierarchicalNSW<float>>(
+          space, total_n, hnswM, hnswefC,100,codes);
+  index_hnsw->addPoint(codebook, pids[0]);
+#pragma omp parallel for
+  for (int64_t i = 1; i < total_n; i++) {
+    index_hnsw->addPoint(codebook + i * ndim, pids[i]);
+  }
+  std::cout << "hnsw totally add " << npts << " points" << std::endl;
+  rc.RecordSection("create index hnsw done");
+  index_hnsw->saveIndex(index_path + HNSW + INDEX + BIN);
+  rc.RecordSection("hnsw save index done");
+  delete[] pids;
+  pids = nullptr;
+  rc.ElapseFromBegin("create index hnsw totally done");
+}
+
 template <typename DATAT, typename DISTT>
 void build_graph(const std::string &index_path, const int hnswM,
                  const int hnswefC, MetricType metric_type,
@@ -294,6 +468,7 @@ void build_graph(const std::string &index_path, const int hnswM,
 
     // for top distance samples distance
     std::unordered_set<int> indices;
+    uint32_t one_percent = bucketSample / 100;
     for (uint32_t j = 0; j < bucketSample; j++) {
       int32_t picked = -1;
       for (uint32_t k = 0; k < entry_num; k++) {
@@ -311,6 +486,7 @@ void build_graph(const std::string &index_path, const int hnswM,
       indices.insert(picked);
       char *entry_begin = buf_begin + entry_size * picked;
       index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin),bbann::util::gen_id(cid0, bid0, j + 1));
+      if (j % one_percent == 0) std::cout << "HNSQ addPoint progress: " << j / one_percent << "%" << std::endl;
     }
     delete[] distance;
     delete[] buf;
