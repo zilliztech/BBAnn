@@ -336,24 +336,28 @@ void build_hnsw_sq(const std::string &index_path,
   std::cout<<"training kmeans down    "<<std::endl;
   delete [] sample_data;
 
-  #pragma omp parallel for      
+  #pragma omp parallel for    
   for (auto d = 0; d < ndim; d++) {
-        auto * x_code = codes + 256 * d;
-        auto * x_codebook = codebook + d * total_n;
-        std::sort(x_code , x_code + 256 );
-        for (int i = 0; i < total_n; i++) {
-          auto pos = std::lower_bound(x_code, x_code + 256, pdata[i*ndim + d]) - x_code;
-          if(pos == 256) { x_codebook[i] = 255; }
-          else if(pos == 0) {x_codebook[i] = 0; }
-          else {
-              x_codebook[i] = (
-              std::abs(x_code[pos-1] - pdata[i*ndim + d]) <
-              std::abs(x_code[pos] - pdata[i*ndim + d]) ? 
-              pos-1 : pos
-              );
-          }
-        }  
-      std::cout<<"assign d:"<<d<<std::endl;
+      auto * d_code = codes + 256 * d;
+      std::sort(d_code , d_code + 256); 
+  }
+
+  #pragma omp parallel for        
+  for (auto i = 0; i < total_n; i++) {           
+    auto * x_codebook = codebook + i  * ndim;
+    for (auto d = 0; d < ndim; d++) {
+      auto * x_code = codes + 256 * d;
+      auto pos = std::lower_bound(x_code, x_code + 256, pdata[i * ndim + d]) - x_code;
+      if(pos == 256) { x_codebook[d] = 255; }
+      else if(pos == 0) {x_codebook[d] = 0; }
+      else {
+        x_codebook[d] = (
+        std::abs(x_code[pos-1] - pdata[i * ndim + d]) <
+        std::abs(x_code[pos] - pdata[i * ndim + d]) ? 
+        pos-1 : pos
+        );
+        }
+    }  
   }
   delete[] pdata;
   pdata = nullptr;
@@ -466,6 +470,7 @@ void build_graph(const std::string &index_path, const int hnswM,
 
     // for top distance samples distance
     std::unordered_set<int> indices;
+    uint32_t one_percent = bucketSample / 100;
     for (uint32_t j = 0; j < bucketSample; j++) {
       int32_t picked = -1;
       for (uint32_t k = 0; k < entry_num; k++) {
@@ -483,6 +488,7 @@ void build_graph(const std::string &index_path, const int hnswM,
       indices.insert(picked);
       char *entry_begin = buf_begin + entry_size * picked;
       index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin),bbann::util::gen_id(cid0, bid0, j + 1));
+      if (j % one_percent == 0) std::cout << "HNSQ addPoint progress: " << j / one_percent << "%" << std::endl;
     }
     delete[] distance;
     delete[] buf;
