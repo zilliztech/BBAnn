@@ -94,15 +94,15 @@ void search_bbann_queryonly(
 
   uint32_t max_cid = 0xff;
   std::unordered_map<uint32_t, int> fds; // cid -> file descriptor
-  for (uint32_t i = 0; i < max_cid; i++) {
+  for (uint32_t i = 0; i < para.K1; i++) {
     std::string cluster_file_path =
         getClusterRawDataFileName(para.indexPrefixPath, i);
     auto fd = open(cluster_file_path.c_str(), O_RDONLY | O_DIRECT);
-    if (fd == 0) {
+    if (fd <= 0) {
       std::cout << "open() failed, fd: " << fd
                 << ", file: " << cluster_file_path << ", errno: " << errno
                 << ", error: " << strerror(errno) << std::endl;
-      continue;
+      exit(-1);
     }
     fds[i] = fd;
   }
