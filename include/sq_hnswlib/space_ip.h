@@ -289,6 +289,7 @@ namespace sq_hnswlib {
         size_t dim_;
     public:
         InnerProductSpace(size_t dim) {
+            std::cout<<"Inner product" << ", dim" << dim << "data size uint8" << std::endl;
             fstdistfunc_ = InnerProduct;
             dim_ = dim;
             data_size_ = dim * sizeof(uint8_t);

@@ -382,6 +382,7 @@ void build_hnsw_sq(const std::string &index_path,
 
   auto index_hnsw = std::make_shared<sq_hnswlib::HierarchicalNSW<float>>(
           space, total_n, hnswM, hnswefC,100,codes);
+    std::out<<"First element label" << pids[0] << "size" << sizeof(pids[0])<<std::endl;
   index_hnsw->addPoint(codebook, pids[0]);
 #pragma omp parallel for
   for (int64_t i = 1; i < total_n; i++) {

@@ -215,6 +215,7 @@ namespace sq_hnswlib {
         size_t dim_;
     public:
         L2Space(size_t dim) {
+            std::cout<<"L2 space" << ", dim" << dim << "data size uint8" << std::endl;
             fstdistfunc_ = L2Sqr;
             dim_ = dim;
             data_size_ = dim * sizeof(uint8_t);

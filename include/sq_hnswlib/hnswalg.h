@@ -610,6 +610,7 @@ namespace sq_hnswlib {
             writeBinaryPOD(output, cur_element_count);
             writeBinaryPOD(output, size_data_per_element_);
             writeBinaryPOD(output, label_offset_);
+            std::cout<< "save index" << "label_offset" << label_offset_ << std::endl;
             writeBinaryPOD(output, offsetData_);
             writeBinaryPOD(output, maxlevel_);
             writeBinaryPOD(output, enterpoint_node_);
@@ -658,6 +659,7 @@ namespace sq_hnswlib {
             max_elements_ = max_elements;
             readBinaryPOD(input, size_data_per_element_);
             readBinaryPOD(input, label_offset_);
+            std::cout<< "load index" << "label_offset" << label_offset_ << std::endl;
             readBinaryPOD(input, offsetData_);
             readBinaryPOD(input, maxlevel_);
             readBinaryPOD(input, enterpoint_node_);
