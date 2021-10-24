@@ -27,6 +27,6 @@ cp ../python/bbann.py benchmark/algorithms/bbann.py
 # python3 install.py --algorithm bbann
 
 # rm -rf results/random-range-xs/*
-python3 run.py --definitions ../python/bbann-algo.yaml --dataset random-range-xs --algorithm bbann --count 96237 # --force --rebuild
+python3 run.py --definitions ../python/bbann-algo.yaml --dataset random-range-xs --algorithm bbann --count 96237 --timeout 345600 --runs 1 # --force --rebuild
 python3 plot.py --definitions ../python/bbann-algo.yaml --dataset  random-range-xs --recompute --count 96237
 popd
