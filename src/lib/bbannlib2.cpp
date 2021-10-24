@@ -19,6 +19,7 @@ namespace bbann {
 struct AlignAllocator {
 	public:
 		AlignAllocator(int max_blocks_num, int blockSize) {
+			rc = std::make_shared<TimeRecorder>(std::string("allocate aligned memory, num of blocks: ") + std::to_string(max_blocks_num) + ", blockSize: " + std::to_string(blockSize));
 			block_bufs.resize(max_blocks_num);
   			for (auto i = 0; i < max_blocks_num; i++) {
   			  auto r = posix_memalign((void **)(&block_bufs[i]), 512, blockSize);
@@ -29,15 +30,19 @@ struct AlignAllocator {
   			    exit(-1);
   			  }
   			}
+			rc->RecordSection("allocate aligned memory done");
 		}
 		~AlignAllocator() {
+			rc->RecordSection("aligned memory use time");
   			for (auto i = 0; i < block_bufs.size(); i++) {
   			  free(block_bufs[i]);
   			}
+			rc->RecordSection("release aligned memory done");
 		}
 
 	public:
 		std::vector<char*> block_bufs;
+		std::shared_ptr<TimeRecorder> rc;
 };
 
 template <typename dataT, typename distanceT>
@@ -321,7 +326,7 @@ void search_bbann_queryonly(
       q_end = nq;
     }
 
-    auto threads_num = 16;
+    auto threads_num = 8;
     auto num = q_end - q_begin;
     if (num < threads_num) {
       threads_num = num;
