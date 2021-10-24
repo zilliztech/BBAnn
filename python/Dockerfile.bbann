@@ -6,8 +6,8 @@ RUN pip3 install pybind11 numpy
 
 RUN git clone --single-branch --branch master --recurse-submodules https://github.com/zilliztech/BBAnn.git
 
-RUN mkdir -p BigAnn/build
-RUN cd BigAnn/build && cmake -DCMAKE_BUILD_TYPE=Release ..
-RUN cd BigAnn/build && make -j
-RUN cd BigAnn/python && pip install -e .
+RUN mkdir -p BBAnn/build
+RUN cd BBAnn/build && cmake -DCMAKE_BUILD_TYPE=Release ..
+RUN cd BBAnn/build && make -j
+RUN cd BBAnn/python && pip install -e .
 RUN python3 -c 'import bbannpy'
