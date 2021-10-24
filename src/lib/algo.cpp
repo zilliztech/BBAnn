@@ -11,10 +11,10 @@
 namespace bbann {
 std::string Hello() { return "Hello!!!!"; }
 
-
+template<typename DATAT>
 void search_graph_hnsw_sq(std::shared_ptr<sq_hnswlib::HierarchicalNSW<float>> index_hnsw_sq,
                           const int nq, const int dq, const int nprobe,
-                          const int refine_nprobe, const float *pquery,
+                          const int refine_nprobe, const DATAT *pquery,
                           uint32_t *buckets_label, float *centroids_dist) {
   TimeRecorder rc("search graph");
   std::cout << "search graph parameters:" << std::endl;
@@ -23,7 +23,6 @@ void search_graph_hnsw_sq(std::shared_ptr<sq_hnswlib::HierarchicalNSW<float>> in
             << " pquery: " << static_cast<const void *>(pquery)
             << " buckets_label: " << static_cast<void *>(buckets_label)
             << std::endl;
-  index_hnsw_sq->setEf(refine_nprobe);
   bool set_distance = centroids_dist != nullptr;
 #pragma omp parallel for
   for (int64_t i = 0; i < nq; i++) {
@@ -846,6 +845,12 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len) {
                                               const float *centroids);         \
   template void hierarchical_clusters<DATAT, DISTT>(                           \
       const BBAnnParameters para, const double avg_len);                       \
+  template                                                                     \
+  void search_graph_hnsw_sq<DATAT>(                                            \
+      std::shared_ptr<sq_hnswlib::HierarchicalNSW<float>> index_hnsw_sq,       \
+      const int nq, const int dq, const int nprobe,                            \
+      const int refine_nprobe, const DATAT *pquery,                            \
+      uint32_t *buckets_label, float *centroids_dist);                         \
   template void search_graph<DATAT, DISTT>(                                    \
       std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,             \
       const int nq, const int dq, const int nprobe, const int refine_nprobe,   \

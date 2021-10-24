@@ -25,9 +25,10 @@ void search_graph(std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,
                   uint32_t *buckets_label, float *centroids_dist);
 
 
+template<typename DATAT>
 void search_graph_hnsw_sq(std::shared_ptr<sq_hnswlib::HierarchicalNSW<float>> index_hnsw_sq,
                           const int nq, const int dq, const int nprobe,
-                          const int refine_nprobe, const float *pquery,
+                          const int refine_nprobe, const DATAT *pquery,
                           uint32_t *buckets_label, float *centroids_dist);
 
 
