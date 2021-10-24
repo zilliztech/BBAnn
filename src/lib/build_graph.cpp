@@ -26,8 +26,13 @@ main(int argc, char **argv) {
     }
     std::cout << std::endl;
 
-    if (argc != 7) {
-        std::cout << "usage: ./build_graph <output_path> <hnswM> <hnswefC> <metric_type> <block_size> <sample>" << std::endl;
+    if (argc != 5) {
+        std::cout << "usage: ./build_graph <output_path> <hnswM> <hnswefC> <metric_type>" << std::endl;
+        std::cout << std::endl;
+        std::cout << "       output_path: /path/to/index/files/, must be end with a slash" << std::endl;
+        std::cout << "       hnswM: parameter M for HNSW" << std::endl;
+        std::cout << "       hnswefC: parameter efC for HNSW" << std::endl;
+        std::cout << "       metric_type: 1 for L2, 2 for IP" << std::endl;
         exit(-1);
     }
 
@@ -35,15 +40,8 @@ main(int argc, char **argv) {
     int hnswM = atoi(argv[2]);
     int hnswefC = atoi(argv[3]);
     MetricType metric_type = (MetricType)atoi(argv[4]);
-    uint64_t block_size = atoll(argv[5]);
-    int32_t sample = atoi(argv[6]);
 
-    bbann::build_graph<float, float>(output_path, 
-	                             hnswM, 
-		                     hnswefC, 
-		                     metric_type,
-		                     block_size,
-		                     sample);
+    bbann::build_hnsw_sq(output_path, hnswM, hnswefC, metric_type);
 
     return 0;
 }
