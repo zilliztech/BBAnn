@@ -15,7 +15,6 @@ void search_graph_hnsw_sq(
     std::shared_ptr<sq_hnswlib::HierarchicalNSW<float>> index_hnsw_sq,
     const int nq, const int dq, const int nprobe, const int refine_nprobe,
     const float *pquery, uint32_t *buckets_label, float *centroids_dist) {
-  index_hnsw_sq->setEf(refine_nprobe);
   bool set_distance = centroids_dist != nullptr;
 #pragma omp parallel for
   for (int64_t i = 0; i < nq; i++) {

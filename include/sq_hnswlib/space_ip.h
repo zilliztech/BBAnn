@@ -272,18 +272,17 @@ static float InnerProduct(const void *pVect1, const void *pVect2,
 
 #if defined(USE_AVX)
   if (dim % 16 == 0)
-    InnerProductSIMD16Ext((void *)vec1.data(), (void *)vec2.data(), qty_ptr);
+    return InnerProductSIMD16Ext((void *)vec1.data(), (void *)vec2.data(), qty_ptr);
   else if (dim % 4 == 0)
-    InnerProductSIMD4Ext((void *)vec1.data(), (void *)vec2.data(), qty_ptr);
+    return InnerProductSIMD4Ext((void *)vec1.data(), (void *)vec2.data(), qty_ptr);
   else if (dim > 16)
-    InnerProductSIMD16ExtResiduals((void *)vec1.data(), (void *)vec2.data(),
+    return InnerProductSIMD16ExtResiduals((void *)vec1.data(), (void *)vec2.data(),
                                    qty_ptr);
   else if (dim > 4)
-    InnerProductSIMD4ExtResiduals((void *)vec1.data(), (void *)vec2.data(),
+    return InnerProductSIMD4ExtResiduals((void *)vec1.data(), (void *)vec2.data(),
                                   qty_ptr);
-#else
-  InnerProduct_float((void *)vec1.data(), (void *)vec2.data(), qty_ptr);
 #endif
+  return InnerProduct_float((void *)vec1.data(), (void *)vec2.data(), qty_ptr);
 }
 
 class InnerProductSpace : public SpaceInterface<float> {
