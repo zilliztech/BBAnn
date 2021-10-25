@@ -20,7 +20,7 @@ namespace bbann {
 struct AlignAllocator {
 	public:
 		AlignAllocator(int max_blocks_num, int blockSize) {
-			rc = std::make_shared<TimeRecorder>(std::string("allocate aligned memory, num of blocks: ") + std::to_string(max_blocks_num) + ", blockSize: " + std::to_string(blockSize));
+			// rc = std::make_shared<TimeRecorder>(std::string("allocate aligned memory, num of blocks: ") + std::to_string(max_blocks_num) + ", blockSize: " + std::to_string(blockSize));
 			block_bufs.resize(max_blocks_num);
   			for (auto i = 0; i < max_blocks_num; i++) {
   			  auto r = posix_memalign((void **)(&block_bufs[i]), 512, blockSize);
@@ -31,19 +31,19 @@ struct AlignAllocator {
   			    exit(-1);
   			  }
   			}
-			rc->RecordSection("allocate aligned memory done");
+			// rc->RecordSection("allocate aligned memory done");
 		}
 		~AlignAllocator() {
-			rc->RecordSection("aligned memory use time");
+			// rc->RecordSection("aligned memory use time");
   			for (auto i = 0; i < block_bufs.size(); i++) {
   			  free(block_bufs[i]);
   			}
-			rc->RecordSection("release aligned memory done");
+			// rc->RecordSection("release aligned memory done");
 		}
 
 	public:
 		std::vector<char*> block_bufs;
-		std::shared_ptr<TimeRecorder> rc;
+		// std::shared_ptr<TimeRecorder> rc;
 };
 
 template <typename dataT, typename distanceT>
@@ -351,8 +351,8 @@ void search_bbann_queryonly(
 
   auto n_batch = util::round_up_div(nq * nprobe, max_blocks_num);
   auto nq_per_batch = util::round_up_div(nq, n_batch);
-  std::cout << "nq: " << nq << ", n_batch: " << n_batch
-            << ", nq_per_batch: " << nq_per_batch << std::endl;
+  // std::cout << "nq: " << nq << ", n_batch: " << n_batch
+  //           << ", nq_per_batch: " << nq_per_batch << std::endl;
 
   auto run_batch_query = [&](int n) {
     auto q_begin = n * nq_per_batch;
