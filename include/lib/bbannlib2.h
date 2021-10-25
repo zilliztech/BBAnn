@@ -23,7 +23,7 @@ struct BBAnnIndex2
 
 public:
   BBAnnIndex2(MetricType metric) : metric_(metric) {
-    std::cout << "BBAnnIndex constructor" << std::endl;
+    // std::cout << "BBAnnIndex constructor" << std::endl;
   }
   MetricType metric_;
 

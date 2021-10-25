@@ -141,7 +141,6 @@ class BbANN(BaseANN):
         if not self.set_index_type(ds.distance(), ds.dtype):
             return False
 
-        self.para.dataFilePath = ds.get_dataset_fn()
         self.para.indexPrefixPath = index_dir+"/"
 
         start = time.time()
@@ -187,7 +186,7 @@ class BbANN(BaseANN):
         nq, dim = (np.shape(X))
         self.res, self.query_dists = self.index.batch_search(
             X, dim, nq, k, self.para)
-        print(self.res)
+        # print(self.res)
 
     def range_query(self, X, radius):
         """
@@ -195,7 +194,7 @@ class BbANN(BaseANN):
         radius.
         """
         nq, dim = (np.shape(X))
-        print(f"Query index with para {self.para}")
+        # print(f"Query index with para {self.para}")
         self.rangeres_lim, (self.rangeres_ids, self.rangeres_dists) = self.index.range_search(
             X, dim, nq, radius, self.para)
 
