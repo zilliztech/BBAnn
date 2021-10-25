@@ -8,7 +8,8 @@
 using CODE_T = float;
 using DIS_T = float;
 const char *Learn_Path = "../../data/Yandex-Text-to-Image/base.10M.fdata";
-const char *Query_Path = "../../data/Yandex-Text-to-Image/query.public.100K.fbin";
+const char *Query_Path =
+    "../../data/Yandex-Text-to-Image/query.public.100K.fbin";
 #define Dis_Compare CMin<float, int>
 #define Dis_Computer IP<const CODE_T, const CODE_T, DIS_T>
 #define OUT_PUT "yandex_text_to_image"
@@ -27,47 +28,47 @@ const int hnswefC = 200;
 const int hnswef = Base_Batch;
 
 int main() {
-    read_bin_file(Query_Path, xq, nq, dim);
-    nq = Query_Batch;
+  read_bin_file(Query_Path, xq, nq, dim);
+  nq = Query_Batch;
 
-    read_bin_file(Learn_Path, xb, nb, dim);
-    nb = Base_Batch;
+  read_bin_file(Learn_Path, xb, nb, dim);
+  nb = Base_Batch;
 
-    uint32_t *ids = new uint32_t[nb];
-    for (uint32_t i = 0; i < nb; ++i) {
-        ids[i] = i;
-    }
+  uint32_t *ids = new uint32_t[nb];
+  for (uint32_t i = 0; i < nb; ++i) {
+    ids[i] = i;
+  }
 
-    hnswlib::SpaceInterface<float> *space = new hnswlib::L2Space(dim);
+  hnswlib::SpaceInterface<float> *space = new hnswlib::L2Space(dim);
 
-    auto index_hnsw = std::make_shared<hnswlib::HierarchicalNSW<float>>(
-        space, nb, hnswM, hnswefC);
-    index_hnsw->addPoint(xb, ids[0]);
+  auto index_hnsw = std::make_shared<hnswlib::HierarchicalNSW<float>>(
+      space, nb, hnswM, hnswefC);
+  index_hnsw->addPoint(xb, ids[0]);
 #pragma omp parallel for
-    for (int64_t i = 1; i < nb; i++) {
-        index_hnsw->addPoint(xb + i * dim, ids[i]);
-    }
+  for (int64_t i = 1; i < nb; i++) {
+    index_hnsw->addPoint(xb + i * dim, ids[i]);
+  }
 
-    std::cout << "Build done" << std::endl;
+  std::cout << "Build done" << std::endl;
 
-    index_hnsw->setEf(hnswef);
+  index_hnsw->setEf(hnswef);
 
-    // for (float radius = 2.4; radius > 0; radius -= 0.1) {
-    auto reti = index_hnsw->searchRange(xq, 20, radius);
-    std::cout << radius << " size: " << reti.size() << std::endl;
+  // for (float radius = 2.4; radius > 0; radius -= 0.1) {
+  auto reti = index_hnsw->searchRange(xq, 20, radius);
+  std::cout << radius << " size: " << reti.size() << std::endl;
 
-    while (!reti.empty()) {
-        auto x = reti.top();
-        // std::cout << x.second << " " << x.first << std::endl;
-        reti.pop();
-    }
-    // }
+  while (!reti.empty()) {
+    auto x = reti.top();
+    // std::cout << x.second << " " << x.first << std::endl;
+    reti.pop();
+  }
+  // }
 
-    std::cout << "Search done" << std::endl;
+  std::cout << "Search done" << std::endl;
 
-    delete space;
-    delete[] xb;
-    delete[] xq;
+  delete space;
+  delete[] xb;
+  delete[] xq;
 
-    return 0;
+  return 0;
 }

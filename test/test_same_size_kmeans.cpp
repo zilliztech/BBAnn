@@ -93,28 +93,28 @@ void IVF_Train(int nx) {
   gettimeofday(&t2, 0);
   printf("kmeans cost %ld ms\n", getTime(t2, t1));
 
-    codes.resize(nlist);
-    ids.resize(nlist);
+  codes.resize(nlist);
+  ids.resize(nlist);
 
 #pragma omp parallel
-    {
-        int64_t nt = omp_get_num_threads();
-        int64_t rank = omp_get_thread_num();
+  {
+    int64_t nt = omp_get_num_threads();
+    int64_t rank = omp_get_thread_num();
 
-        // this thread is taking care of centroids c0:c1
-        int64_t c0 = (nlist * rank) / nt;
-        int64_t c1 = (nlist * (rank + 1)) / nt;
+    // this thread is taking care of centroids c0:c1
+    int64_t c0 = (nlist * rank) / nt;
+    int64_t c1 = (nlist * (rank + 1)) / nt;
 
-        for (int64_t i = 0; i < nx; i++) {
-            int64_t ci = assign[i];
-            if (ci >= c0 && ci < c1) {
-                codes[ci].resize(codes[ci].size() + dim);
-                memcpy(codes[ci].data() + ids[ci].size() * dim,
-                       xb + i * dim, dim * sizeof(CODE_T));
-                ids[ci].push_back(i);
-            }
-        }
+    for (int64_t i = 0; i < nx; i++) {
+      int64_t ci = assign[i];
+      if (ci >= c0 && ci < c1) {
+        codes[ci].resize(codes[ci].size() + dim);
+        memcpy(codes[ci].data() + ids[ci].size() * dim, xb + i * dim,
+               dim * sizeof(CODE_T));
+        ids[ci].push_back(i);
+      }
     }
+  }
 
   delete[] assign;
 }

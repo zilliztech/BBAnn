@@ -1,4 +1,6 @@
 #pragma once
+#include "util/defines.h"
+#include "util/distance.h"
 #include <fstream>
 #include <functional>
 #include <iostream>
@@ -8,16 +10,11 @@
 #include <sys/stat.h>
 #include <unordered_map>
 #include <vector>
-#include "util/defines.h"
-#include "util/distance.h"
-
 
 namespace bbann {
 namespace util {
 
-inline int round_up_div(int x, int y) {
-    return (x + y - 1) / y;
-}
+inline int round_up_div(int x, int y) { return (x + y - 1) / y; }
 
 inline int get_max_events_num_of_aio() {
   auto file = "/proc/sys/fs/aio-max-nr";
@@ -115,22 +112,23 @@ inline void parse_global_block_id(uint32_t id, uint32_t &cid, uint32_t &bid) {
   return;
 }
 
-inline uint64_t gen_id(const uint32_t cid, const uint32_t bid, const uint32_t off) {
-    uint64_t ret = 0;
-    ret |= (cid & 0xff);
-    ret <<= 24;
-    ret |= (bid & 0xffffff);
-    ret <<= 32;
-    ret |= (off & 0xffffffff);
-    return ret;
+inline uint64_t gen_id(const uint32_t cid, const uint32_t bid,
+                       const uint32_t off) {
+  uint64_t ret = 0;
+  ret |= (cid & 0xff);
+  ret <<= 24;
+  ret |= (bid & 0xffffff);
+  ret <<= 32;
+  ret |= (off & 0xffffffff);
+  return ret;
 }
 
-inline void parse_id(uint64_t id, uint32_t& cid, uint32_t& bid, uint32_t& off) {
-    off = (id & 0xffffffff);
-    id >>= 32;
-    bid = (id & 0xffffff);
-    id >>= 24;
-    cid = (id & 0xff);
+inline void parse_id(uint64_t id, uint32_t &cid, uint32_t &bid, uint32_t &off) {
+  off = (id & 0xffffffff);
+  id >>= 32;
+  bid = (id & 0xffffff);
+  id >>= 24;
+  cid = (id & 0xff);
 }
 
 template <typename T1, typename T2, typename R>
@@ -150,15 +148,16 @@ inline Computer<T1, T2, R> select_computer(MetricType metric_type) {
 
 } // namespace util
 
-
-inline std::string getClusterRawDataFileName(std::string prefix, int cluster_id) {
+inline std::string getClusterRawDataFileName(std::string prefix,
+                                             int cluster_id) {
   return prefix + "cluster-" + std::to_string(cluster_id) + "-raw_data.bin";
 }
-inline std::string getClusterGlobalIdsFileName(std::string prefix, int cluster_id) {
+inline std::string getClusterGlobalIdsFileName(std::string prefix,
+                                               int cluster_id) {
   return prefix + "cluster-" + std::to_string(cluster_id) + "-global_ids.bin";
 }
 inline std::string getSQMetaFileName(std::string prefix) {
-    return prefix + "meta";
+  return prefix + "meta";
 }
 
 inline float rand_float() {
@@ -171,71 +170,59 @@ inline int rand_int() {
   return generator() & 0x7fffffff;
 }
 
-
-template<typename T>
-inline void random_sampling_k2(
-        const T* data,
-        const int64_t data_size,
-        const int64_t dim,
-        const int64_t sample_size,
-        T* sample_data,
-        int64_t seed = 1234
-) {
-    std::vector<int> perm(data_size);
-    for (int64_t i = 0; i < data_size; i++) {
-        perm[i] = i;
-    }
-    std::shuffle(perm.begin(), perm.end(), std::default_random_engine(seed));
-    for (int64_t i = 0; i < sample_size; i++) {
-        memcpy(sample_data + i * dim, data + perm[i] * dim,  dim * sizeof(T));
-    }
-    return ;
+template <typename T>
+inline void random_sampling_k2(const T *data, const int64_t data_size,
+                               const int64_t dim, const int64_t sample_size,
+                               T *sample_data, int64_t seed = 1234) {
+  std::vector<int> perm(data_size);
+  for (int64_t i = 0; i < data_size; i++) {
+    perm[i] = i;
+  }
+  std::shuffle(perm.begin(), perm.end(), std::default_random_engine(seed));
+  for (int64_t i = 0; i < sample_size; i++) {
+    memcpy(sample_data + i * dim, data + perm[i] * dim, dim * sizeof(T));
+  }
+  return;
 }
 
-template<typename T>
-inline void transform_data(T* data, T* tdata, int64_t n, uint32_t dim) {
-    for (auto i = 0; i < n; i++) {
-        for (auto j = 0; j < dim; j++) {
-            tdata[n * j + i] = data[i * dim + j];
-        }
+template <typename T>
+inline void transform_data(T *data, T *tdata, int64_t n, uint32_t dim) {
+  for (auto i = 0; i < n; i++) {
+    for (auto j = 0; j < dim; j++) {
+      tdata[n * j + i] = data[i * dim + j];
     }
+  }
 }
 
-template<typename T>
-inline void train_code(T* max_len, T* min_len, T* data, int64_t n, uint32_t dim){
-    float rs_arg = 0.0;
-    int o;
-    T* min,max;
-    T* tdata = new T[n * dim];
-    transform_data(data, tdata, n, dim);
-    for (int d = 0; d < dim; d++) {
-        auto *__restrict tdata_d = tdata + n * d;
-        std::sort(tdata_d, tdata_d + n);
-        o = int(rs_arg * n);
-        if (o < 0)
-            o = 0;
-        if (o > n - o)
-            o = n / 2;
-        min_len[d] = tdata_d[o];
-        max_len[d] = tdata_d[n - 1 - o];
-    }
-    delete [] tdata;
+template <typename T>
+inline void train_code(T *max_len, T *min_len, T *data, int64_t n,
+                       uint32_t dim) {
+  float rs_arg = 0.0;
+  int o;
+  T *min, max;
+  T *tdata = new T[n * dim];
+  transform_data(data, tdata, n, dim);
+  for (int d = 0; d < dim; d++) {
+    auto *__restrict tdata_d = tdata + n * d;
+    std::sort(tdata_d, tdata_d + n);
+    o = int(rs_arg * n);
+    if (o < 0)
+      o = 0;
+    if (o > n - o)
+      o = n / 2;
+    min_len[d] = tdata_d[o];
+    max_len[d] = tdata_d[n - 1 - o];
+  }
+  delete[] tdata;
 }
 
 // For RS_opt
 /*
 template<typename T>
-inline void train_code(T* max_len, T* min_len, T* data, int64_t n, uint32_t dim){
-    float rs_arg = 0;
-    int o;
-    T vmin,vmax;
-    T* tdata= new T[n * dim];
-    int k = 256;
-    transform_data(data, tdata, n, dim);
-    for (int d = 0; d < dim; d++) {
-        float a, b;
-        float sx = 0;
-        T* x = tdata + n * d;
+inline void train_code(T* max_len, T* min_len, T* data, int64_t n, uint32_t
+dim){ float rs_arg = 0; int o; T vmin,vmax; T* tdata= new T[n * dim]; int k =
+256; transform_data(data, tdata, n, dim); for (int d = 0; d < dim; d++) { float
+a, b; float sx = 0; T* x = tdata + n * d;
         {
             vmin = std::numeric_limits<T>::max();
             vmax = std::numeric_limits<T>::min();
@@ -290,63 +277,70 @@ inline void train_code(T* max_len, T* min_len, T* data, int64_t n, uint32_t dim)
 }
 */
 
-template<typename T>
-inline void encode_uint8(T* max_len, T* min_len, T* data, uint8_t* code, int64_t n, uint32_t dim)  {
-    for (int64_t i = 0; i < n; i++) {
-        T x_temp;
-        T * __restrict x = data + i * dim;
-        uint8_t * __restrict y = code + i * dim;
-        for(int d = 0; d < dim; d++) {
-            x_temp = (x[d] - min_len[d]) / (max_len[d] - min_len[d]);
-            if(x_temp<0.0) x_temp = 0;
-            if(x_temp>1.0) x_temp = 1;
-            y[d] = (uint8_t)(x_temp * 255);
-        }
+template <typename T>
+inline void encode_uint8(T *max_len, T *min_len, T *data, uint8_t *code,
+                         int64_t n, uint32_t dim) {
+  for (int64_t i = 0; i < n; i++) {
+    T x_temp;
+    T *__restrict x = data + i * dim;
+    uint8_t *__restrict y = code + i * dim;
+    for (int d = 0; d < dim; d++) {
+      x_temp = (x[d] - min_len[d]) / (max_len[d] - min_len[d]);
+      if (x_temp < 0.0)
+        x_temp = 0;
+      if (x_temp > 1.0)
+        x_temp = 1;
+      y[d] = (uint8_t)(x_temp * 255);
     }
+  }
 }
 
-template<typename T>
-inline void decode_uint8(T* max_len, T* min_len, T* data, uint8_t* code, int64_t n, uint32_t dim)  {
-    for (int64_t i = 0; i < n; i++) {
-        auto * __restrict x = data + i * dim;
-        auto * __restrict y = code + i * dim;
-        for(int d = 0; d < dim; d++) {
-            x[d] =min_len[d]+(y[d] + 0.5f)/255.0f*(max_len[d] -min_len[d]);
-        }
+template <typename T>
+inline void decode_uint8(T *max_len, T *min_len, T *data, uint8_t *code,
+                         int64_t n, uint32_t dim) {
+  for (int64_t i = 0; i < n; i++) {
+    auto *__restrict x = data + i * dim;
+    auto *__restrict y = code + i * dim;
+    for (int d = 0; d < dim; d++) {
+      x[d] = min_len[d] + (y[d] + 0.5f) / 255.0f * (max_len[d] - min_len[d]);
     }
+  }
 }
 
-
-template<typename T>
-inline void encode_uint8_2(T* max_len, T* min_len, T* data, uint8_t* code, int64_t n, uint32_t dim)  {
-    for (int64_t i = 0; i < n; i++) {
-        auto * __restrict x = data + i * dim;
-        auto * __restrict y = code + i * dim;
-        for(int d = 0; d < dim; d++) {
-            y[d] = (uint8_t)((x[d] - min_len[d])/(max_len[d] - min_len[d] + 1) * 256);
-        }
+template <typename T>
+inline void encode_uint8_2(T *max_len, T *min_len, T *data, uint8_t *code,
+                           int64_t n, uint32_t dim) {
+  for (int64_t i = 0; i < n; i++) {
+    auto *__restrict x = data + i * dim;
+    auto *__restrict y = code + i * dim;
+    for (int d = 0; d < dim; d++) {
+      y[d] =
+          (uint8_t)((x[d] - min_len[d]) / (max_len[d] - min_len[d] + 1) * 256);
     }
+  }
 }
-template<typename T>
-inline void decode_uint8_2(T* max_len, T* min_len, T* data, uint8_t* code, int64_t n, uint32_t dim)  {
-    for (int64_t i = 0; i < n; i++) {
-        auto * __restrict x = data + i * dim;
-        auto * __restrict y = code + i * dim;
-        for(int d = 0; d < dim; d++) {
-            x[d] = y[d] * (max_len[d] - min_len[d] + 1) / 256 + min_len[d];
-        }
+template <typename T>
+inline void decode_uint8_2(T *max_len, T *min_len, T *data, uint8_t *code,
+                           int64_t n, uint32_t dim) {
+  for (int64_t i = 0; i < n; i++) {
+    auto *__restrict x = data + i * dim;
+    auto *__restrict y = code + i * dim;
+    for (int d = 0; d < dim; d++) {
+      x[d] = y[d] * (max_len[d] - min_len[d] + 1) / 256 + min_len[d];
     }
+  }
 }
 
-template<typename T>
-inline void train_code_2(T* max_len, T* min_len, T* data, int64_t n, uint32_t dim){
-    std::vector<T> tdata(dim * n);
-    transform_data(data, tdata, n, dim);
-    for (auto i = 0; i < dim; i++) {
-        auto * __restrict tx = tdata + i * n;
-        min_len[i] = std::min((float *)tx, (float*)(tx + n));
-        max_len[i] = std::max((float *)tx, (float*)(tx + n));
-    }
+template <typename T>
+inline void train_code_2(T *max_len, T *min_len, T *data, int64_t n,
+                         uint32_t dim) {
+  std::vector<T> tdata(dim * n);
+  transform_data(data, tdata, n, dim);
+  for (auto i = 0; i < dim; i++) {
+    auto *__restrict tx = tdata + i * n;
+    min_len[i] = std::min((float *)tx, (float *)(tx + n));
+    max_len[i] = std::max((float *)tx, (float *)(tx + n));
+  }
 }
 
 } // namespace bbann

@@ -59,4 +59,3 @@ public:
   RangeSearchCpp(const dataT *pquery, uint64_t dim, uint64_t numQuery,
                  double radius, const paraT para) = 0;
 };
-

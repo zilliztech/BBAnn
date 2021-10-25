@@ -1,10 +1,10 @@
 #include "lib/bbannlib2.h"
 #include "ann_interface.h"
+#include "sq_hnswlib/hnswalg.h"
 #include "util/TimeRecorder.h"
 #include "util/file_handler.h"
 #include "util/heap.h"
 #include "util/utils_inline.h"
-#include "sq_hnswlib/hnswalg.h"
 #include <iostream>
 #include <memory>
 #include <omp.h>
@@ -18,43 +18,47 @@
 namespace bbann {
 
 struct AlignAllocator {
-	public:
-		AlignAllocator(int max_blocks_num, int blockSize) {
-			// rc = std::make_shared<TimeRecorder>(std::string("allocate aligned memory, num of blocks: ") + std::to_string(max_blocks_num) + ", blockSize: " + std::to_string(blockSize));
-			block_bufs.resize(max_blocks_num);
-  			for (auto i = 0; i < max_blocks_num; i++) {
-  			  auto r = posix_memalign((void **)(&block_bufs[i]), 512, blockSize);
-  			  if (r != 0) {
-  			    std::cout << "posix_memalign() failed, returned: " << r
-  			              << ", errno: " << errno << ", error: " << strerror(errno)
-  			              << std::endl;
-  			    exit(-1);
-  			  }
-  			}
-			// rc->RecordSection("allocate aligned memory done");
-		}
-		~AlignAllocator() {
-			// rc->RecordSection("aligned memory use time");
-  			for (auto i = 0; i < block_bufs.size(); i++) {
-  			  free(block_bufs[i]);
-  			}
-			// rc->RecordSection("release aligned memory done");
-		}
+public:
+  AlignAllocator(int max_blocks_num, int blockSize) {
+    // rc = std::make_shared<TimeRecorder>(std::string("allocate aligned memory,
+    // num of blocks: ") + std::to_string(max_blocks_num) + ", blockSize: " +
+    // std::to_string(blockSize));
+    block_bufs.resize(max_blocks_num);
+    for (auto i = 0; i < max_blocks_num; i++) {
+      auto r = posix_memalign((void **)(&block_bufs[i]), 512, blockSize);
+      if (r != 0) {
+        std::cout << "posix_memalign() failed, returned: " << r
+                  << ", errno: " << errno << ", error: " << strerror(errno)
+                  << std::endl;
+        exit(-1);
+      }
+    }
+    // rc->RecordSection("allocate aligned memory done");
+  }
+  ~AlignAllocator() {
+    // rc->RecordSection("aligned memory use time");
+    for (auto i = 0; i < block_bufs.size(); i++) {
+      free(block_bufs[i]);
+    }
+    // rc->RecordSection("release aligned memory done");
+  }
 
-	public:
-		std::vector<char*> block_bufs;
-		// std::shared_ptr<TimeRecorder> rc;
+public:
+  std::vector<char *> block_bufs;
+  // std::shared_ptr<TimeRecorder> rc;
 };
 
 template <typename dataT, typename distanceT>
-bool BBAnnIndex2<dataT, distanceT>::LoadIndex(std::string &indexPathPrefix, const BBAnnParameters para) {
+bool BBAnnIndex2<dataT, distanceT>::LoadIndex(std::string &indexPathPrefix,
+                                              const BBAnnParameters para) {
   indexPrefix_ = indexPathPrefix;
   std::cout << "Loading: " << indexPrefix_;
   uint32_t bucket_num, dim;
   util::get_bin_metadata(getBucketCentroidsFileName(), bucket_num, dim);
 
   std::cout << "BBAnnIndex2::LoadIndex: "
-            << "use_hnsw_sq: " << (para.use_hnsw_sq ? std::string("true") : std::string("false"))
+            << "use_hnsw_sq: "
+            << (para.use_hnsw_sq ? std::string("true") : std::string("false"))
             << std::endl;
 
   if (para.use_hnsw_sq) {
@@ -69,16 +73,16 @@ bool BBAnnIndex2<dataT, distanceT>::LoadIndex(std::string &indexPathPrefix, cons
     }
 
     index_hnsw_ = nullptr;
-    index_sq_hnsw_ = std::make_shared<sq_hnswlib::HierarchicalNSW<float>>(space, getHnswIndexFileName());
+    index_sq_hnsw_ = std::make_shared<sq_hnswlib::HierarchicalNSW<float>>(
+        space, getHnswIndexFileName());
   } else {
     // hnswlib::SpaceInterface<distanceT> *space =
     auto *space = getDistanceSpace<dataT, distanceT>(metric_, dim);
     // load hnsw
-    index_hnsw_ = std::make_shared < hnswlib::HierarchicalNSW < distanceT >> (
-            space, getHnswIndexFileName());
+    index_hnsw_ = std::make_shared<hnswlib::HierarchicalNSW<distanceT>>(
+        space, getHnswIndexFileName());
     index_sq_hnsw_ = nullptr;
   }
-
 
   indexPrefix_ = indexPathPrefix;
   return true;
@@ -93,10 +97,10 @@ void search_bbann_queryonly(
   TimeRecorder rc("search bigann");
 
   if (index_hnsw) {
-  	index_hnsw->setEf(para.efSearch);
+    index_hnsw->setEf(para.efSearch);
   }
   if (index_sq_hnsw) {
-  	index_sq_hnsw->setEf(para.efSearch);
+    index_sq_hnsw->setEf(para.efSearch);
   }
 
   auto dis_computer = util::select_computer<DATAT, DATAT, DISTT>(para.metric);
@@ -303,14 +307,15 @@ void search_bbann_queryonly(
 
   auto run_query = [&](int l, int r) {
     // step 1: search graph.
-   if (para.use_hnsw_sq) {
-     const float* pq = (float*)const_cast<DATAT*>(pquery);
-     search_graph_hnsw_sq(index_sq_hnsw, r - l, dim, nprobe, para.efSearch, pq + l * dim,
-                          bucket_labels + l * nprobe, nullptr);
-   } else {
-     search_graph<DATAT, DISTT>(index_hnsw, r - l, dim, nprobe, para.efSearch, pquery + l * dim,
-                         bucket_labels + l * nprobe, nullptr);
-   }
+    if (para.use_hnsw_sq) {
+      const float *pq = (float *)const_cast<DATAT *>(pquery);
+      search_graph_hnsw_sq(index_sq_hnsw, r - l, dim, nprobe, para.efSearch,
+                           pq + l * dim, bucket_labels + l * nprobe, nullptr);
+    } else {
+      search_graph<DATAT, DISTT>(index_hnsw, r - l, dim, nprobe, para.efSearch,
+                                 pquery + l * dim, bucket_labels + l * nprobe,
+                                 nullptr);
+    }
 
     auto num_jobs = 4;
     auto max_events_num = 1023;
@@ -401,16 +406,18 @@ void BBAnnIndex2<dataT, distanceT>::BatchSearchCpp(
   // std::cout << "Query: " << std::endl;
 
   // std::cout << "BBAnnIndex2::BatchSearchCpp: "
-  //           << "use_hnsw_sq: " << (para.use_hnsw_sq ? std::string("true") : std::string("false"))
+  //           << "use_hnsw_sq: " << (para.use_hnsw_sq ? std::string("true") :
+  //           std::string("false"))
   //           << std::endl;
   if (para.use_hnsw_sq) {
-    search_bbann_queryonly<dataT, distanceT>(
-            nullptr, index_sq_hnsw_, para, knn, pquery, answer_ids, answer_dists, numQuery, dim);
+    search_bbann_queryonly<dataT, distanceT>(nullptr, index_sq_hnsw_, para, knn,
+                                             pquery, answer_ids, answer_dists,
+                                             numQuery, dim);
   } else {
-    search_bbann_queryonly<dataT, distanceT>(
-            index_hnsw_, nullptr, para, knn, pquery, answer_ids, answer_dists, numQuery, dim);
+    search_bbann_queryonly<dataT, distanceT>(index_hnsw_, nullptr, para, knn,
+                                             pquery, answer_ids, answer_dists,
+                                             numQuery, dim);
   }
-
 }
 
 template <typename dataT, typename distanceT>
@@ -454,7 +461,7 @@ void BBAnnIndex2<dataT, distanceT>::BuildWithParameter(
   } else {
     std::cout << "build graph type: HNSW" << std::endl;
     build_graph<dataT, distanceT>(indexPrefix_, para.hnswM, para.hnswefC,
-                                para.metric, para.blockSize, para.sample);
+                                  para.metric, para.blockSize, para.sample);
   }
   rc.RecordSection("build hnsw done.");
 
@@ -473,7 +480,6 @@ BBAnnIndex2<dataT, distanceT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
                                               const BBAnnParameters para) {
   TimeRecorder rc("range search bbann");
 
-
   std::cout << "query numbers: " << numQuery << " query dims: " << dim
             << std::endl;
 
@@ -487,8 +493,9 @@ BBAnnIndex2<dataT, distanceT>::RangeSearchCpp(const dataT *pquery, uint64_t dim,
                                    int r) -> std::vector<std::pair<int, int>> {
     std::vector<std::pair<int, int>> ret;
     for (int i = l; i < r; i++) {
-      const auto reti = index_hnsw_->searchRange(
-          pquery + i * dim, para.rangeSearchProbeCount, radius*para.radiusFactor);
+      const auto reti =
+          index_hnsw_->searchRange(pquery + i * dim, para.rangeSearchProbeCount,
+                                   radius * para.radiusFactor);
       for (auto const &[dist, bucket_label] : reti) {
         // convert the bucket label from 64bit to 32 bit
         uint32_t cid, bid, offset;
