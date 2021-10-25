@@ -1,10 +1,8 @@
 # Block-based Approximate Nearest Neighbor (BBAnn)
 BBAnn is an algorithm optimized for SSD storage. It organizes data so that they are aligned with SSD block size. 
 
-This index is a candidate participating [Billion-Scale Approximate Nearest Neighbor Search Challenge](http://big-ann-benchmarks.com/) Track 2, which searches on a machine with 64GB RAM + 1TB NVMe SSD. 
-
 The source code is mainly located in `include` and `src` folders.
-By running scripts under `python` directory, it will create docker image, install python library bound with [pybind11](https://github.com/pybind/pybind11) and then run the benchmark framework.
+By running scripts under `python` directory, it will create docker image, install python library bound with [pybind11](https://github.com/pybind/pybind11) and then run the framework.
 
 ## Prerequisites
 * CMake >= 3.10
