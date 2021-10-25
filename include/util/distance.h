@@ -1,31 +1,55 @@
 #pragma once
-#include <stddef.h>
-#include <stdio.h>
-#include <immintrin.h>
-#include <stdint.h>
 #include <assert.h>
+#include <immintrin.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
 
 // Data type: T1, T2
 // Distance type: R
 
-template<typename T1, typename T2, typename R>
+template <typename T1, typename T2, typename R>
 R L2sqr(T1 *a, T2 *b, size_t n) {
-    size_t i = 0;
-    R dis = 0, dif;
-    switch(n & 7) {
-        default:
-            while (n > 7) {
-                n -= 8; dif=(R)a[i]-(R)b[i]; dis+=dif*dif; i++;
-                case 7: dif=(R)a[i]-(R)b[i]; dis+=dif*dif; i++;
-                case 6: dif=(R)a[i]-(R)b[i]; dis+=dif*dif; i++;
-                case 5: dif=(R)a[i]-(R)b[i]; dis+=dif*dif; i++;
-                case 4: dif=(R)a[i]-(R)b[i]; dis+=dif*dif; i++;
-                case 3: dif=(R)a[i]-(R)b[i]; dis+=dif*dif; i++;
-                case 2: dif=(R)a[i]-(R)b[i]; dis+=dif*dif; i++;
-                case 1: dif=(R)a[i]-(R)b[i]; dis+=dif*dif; i++;
-            }
+  size_t i = 0;
+  R dis = 0, dif;
+  switch (n & 7) {
+  default:
+    while (n > 7) {
+      n -= 8;
+      dif = (R)a[i] - (R)b[i];
+      dis += dif * dif;
+      i++;
+    case 7:
+      dif = (R)a[i] - (R)b[i];
+      dis += dif * dif;
+      i++;
+    case 6:
+      dif = (R)a[i] - (R)b[i];
+      dis += dif * dif;
+      i++;
+    case 5:
+      dif = (R)a[i] - (R)b[i];
+      dis += dif * dif;
+      i++;
+    case 4:
+      dif = (R)a[i] - (R)b[i];
+      dis += dif * dif;
+      i++;
+    case 3:
+      dif = (R)a[i] - (R)b[i];
+      dis += dif * dif;
+      i++;
+    case 2:
+      dif = (R)a[i] - (R)b[i];
+      dis += dif * dif;
+      i++;
+    case 1:
+      dif = (R)a[i] - (R)b[i];
+      dis += dif * dif;
+      i++;
     }
-    return dis;
+  }
+  return dis;
 }
 
 #define L2SQR_FLOAT_IMPL                                                       \
@@ -69,13 +93,14 @@ R L2sqr(T1 *a, T2 *b, size_t n) {
   }                                                                            \
   return dis;
 
-template<>
+template <>
 inline float L2sqr<float, float, float>(float *a, float *b, size_t n) {
-    L2SQR_FLOAT_IMPL;
+  L2SQR_FLOAT_IMPL;
 }
-template<>
-inline float L2sqr<const float, const float, float>(const float *a, const float *b, size_t n) {
-    L2SQR_FLOAT_IMPL;
+template <>
+inline float L2sqr<const float, const float, float>(const float *a,
+                                                    const float *b, size_t n) {
+  L2SQR_FLOAT_IMPL;
 }
 
 #define L2SQR_UINT8_IMPL                                                       \
@@ -120,14 +145,17 @@ inline float L2sqr<const float, const float, float>(const float *a, const float 
   msum2 = _mm_hadd_epi32(msum2, msum2);                                        \
   return _mm_cvtsi128_si32(msum2);
 
-template<>
-inline uint32_t L2sqr<uint8_t, uint8_t, uint32_t>(uint8_t *a, uint8_t *b, size_t n) {
-    L2SQR_UINT8_IMPL
+template <>
+inline uint32_t L2sqr<uint8_t, uint8_t, uint32_t>(uint8_t *a, uint8_t *b,
+                                                  size_t n) {
+  L2SQR_UINT8_IMPL
 }
 
-template<>
-inline uint32_t L2sqr<const uint8_t, const uint8_t, uint32_t>(const uint8_t *a, const uint8_t *b, size_t n) {
-    L2SQR_UINT8_IMPL
+template <>
+inline uint32_t L2sqr<const uint8_t, const uint8_t, uint32_t>(const uint8_t *a,
+                                                              const uint8_t *b,
+                                                              size_t n) {
+  L2SQR_UINT8_IMPL
 }
 
 #define L2SQR_INT8_IMPL                                                        \
@@ -170,90 +198,123 @@ inline uint32_t L2sqr<const uint8_t, const uint8_t, uint32_t>(const uint8_t *a, 
   msum2 = _mm_hadd_epi32(msum2, msum2);                                        \
   return _mm_cvtsi128_si32(msum2);
 
-template<>
+template <>
 inline int L2sqr<int8_t, int8_t, int>(int8_t *a, int8_t *b, size_t n) {
-    L2SQR_INT8_IMPL;
+  L2SQR_INT8_IMPL;
 }
 
-template<>
-inline int L2sqr<const int8_t, const int8_t, int>(const int8_t *a, const int8_t *b, size_t n) {
-    L2SQR_INT8_IMPL;
+template <>
+inline int L2sqr<const int8_t, const int8_t, int>(const int8_t *a,
+                                                  const int8_t *b, size_t n) {
+  L2SQR_INT8_IMPL;
 }
 
-
-template<>
+template <>
 inline float L2sqr<int8_t, float, float>(int8_t *a, float *b, size_t n) {
-    float afloatbuffer[256];
-    for (int i=0; i< n; i++) {
-        afloatbuffer[i] = (float) a[i];
-    }
-    return L2sqr<float, float, float>(afloatbuffer, b, n);
+  float afloatbuffer[256];
+  for (int i = 0; i < n; i++) {
+    afloatbuffer[i] = (float)a[i];
+  }
+  return L2sqr<float, float, float>(afloatbuffer, b, n);
 }
 
-template<>
-inline float L2sqr<const int8_t, const float, float>(const int8_t *a, const float *b, size_t n) {
-    float afloatbuffer[256];
-    for (int i=0; i< n; i++) {
-        afloatbuffer[i] = (float) a[i];
-    }
-    return L2sqr<const float, const float, float>(afloatbuffer, b, n);
+template <>
+inline float L2sqr<const int8_t, const float, float>(const int8_t *a,
+                                                     const float *b, size_t n) {
+  float afloatbuffer[256];
+  for (int i = 0; i < n; i++) {
+    afloatbuffer[i] = (float)a[i];
+  }
+  return L2sqr<const float, const float, float>(afloatbuffer, b, n);
 }
 
-
-template<>
+template <>
 inline float L2sqr<uint8_t, float, float>(uint8_t *a, float *b, size_t n) {
-    float afloatbuffer[256];
-    for (int i=0; i< n; i++) {
-        afloatbuffer[i] = (float) a[i];
-    }
-    return L2sqr<float, float, float>(afloatbuffer, b, n);
+  float afloatbuffer[256];
+  for (int i = 0; i < n; i++) {
+    afloatbuffer[i] = (float)a[i];
+  }
+  return L2sqr<float, float, float>(afloatbuffer, b, n);
 }
 
-template<>
-inline float L2sqr<const uint8_t, const float, float>(const uint8_t *a, const float *b, size_t n) {
-    float afloatbuffer[256];
-    for (int i=0; i< n; i++) {
-        afloatbuffer[i] = (float) a[i];
-    }
-    return L2sqr<const float, const float, float>(afloatbuffer, b, n);
+template <>
+inline float L2sqr<const uint8_t, const float, float>(const uint8_t *a,
+                                                      const float *b,
+                                                      size_t n) {
+  float afloatbuffer[256];
+  for (int i = 0; i < n; i++) {
+    afloatbuffer[i] = (float)a[i];
+  }
+  return L2sqr<const float, const float, float>(afloatbuffer, b, n);
 }
 
-template<typename T1, typename T2, typename R>
-R IP(T1 *a, T2 *b, size_t n) {
-    size_t i = 0;
-    R dis = 0;
-    switch(n & 7) {
-        default:
-            while (n > 7) {
-                n -= 8; dis+=(R)a[i]*(R)b[i]; i++;
-                case 7: dis+=(R)a[i]*(R)b[i]; i++;
-                case 6: dis+=(R)a[i]*(R)b[i]; i++;
-                case 5: dis+=(R)a[i]*(R)b[i]; i++;
-                case 4: dis+=(R)a[i]*(R)b[i]; i++;
-                case 3: dis+=(R)a[i]*(R)b[i]; i++;
-                case 2: dis+=(R)a[i]*(R)b[i]; i++;
-                case 1: dis+=(R)a[i]*(R)b[i]; i++;
-            }
+template <typename T1, typename T2, typename R> R IP(T1 *a, T2 *b, size_t n) {
+  size_t i = 0;
+  R dis = 0;
+  switch (n & 7) {
+  default:
+    while (n > 7) {
+      n -= 8;
+      dis += (R)a[i] * (R)b[i];
+      i++;
+    case 7:
+      dis += (R)a[i] * (R)b[i];
+      i++;
+    case 6:
+      dis += (R)a[i] * (R)b[i];
+      i++;
+    case 5:
+      dis += (R)a[i] * (R)b[i];
+      i++;
+    case 4:
+      dis += (R)a[i] * (R)b[i];
+      i++;
+    case 3:
+      dis += (R)a[i] * (R)b[i];
+      i++;
+    case 2:
+      dis += (R)a[i] * (R)b[i];
+      i++;
+    case 1:
+      dis += (R)a[i] * (R)b[i];
+      i++;
     }
-    return dis;
+  }
+  return dis;
 }
 
-template<typename T1, typename T2, typename R>
-inline void compute_residual(T1* x, T2* c, R* res, size_t d) {
-    size_t i = 0;
-    switch(d & 7) {
-        default:
-            while (d > 7) {
-                d -= 8; res[i]=(R)x[i]-(R)c[i]; i++;
-                case 7: res[i]=(R)x[i]-(R)c[i]; i++;
-                case 6: res[i]=(R)x[i]-(R)c[i]; i++;
-                case 5: res[i]=(R)x[i]-(R)c[i]; i++;
-                case 4: res[i]=(R)x[i]-(R)c[i]; i++;
-                case 3: res[i]=(R)x[i]-(R)c[i]; i++;
-                case 2: res[i]=(R)x[i]-(R)c[i]; i++;
-                case 1: res[i]=(R)x[i]-(R)c[i]; i++;
-            }
+template <typename T1, typename T2, typename R>
+inline void compute_residual(T1 *x, T2 *c, R *res, size_t d) {
+  size_t i = 0;
+  switch (d & 7) {
+  default:
+    while (d > 7) {
+      d -= 8;
+      res[i] = (R)x[i] - (R)c[i];
+      i++;
+    case 7:
+      res[i] = (R)x[i] - (R)c[i];
+      i++;
+    case 6:
+      res[i] = (R)x[i] - (R)c[i];
+      i++;
+    case 5:
+      res[i] = (R)x[i] - (R)c[i];
+      i++;
+    case 4:
+      res[i] = (R)x[i] - (R)c[i];
+      i++;
+    case 3:
+      res[i] = (R)x[i] - (R)c[i];
+      i++;
+    case 2:
+      res[i] = (R)x[i] - (R)c[i];
+      i++;
+    case 1:
+      res[i] = (R)x[i] - (R)c[i];
+      i++;
     }
+  }
 }
 
 #define IP_FLOAT_IMPL                                                          \
@@ -291,14 +352,14 @@ inline void compute_residual(T1* x, T2* c, R* res, size_t d) {
   }                                                                            \
   return dis;
 
-template<>
-inline float IP<float, float, float>(float* a, float* b, size_t n) {
-    IP_FLOAT_IMPL;
+template <> inline float IP<float, float, float>(float *a, float *b, size_t n) {
+  IP_FLOAT_IMPL;
 }
 
-template<>
-inline float IP<const float, const float, float>(const float* a, const float* b, size_t n) {
-    IP_FLOAT_IMPL;
+template <>
+inline float IP<const float, const float, float>(const float *a, const float *b,
+                                                 size_t n) {
+  IP_FLOAT_IMPL;
 }
 
 // A vector multiply a matrix
@@ -308,16 +369,17 @@ inline float IP<const float, const float, float>(const float* a, const float* b,
 // c: result;
 // n: sub_dim;
 // m: the number of centroids, m is divisible by 32.
-template<typename T1>
-inline void compute_lookuptable_IP(T1* a, float* b, float* c, size_t n, size_t m) {
-    float* a_buffer = new float[n];
-    for (int i=0; i<n; i++) {
-        a_buffer[i] = (float) a[i];
-    }
+template <typename T1>
+inline void compute_lookuptable_IP(T1 *a, float *b, float *c, size_t n,
+                                   size_t m) {
+  float *a_buffer = new float[n];
+  for (int i = 0; i < n; i++) {
+    a_buffer[i] = (float)a[i];
+  }
 
-    compute_lookuptable_IP<float>(a_buffer, b, c, n, m);
+  compute_lookuptable_IP<float>(a_buffer, b, c, n, m);
 
-    delete[] a_buffer;
+  delete[] a_buffer;
 }
 
 #define COMPUTE_LOOKUPTABLE_IP_IMPL                                            \
@@ -351,26 +413,29 @@ inline void compute_lookuptable_IP(T1* a, float* b, float* c, size_t n, size_t m
     c += 32;                                                                   \
   }
 
-template<>
-inline void compute_lookuptable_IP<float>(float* a, float* b, float* c, size_t n, size_t m) {
-    COMPUTE_LOOKUPTABLE_IP_IMPL
+template <>
+inline void compute_lookuptable_IP<float>(float *a, float *b, float *c,
+                                          size_t n, size_t m) {
+  COMPUTE_LOOKUPTABLE_IP_IMPL
 }
 
-template<>
-inline void compute_lookuptable_IP<const float>(const float* a, float* b, float* c, size_t n, size_t m) {
-    COMPUTE_LOOKUPTABLE_IP_IMPL
+template <>
+inline void compute_lookuptable_IP<const float>(const float *a, float *b,
+                                                float *c, size_t n, size_t m) {
+  COMPUTE_LOOKUPTABLE_IP_IMPL
 }
 
-template<typename T1>
-inline void compute_lookuptable_L2(T1* a, float* b, float* c, size_t n, size_t m) {
-    float* a_buffer = new float[n];
-    for (int i=0; i<n; i++) {
-        a_buffer[i] = (float) a[i];
-    }
+template <typename T1>
+inline void compute_lookuptable_L2(T1 *a, float *b, float *c, size_t n,
+                                   size_t m) {
+  float *a_buffer = new float[n];
+  for (int i = 0; i < n; i++) {
+    a_buffer[i] = (float)a[i];
+  }
 
-    compute_lookuptable_L2<float>(a_buffer, b, c, n, m);
+  compute_lookuptable_L2<float>(a_buffer, b, c, n, m);
 
-    delete[] a_buffer;
+  delete[] a_buffer;
 }
 
 #define COMPUTE_LOOKUPTABLE_L2_IMPL                                            \
@@ -409,23 +474,26 @@ inline void compute_lookuptable_L2(T1* a, float* b, float* c, size_t n, size_t m
   }                                                                            \
   return;
 
-template<>
-inline void compute_lookuptable_L2<float>(float* a, float* b, float* c, size_t n, size_t m) {
-    COMPUTE_LOOKUPTABLE_L2_IMPL;
+template <>
+inline void compute_lookuptable_L2<float>(float *a, float *b, float *c,
+                                          size_t n, size_t m) {
+  COMPUTE_LOOKUPTABLE_L2_IMPL;
 }
 
-template<>
-inline void compute_lookuptable_L2<const float>(const float* a, float* b, float* c, size_t n, size_t m) {
-    COMPUTE_LOOKUPTABLE_L2_IMPL;
+template <>
+inline void compute_lookuptable_L2<const float>(const float *a, float *b,
+                                                float *c, size_t n, size_t m) {
+  COMPUTE_LOOKUPTABLE_L2_IMPL;
 }
 
-inline void matrix_transpose(const float* src, float* des, int64_t row, int64_t col) {
-    assert(src != nullptr);
-    assert(des != nullptr);
+inline void matrix_transpose(const float *src, float *des, int64_t row,
+                             int64_t col) {
+  assert(src != nullptr);
+  assert(des != nullptr);
 
-    for (int64_t i = 0; i < row; ++i) {
-        for (int64_t j = 0; j < col; ++j) {
-            *(des + j * row + i) = *(src + i * col + j);
-        }
+  for (int64_t i = 0; i < row; ++i) {
+    for (int64_t j = 0; j < col; ++j) {
+      *(des + j * row + i) = *(src + i * col + j);
     }
+  }
 }

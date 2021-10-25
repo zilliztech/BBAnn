@@ -579,10 +579,12 @@ void kmeans(int64_t nx, const T *x_in, int64_t dim, int64_t k, float *centroids,
     // std::cout<<hassign[i]<<std::endl;
   }
   end = clock();
-  // std::cout << "after the kmeans with nx = " << nx << ", k = " << k << ", has "
+  // std::cout << "after the kmeans with nx = " << nx << ", k = " << k << ", has
+  // "
   //           << empty_cnt << " empty clusters,"
   //           << " max cluster: " << mx << " min cluster: " << mn
-  //           << " time spent " << ((double)end - start) / CLOCKS_PER_SEC * 1000
+  //           << " time spent " << ((double)end - start) / CLOCKS_PER_SEC *
+  //           1000
   //           << "ms" << std::endl;
 }
 
@@ -607,13 +609,13 @@ void non_recursive_multilevel_kmeans(
     int level,         // n-th round recursive clustering, start with 0
     std::mutex &mutex, // mutex to protect write out centroids
     std::vector<ClusteringTask> &output_tasks, // output clustering tasks
-    bool vector_use_sq, // whether use scalar quantization on base vector
+    bool vector_use_sq,      // whether use scalar quantization on base vector
     std::vector<T> &max_len, // the max value on each dimension
     std::vector<T> &min_len, // the min value on each dimension
-    bool kmpp,                                 // k-means parameter
-    float avg_len,                             // k-means parameter
-    int64_t niter,                             // k-means parameter
-    int64_t seed                               // k-means parameter
+    bool kmpp,               // k-means parameter
+    float avg_len,           // k-means parameter
+    int64_t niter,           // k-means parameter
+    int64_t seed             // k-means parameter
 ) {
   // move pointer to current round
   data = data + round_offset * dim;
@@ -624,8 +626,6 @@ void non_recursive_multilevel_kmeans(
 
   int64_t vector_size = sizeof(T) * dim;
   int64_t id_size = sizeof(uint32_t);
-
-
 
   // Step 0: set k2, the num of cluster in this round clustering
 
@@ -647,9 +647,6 @@ void non_recursive_multilevel_kmeans(
   //           << "[k2 " << k2 << "] "
   //           << "[do same size kmeans " << do_same_size_kmeans << "] "
   //           << std::endl;
-
-
-
 
   // Step 1: k2, clustering in a file
 
@@ -677,7 +674,6 @@ void non_recursive_multilevel_kmeans(
     // clustering
     kmeans<T>(train_size, train_data, dim, k2, k2_centroids.data(), kmpp,
               avg_len, niter, seed);
-
 
     // free temp memory for sampling
     if (cluster_size > k2 * K2_MAX_POINTS_PER_CENTROID) {
@@ -713,11 +709,9 @@ void non_recursive_multilevel_kmeans(
     // cluster_id.data(), k2_centroids, avg_len);
   }
   // std::cout << "step 1: clustering: "
-  //           << "cluster centroids be wrote into k2_centroids and cluster_id: "
+  //           << "cluster centroids be wrote into k2_centroids and cluster_id:
+  //           "
   //           << std::endl;
-
-
-
 
   // Step 2: reorder data by cluster id
 
@@ -747,9 +741,6 @@ void non_recursive_multilevel_kmeans(
 
   // std::cout << "step 2: reorder data by cluster id: " << std::endl;
 
-
-
-
   // Step 3: check all cluster, write out or generate new ClusteringTask
 
   int64_t bucket_size;
@@ -757,10 +748,10 @@ void non_recursive_multilevel_kmeans(
 
   int entry_size = vector_size + id_size;
 
-  // alloc buffer to organize the persistent layout, persistent layout is repeated[vector, id],
-  // in-memory layout is repeated[vector] and repeated[id]
+  // alloc buffer to organize the persistent layout, persistent layout is
+  // repeated[vector, id], in-memory layout is repeated[vector] and repeated[id]
   char *data_blk_buf = new char[blk_size];
-  std::vector<uint8_t > codes(threshold * dim, 0);
+  std::vector<uint8_t> codes(threshold * dim, 0);
 
   // check each k2 cluster, persistent or split again
   for (int i = 0; i < k2; i++) {
@@ -788,12 +779,13 @@ void non_recursive_multilevel_kmeans(
       char *beg_address = data_blk_buf + sizeof(uint32_t);
 
       if (vector_use_sq) {
-        bbann::encode_uint8(max_len.data(),             // max from meta file
-                            min_len.data(),             // min from meta file
-                            data + dim * bucket_offset, // address of source vector
-                            codes.data(),               // output variable, codes
-                            bucket_size,                // number of vector in a bucket
-                            dim);                       // dimension
+        bbann::encode_uint8(max_len.data(), // max from meta file
+                            min_len.data(), // min from meta file
+                            data +
+                                dim * bucket_offset, // address of source vector
+                            codes.data(),            // output variable, codes
+                            bucket_size, // number of vector in a bucket
+                            dim);        // dimension
 
         int code_size = sizeof(uint8_t) * dim;
         entry_size = code_size + id_size;
@@ -804,8 +796,8 @@ void non_recursive_multilevel_kmeans(
           memcpy(entry_address,                // dest
                  codes.data() + j * code_size, // src
                  code_size);
-          memcpy(entry_address + code_size,    // dest
-                 ids + bucket_offset + j,      // src
+          memcpy(entry_address + code_size, // dest
+                 ids + bucket_offset + j,   // src
                  id_size);
         }
       } else {
@@ -835,8 +827,8 @@ void non_recursive_multilevel_kmeans(
         // make sure type cast safety
         assert(local_block_index >= 0);
 
-        uint32_t global_id =
-            bbann::util::gen_global_block_id(k1_id, (uint32_t)local_block_index);
+        uint32_t global_id = bbann::util::gen_global_block_id(
+            k1_id, (uint32_t)local_block_index);
 
         // persistent a block
         data_writer.write((char *)data_blk_buf, blk_size);
@@ -844,14 +836,15 @@ void non_recursive_multilevel_kmeans(
         // FIXME: ????????????????????????
         // convert centroids to specified datatype
         if (sizeof(T) != sizeof(float)) {
-          T* k2_centroids_T = new T[dim];
+          T *k2_centroids_T = new T[dim];
           for (int j = 0; j < dim; j++) {
-              k2_centroids_T[j] = (T) k2_centroids[i * dim + j];
+            k2_centroids_T[j] = (T)k2_centroids[i * dim + j];
           }
-          centroids_writer.write((char *) k2_centroids_T, sizeof(T) * dim);
+          centroids_writer.write((char *)k2_centroids_T, sizeof(T) * dim);
           delete[] k2_centroids_T;
         } else {
-          centroids_writer.write((char *) (k2_centroids.data() + i * dim), sizeof(float) * dim);
+          centroids_writer.write((char *)(k2_centroids.data() + i * dim),
+                                 sizeof(float) * dim);
         }
 
         centroids_id_writer.write((char *)(&global_id), sizeof(uint32_t));
@@ -863,7 +856,8 @@ void non_recursive_multilevel_kmeans(
   }
   delete[] data_blk_buf;
   // std::cout << "step 3: write out and generate new ClusteringTask: "
-  //           << "[output_tasks size " << output_tasks.size() << "]" << std::endl;
+  //           << "[output_tasks size " << output_tasks.size() << "]" <<
+  //           std::endl;
 }
 
 template <typename T>
@@ -1137,28 +1131,24 @@ void same_size_kmeans(int64_t nx, const T *x_in, int64_t dim, int64_t k,
   template void non_recursive_multilevel_kmeans<T>(                            \
       uint32_t k1_id, int64_t cluster_size, T * data, uint32_t * ids,          \
       int64_t round_offset, int64_t dim, uint32_t threshold,                   \
-      const uint64_t blk_size, uint32_t &blk_num,                              \
-      /* IOWriter */                                                           \
-      IOWriter &data_writer,                                                   \
-      IOWriter &centroids_writer,                                              \
-      IOWriter &centroids_id_writer,                                           \
-      /* parameters for multi-thread accelerate */                             \
+      const uint64_t blk_size, uint32_t &blk_num, /* IOWriter */               \
+      IOWriter &data_writer, IOWriter &centroids_writer,                       \
+      IOWriter                                                                 \
+          &centroids_id_writer, /* parameters for multi-thread accelerate */   \
       int64_t centroids_id_start_position, int level, std::mutex &mutex,       \
-      std::vector<ClusteringTask> &output_tasks,                               \
-      /* SQ encode on base vectors */                                          \
-      bool vector_use_sq,                                                      \
-      std::vector<T> &max_len, std::vector<T> &min_len,                        \
-      /* k-means parameters */                                                 \
-      bool kmpp = false,                                                       \
-      float avg_len, int64_t niter, int64_t seed);                             \
+      std::vector<ClusteringTask>                                              \
+          &output_tasks, /* SQ encode on base vectors */                       \
+      bool vector_use_sq, std::vector<T> &max_len,                             \
+      std::vector<T> &min_len, /* k-means parameters */                        \
+      bool kmpp = false, float avg_len, int64_t niter, int64_t seed);          \
   template void same_size_kmeans<T>(                                           \
       int64_t nx, const T *x_in, int64_t dim, int64_t k, float *centroids,     \
       int64_t *assign, bool kmpp = false, float avg_len, int64_t niter,        \
       int64_t seed);
-#define IVF_T(T1,T2,R) \
-template void elkan_L2_assign<T1, T2, R>(const T1 *x, const T2 *y, int64_t dim, \
-                                         int64_t nx, int64_t ny, int64_t *ids, \
-                                         R *val); 
+#define IVF_T(T1, T2, R)                                                       \
+  template void elkan_L2_assign<T1, T2, R>(const T1 *x, const T2 *y,           \
+                                           int64_t dim, int64_t nx,            \
+                                           int64_t ny, int64_t *ids, R *val);
 
 IVF(uint8_t);
 IVF(int8_t);

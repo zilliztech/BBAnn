@@ -1,23 +1,21 @@
 #pragma once
+#include "util/file_handler.h"
 #include <algorithm>
 #include <assert.h>
 #include <cmath>
 #include <cstdint>
 #include <memory>
-#include <mutex> 
-#include <vector>
+#include <mutex>
 #include <string.h>
 #include <unistd.h>
-#include "util/file_handler.h"
+#include <vector>
 
-
-
-struct ClusteringTask{
-    ClusteringTask(int64_t o, int64_t n, int64_t l)
-    : offset(o), num_elems(n), level(l) {}
-    int64_t offset;
-    int64_t num_elems;
-    int64_t level;
+struct ClusteringTask {
+  ClusteringTask(int64_t o, int64_t n, int64_t l)
+      : offset(o), num_elems(n), level(l) {}
+  int64_t offset;
+  int64_t num_elems;
+  int64_t level;
 };
 
 template <typename T1, typename T2, typename R>
@@ -50,16 +48,14 @@ void non_recursive_multilevel_kmeans(
     int level,         // n-th round recursive clustering, start with 0
     std::mutex &mutex, // mutex to protect write out centroids
     std::vector<ClusteringTask> &output_tasks, // output clustering tasks
-    bool vector_use_sq, // whether use scalar quantization on base vector
+    bool vector_use_sq,      // whether use scalar quantization on base vector
     std::vector<T> &max_len, // the max value on each dimension
     std::vector<T> &min_len, // the min value on each dimension
-    bool kmpp = false,                         // k-means parameter
-    float avg_len = 0.0,                       // k-means parameter
-    int64_t niter = 10,                        // k-means parameter
-    int64_t seed = 1234                        // k-means parameter
+    bool kmpp = false,       // k-means parameter
+    float avg_len = 0.0,     // k-means parameter
+    int64_t niter = 10,      // k-means parameter
+    int64_t seed = 1234      // k-means parameter
 );
-
-
 
 template <typename T>
 void same_size_kmeans(int64_t nx, const T *x_in, int64_t dim, int64_t k,

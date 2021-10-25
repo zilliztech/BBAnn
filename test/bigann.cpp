@@ -1,47 +1,45 @@
-#include "util/read_file.h"
-#include "util/merge.h"
 #include "flat/flat.h"
 #include "ivf/ivf_flat.h"
+#include "util/merge.h"
+#include "util/read_file.h"
 
-#include "hnswlib/space_ui8_l2.h"
-#include "hnswlib/hnswlib.h"
 #include "hnswlib/hnswalg.h"
+#include "hnswlib/hnswlib.h"
+#include "hnswlib/space_ui8_l2.h"
 
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/types.h>
 #include <unistd.h>
-
-
 
 // test ivfflat
 
 #define Yandex_Text_to_Image
 
 #ifdef BigAnn
-    using CODE_T = uint8_t;
-    using DIS_T = int32_t;
-    const char* Learn_Path = "data/BIGANN/learn.100M.u8bin";
-    const char* Query_Path = "data/BIGANN/query.public.10K.u8bin";
-    #define Dis_Compare     CMax<int,int>
-    #define Dis_Computer    L2sqr<const CODE_T, const CODE_T, DIS_T>
-    #define OUT_PUT         "bigann"
+using CODE_T = uint8_t;
+using DIS_T = int32_t;
+const char *Learn_Path = "data/BIGANN/learn.100M.u8bin";
+const char *Query_Path = "data/BIGANN/query.public.10K.u8bin";
+#define Dis_Compare CMax<int, int>
+#define Dis_Computer L2sqr<const CODE_T, const CODE_T, DIS_T>
+#define OUT_PUT "bigann"
 #endif
 
 #ifdef Yandex_Text_to_Image
-    using CODE_T = float;
-    using DIS_T = float;
-    const char* Learn_Path = "data/Yandex_Text-to-Image/query.learn.50M.fbin";
-    const char* Query_Path = "data/Yandex_Text-to-Image/query.public.100K.fbin";
-    #define Dis_Compare     CMin<float,int>
-    #define Dis_Computer    IP<const CODE_T, const CODE_T, DIS_T>
-    #define OUT_PUT         "yandex_text_to_image"
+using CODE_T = float;
+using DIS_T = float;
+const char *Learn_Path = "data/Yandex_Text-to-Image/query.learn.50M.fbin";
+const char *Query_Path = "data/Yandex_Text-to-Image/query.public.100K.fbin";
+#define Dis_Compare CMin<float, int>
+#define Dis_Computer IP<const CODE_T, const CODE_T, DIS_T>
+#define OUT_PUT "yandex_text_to_image"
 #endif
-
 
 timeval t1, t2;
 long int getTime(timeval end, timeval start) {
-    return 1000*(end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec)/1000;
+  return 1000 * (end.tv_sec - start.tv_sec) +
+         (end.tv_usec - start.tv_usec) / 1000;
 }
 
 int nb, nq, dim;
@@ -57,140 +55,147 @@ int *global_lab = new int[Query_Batch * topk];
 DIS_T *tmp_dis = new DIS_T[Query_Batch * topk];
 int *tmp_lab = new int[Query_Batch * topk];
 
-void Output(const char* file_name, DIS_T *dis, int *lab) {
-    FILE *fi = fopen(file_name, "w");
-    for(int i=0;i<nq;i++){
-        for(int j=0;j<topk;j++){
-            fprintf(fi, "%f %d\n", (float)dis[i*topk+j], lab[i*topk+j]);
-        }
-        fprintf(fi, "\n");
+void Output(const char *file_name, DIS_T *dis, int *lab) {
+  FILE *fi = fopen(file_name, "w");
+  for (int i = 0; i < nq; i++) {
+    for (int j = 0; j < topk; j++) {
+      fprintf(fi, "%f %d\n", (float)dis[i * topk + j], lab[i * topk + j]);
     }
-    fclose(fi);
+    fprintf(fi, "\n");
+  }
+  fclose(fi);
 }
 
 void Flat(int batch_from, int batch_num) {
-    gettimeofday(&t1, 0);
+  gettimeofday(&t1, 0);
 
-    knn_2<Dis_Compare, CODE_T, CODE_T> (
-        xq, xb, nq, batch_num, dim, topk, tmp_dis, tmp_lab, Dis_Computer);
+  knn_2<Dis_Compare, CODE_T, CODE_T>(xq, xb, nq, batch_num, dim, topk, tmp_dis,
+                                     tmp_lab, Dis_Computer);
 
-    gettimeofday(&t2, 0);
-    printf("flat seg %d cost %ldms\n", batch_from/Base_Batch, getTime(t2,t1));
+  gettimeofday(&t2, 0);
+  printf("flat seg %d cost %ldms\n", batch_from / Base_Batch, getTime(t2, t1));
 
-    char file_name[64];
-    sprintf(file_name, "%s_flat_segment_%d.txt",OUT_PUT, batch_from/Base_Batch);
-    Output(file_name, tmp_dis, tmp_lab);
+  char file_name[64];
+  sprintf(file_name, "%s_flat_segment_%d.txt", OUT_PUT,
+          batch_from / Base_Batch);
+  Output(file_name, tmp_dis, tmp_lab);
 
-    merge<Dis_Compare>(global_dis, global_lab, tmp_dis, tmp_lab, nq, topk, batch_from);
+  merge<Dis_Compare>(global_dis, global_lab, tmp_dis, tmp_lab, nq, topk,
+                     batch_from);
 }
 
 int nlist = 2048;
 int nprobe = 24;
-float* centroids = nullptr;
+float *centroids = nullptr;
 std::vector<std::vector<CODE_T>> codes;
 std::vector<std::vector<int32_t>> ids;
 
 void IVF_Train(int batch_from, int batch_num) {
-    centroids = new float[nlist * dim];
+  centroids = new float[nlist * dim];
 
-    gettimeofday(&t1, 0);
+  gettimeofday(&t1, 0);
 
-    kmeans(batch_num, xb, dim, nlist, centroids);
+  kmeans(batch_num, xb, dim, nlist, centroids);
 
-    gettimeofday(&t2, 0);
-    printf("kmeans cost %ldms\n", getTime(t2,t1));
+  gettimeofday(&t2, 0);
+  printf("kmeans cost %ldms\n", getTime(t2, t1));
 
-    FILE *fi=fopen(OUT_PUT "_centroids_2048.bin", "w");
-    fwrite(centroids, sizeof(float), nlist * dim, fi);
-    fclose(fi);
+  FILE *fi = fopen(OUT_PUT "_centroids_2048.bin", "w");
+  fwrite(centroids, sizeof(float), nlist * dim, fi);
+  fclose(fi);
 }
 
 void IVF_Insert(int batch_from, int batch_num) {
-    gettimeofday(&t1, 0);
+  gettimeofday(&t1, 0);
 
-    ivf_flat_insert(batch_num, xb, dim, nlist, centroids, codes, ids);
+  ivf_flat_insert(batch_num, xb, dim, nlist, centroids, codes, ids);
 
-    gettimeofday(&t2, 0);
-    printf("insert seg %d cost %ldms\n", batch_from/Base_Batch, getTime(t2,t1));
+  gettimeofday(&t2, 0);
+  printf("insert seg %d cost %ldms\n", batch_from / Base_Batch,
+         getTime(t2, t1));
 
-    char file_name[64];
-    sprintf(file_name, "%s_ivf_segment_%d.bin",OUT_PUT, batch_from/Base_Batch);
-    FILE *fi=fopen(file_name, "w");
-    fwrite(&batch_from, sizeof(int), 1, fi);
-    fwrite(&nlist, sizeof(int), 1, fi);
-    for (int i=0;i<nlist;i++){
-        int s=ids[i].size();
-        fwrite(&s, sizeof(int), 1, fi);
-        fwrite(ids[i].data(), sizeof(int), s, fi);
-        fwrite(codes[i].data(), dim * sizeof(CODE_T), s, fi);
-    }
-    fclose(fi);
+  char file_name[64];
+  sprintf(file_name, "%s_ivf_segment_%d.bin", OUT_PUT, batch_from / Base_Batch);
+  FILE *fi = fopen(file_name, "w");
+  fwrite(&batch_from, sizeof(int), 1, fi);
+  fwrite(&nlist, sizeof(int), 1, fi);
+  for (int i = 0; i < nlist; i++) {
+    int s = ids[i].size();
+    fwrite(&s, sizeof(int), 1, fi);
+    fwrite(ids[i].data(), sizeof(int), s, fi);
+    fwrite(codes[i].data(), dim * sizeof(CODE_T), s, fi);
+  }
+  fclose(fi);
 
-    for(int i=0;i<nlist;i++){
-        printf("%f\t%ld\n",
-            sqrt(IP<float,float,float>(centroids+i*dim, centroids+i*dim, dim)),
-            ids[i].size());
-    }
+  for (int i = 0; i < nlist; i++) {
+    printf("%f\t%ld\n",
+           sqrt(IP<float, float, float>(centroids + i * dim,
+                                        centroids + i * dim, dim)),
+           ids[i].size());
+  }
 }
 
 void IVF_Search(int batch_from, int batch_num) {
-    gettimeofday(&t1, 0);
+  gettimeofday(&t1, 0);
 
-    ivf_flat_search<Dis_Compare, CODE_T, DIS_T>(
-        nq, xq, dim, nlist, centroids, codes, ids, nprobe, topk, tmp_dis, tmp_lab, Dis_Computer);
+  ivf_flat_search<Dis_Compare, CODE_T, DIS_T>(nq, xq, dim, nlist, centroids,
+                                              codes, ids, nprobe, topk, tmp_dis,
+                                              tmp_lab, Dis_Computer);
 
-    gettimeofday(&t2, 0);
-    printf("query seg %d cost %ldms\n", batch_from/Base_Batch, getTime(t2,t1));
+  gettimeofday(&t2, 0);
+  printf("query seg %d cost %ldms\n", batch_from / Base_Batch, getTime(t2, t1));
 
-    char file_name[64];
-    sprintf(file_name, "%s_ivf_%d_segment_%d.txt",OUT_PUT, nprobe, batch_from/Base_Batch);
-    Output(file_name, tmp_dis, tmp_lab);
+  char file_name[64];
+  sprintf(file_name, "%s_ivf_%d_segment_%d.txt", OUT_PUT, nprobe,
+          batch_from / Base_Batch);
+  Output(file_name, tmp_dis, tmp_lab);
 
-    merge<Dis_Compare>(global_dis, global_lab, tmp_dis, tmp_lab, nq, topk, batch_from);
+  merge<Dis_Compare>(global_dis, global_lab, tmp_dis, tmp_lab, nq, topk,
+                     batch_from);
 }
 
 int main() {
-    // init heap
-    heap_heapify<Dis_Compare>(Query_Batch * topk, global_dis, global_lab);
+  // init heap
+  heap_heapify<Dis_Compare>(Query_Batch * topk, global_dis, global_lab);
 
-    FILE *fi;
-    // just query 1 batch
-    fi = read_file_head(Query_Path, &nq, &dim);
-    assert(fi);
-    xq = new CODE_T[Query_Batch * dim];
+  FILE *fi;
+  // just query 1 batch
+  fi = read_file_head(Query_Path, &nq, &dim);
+  assert(fi);
+  xq = new CODE_T[Query_Batch * dim];
 
-    read_file_data(fi, Query_Batch, dim, xq);
-    fclose(fi);
-    nq = Query_Batch;
+  read_file_data(fi, Query_Batch, dim, xq);
+  fclose(fi);
+  nq = Query_Batch;
 
-    // for each learn
-    fi = read_file_head(Learn_Path, &nb, &dim);
-    assert(fi);
-    xb = new CODE_T[Base_Batch * dim];
+  // for each learn
+  fi = read_file_head(Learn_Path, &nb, &dim);
+  assert(fi);
+  xb = new CODE_T[Base_Batch * dim];
 
-    for (int batch_from = 0; batch_from < nb; batch_from += Base_Batch) {
-        int batch_num = read_file_data(fi, Base_Batch, dim, xb);
+  for (int batch_from = 0; batch_from < nb; batch_from += Base_Batch) {
+    int batch_num = read_file_data(fi, Base_Batch, dim, xb);
 
-//        Flat(batch_from, batch_num);
+    //        Flat(batch_from, batch_num);
 
-        if (batch_from == 0) {
-            IVF_Train(batch_from, batch_num);
-        }
-
-        codes.clear();
-        ids.clear();
-        IVF_Insert(batch_from, batch_num);
-        IVF_Search(batch_from, batch_num);
-
-        nprobe = 48;
-        IVF_Search(batch_from, batch_num);
-
-        break;
+    if (batch_from == 0) {
+      IVF_Train(batch_from, batch_num);
     }
-    fclose(fi);
 
-    // Output(OUT_PUT "_flat.txt", global_dis, global_lab);
-    // Output(OUT_PUT "_ivf.txt", global_dis, global_lab);
+    codes.clear();
+    ids.clear();
+    IVF_Insert(batch_from, batch_num);
+    IVF_Search(batch_from, batch_num);
+
+    nprobe = 48;
+    IVF_Search(batch_from, batch_num);
+
+    break;
+  }
+  fclose(fi);
+
+  // Output(OUT_PUT "_flat.txt", global_dis, global_lab);
+  // Output(OUT_PUT "_ivf.txt", global_dis, global_lab);
 
 #if 0
     // hnsw
@@ -242,13 +247,13 @@ int main() {
     }
 #endif
 
-    delete []global_dis;
-    delete []global_lab;
-    delete []tmp_dis;
-    delete []tmp_lab;
+  delete[] global_dis;
+  delete[] global_lab;
+  delete[] tmp_dis;
+  delete[] tmp_lab;
 
-    delete []xb;
-    delete []xq;
+  delete[] xb;
+  delete[] xq;
 
-    return 0;
+  return 0;
 }

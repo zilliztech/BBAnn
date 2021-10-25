@@ -11,11 +11,10 @@
 namespace bbann {
 std::string Hello() { return "Hello!!!!"; }
 
-
-void search_graph_hnsw_sq(std::shared_ptr<sq_hnswlib::HierarchicalNSW<float>> index_hnsw_sq,
-                          const int nq, const int dq, const int nprobe,
-                          const int refine_nprobe, const float *pquery,
-                          uint32_t *buckets_label, float *centroids_dist) {
+void search_graph_hnsw_sq(
+    std::shared_ptr<sq_hnswlib::HierarchicalNSW<float>> index_hnsw_sq,
+    const int nq, const int dq, const int nprobe, const int refine_nprobe,
+    const float *pquery, uint32_t *buckets_label, float *centroids_dist) {
   index_hnsw_sq->setEf(refine_nprobe);
   bool set_distance = centroids_dist != nullptr;
 #pragma omp parallel for
@@ -94,19 +93,21 @@ void train_cluster(const std::string &raw_data_bin_file,
   rc.RecordSection("kmeans done");
   assert((*centroids) != nullptr);
 
-  if(vector_use_sq) {
-      std::vector<DATAT> max_len;
-      std::vector<DATAT> min_len;
-      max_len.assign(dim, std::numeric_limits<DATAT>::min());
-      min_len.assign(dim, std::numeric_limits<DATAT>::max());
-      train_code<DATAT>(max_len.data(), min_len.data(), sample_data, sample_num, dim);
-      std::string meta_file = getSQMetaFileName(output_path);
-      IOWriter meta_writer(meta_file);
-      meta_writer.write((char*)max_len.data(), sizeof(DATAT) * dim);
-      meta_writer.write((char*)min_len.data(), sizeof(DATAT) * dim);
-      // for(int i =0; i< dim; i++) {
-      //     std::cout<<"dim: "<<i<<"max: "<<max_len[i]<<", min: "<<min_len[i]<<std::endl;
-      // }
+  if (vector_use_sq) {
+    std::vector<DATAT> max_len;
+    std::vector<DATAT> min_len;
+    max_len.assign(dim, std::numeric_limits<DATAT>::min());
+    min_len.assign(dim, std::numeric_limits<DATAT>::max());
+    train_code<DATAT>(max_len.data(), min_len.data(), sample_data, sample_num,
+                      dim);
+    std::string meta_file = getSQMetaFileName(output_path);
+    IOWriter meta_writer(meta_file);
+    meta_writer.write((char *)max_len.data(), sizeof(DATAT) * dim);
+    meta_writer.write((char *)min_len.data(), sizeof(DATAT) * dim);
+    // for(int i =0; i< dim; i++) {
+    //     std::cout<<"dim: "<<i<<"max: "<<max_len[i]<<", min:
+    //     "<<min_len[i]<<std::endl;
+    // }
   }
 
   delete[] sample_data;
@@ -244,53 +245,53 @@ getDistanceSpace<uint8_t, uint32_t>(MetricType metric_type, uint32_t ndim) {
   return space;
 }
 
-
-template<typename T>
-inline void read_bin_file_half_dimension(const std::string& file_name, T*& data,uint32_t& n,
-                                             uint32_t& dim,const uint32_t& begin_dim){
+template <typename T>
+inline void read_bin_file_half_dimension(const std::string &file_name, T *&data,
+                                         uint32_t &n, uint32_t &dim,
+                                         const uint32_t &begin_dim) {
   std::ifstream reader(file_name, std::ios::binary);
 
-  reader.read((char*)&n, sizeof(uint32_t));
-  reader.read((char*)&dim, sizeof(uint32_t));
-  if (begin_dim==0){
-    uint32_t new_dim=dim/2;
-    if (data== nullptr) {
-      data = new T[(uint64_t) n * (uint64_t) new_dim];
+  reader.read((char *)&n, sizeof(uint32_t));
+  reader.read((char *)&dim, sizeof(uint32_t));
+  if (begin_dim == 0) {
+    uint32_t new_dim = dim / 2;
+    if (data == nullptr) {
+      data = new T[(uint64_t)n * (uint64_t)new_dim];
     }
-    T* buf=new T[(uint64_t)(dim-new_dim)];
-    for (uint32_t i=0;i<n;++i){
-      for (uint32_t j=0;j<new_dim;j++){
-        reader.read((char*)(data+j*n+i),sizeof(T));
+    T *buf = new T[(uint64_t)(dim - new_dim)];
+    for (uint32_t i = 0; i < n; ++i) {
+      for (uint32_t j = 0; j < new_dim; j++) {
+        reader.read((char *)(data + j * n + i), sizeof(T));
       }
-      reader.read((char*)buf,sizeof(T)*(dim-new_dim));
+      reader.read((char *)buf, sizeof(T) * (dim - new_dim));
     }
-    delete [] buf;
-    buf= nullptr;
-    std::cout << "read binary file from " << file_name << " done in ... seconds, n = "
-                  << n << ", dim = " << new_dim << std::endl;
-  } else{
-    if (data== nullptr){
-      data=new T[(uint64_t)n*(uint64_t)(dim-begin_dim)];
+    delete[] buf;
+    buf = nullptr;
+    std::cout << "read binary file from " << file_name
+              << " done in ... seconds, n = " << n << ", dim = " << new_dim
+              << std::endl;
+  } else {
+    if (data == nullptr) {
+      data = new T[(uint64_t)n * (uint64_t)(dim - begin_dim)];
     }
-    T* buf=new T[(uint64_t)begin_dim];
-    uint32_t offset=dim-begin_dim;
-    for (uint32_t i=0;i<n;++i){
-      reader.read((char*)buf,sizeof(T)*begin_dim);
-      for (uint32_t j=0;j<offset;++j){
-        reader.read((char*)(data+j*n+i),sizeof(T));
+    T *buf = new T[(uint64_t)begin_dim];
+    uint32_t offset = dim - begin_dim;
+    for (uint32_t i = 0; i < n; ++i) {
+      reader.read((char *)buf, sizeof(T) * begin_dim);
+      for (uint32_t j = 0; j < offset; ++j) {
+        reader.read((char *)(data + j * n + i), sizeof(T));
       }
     }
-    delete [] buf;
-    buf= nullptr;
-    std::cout << "read binary file from " << file_name << " done in ... seconds, n = "
-                  << n << ", dim = " << offset << std::endl;
+    delete[] buf;
+    buf = nullptr;
+    std::cout << "read binary file from " << file_name
+              << " done in ... seconds, n = " << n << ", dim = " << offset
+              << std::endl;
   }
 }
 
-void build_hnsw_sq(const std::string &index_path,
-                   const int hnswM,
-                   const int hnswefC,
-                   MetricType metric_type) {
+void build_hnsw_sq(const std::string &index_path, const int hnswM,
+                   const int hnswefC, MetricType metric_type) {
   TimeRecorder rc("create_graph_index");
   std::cout << "build hnsw parameters:" << std::endl;
   std::cout << " index_path: " << index_path << " hnsw.M: " << hnswM
@@ -299,76 +300,78 @@ void build_hnsw_sq(const std::string &index_path,
   uint32_t *pids = nullptr;
   uint32_t npts, ndim, nids, nidsdim, npts2;
   uint32_t total_n = 0;
-  float *pdata = nullptr; 
-  util::read_bin_file(index_path+BUCKET+CENTROIDS+BIN, pdata, total_n, ndim);
+  float *pdata = nullptr;
+  util::read_bin_file(index_path + BUCKET + CENTROIDS + BIN, pdata, total_n,
+                      ndim);
 
-  
   float *codes = new float[256 * ndim];
   uint8_t *codebook = new uint8_t[(uint64_t)total_n * (uint64_t)ndim];
   memset(codebook, 0, sizeof(uint8_t) * (uint64_t)total_n * (uint64_t)ndim);
   uint64_t sample_size = total_n * 0.01;
-  float * sample_data = new float [ndim * sample_size];
+  float *sample_data = new float[ndim * sample_size];
   random_sampling_k2(pdata, total_n, ndim, sample_size, sample_data);
-  float temp ;
+  float temp;
   // #pragma omp parallel for
   for (int i = 0; i < sample_size; i++) {
-      for(int j = i; j < ndim; j++) {
-          temp = sample_data[sample_size * j + i];
-          sample_data[sample_size * j + i] = sample_data[i * ndim + j];
-          sample_data[i * ndim + j] = temp;
-      }
+    for (int j = i; j < ndim; j++) {
+      temp = sample_data[sample_size * j + i];
+      sample_data[sample_size * j + i] = sample_data[i * ndim + j];
+      sample_data[i * ndim + j] = temp;
+    }
   }
 
   for (uint32_t i = 0; i < ndim; ++i) {
-      // std::cout<<"training the dim :     "<<i<<std::endl;
-      kmeans(sample_size, sample_data + i * sample_size, 1, 256, (float*)(codes + i * 256));
+    // std::cout<<"training the dim :     "<<i<<std::endl;
+    kmeans(sample_size, sample_data + i * sample_size, 1, 256,
+           (float *)(codes + i * 256));
   }
   // std::cout<<"training kmeans down    "<<std::endl;
-  delete [] sample_data;
+  delete[] sample_data;
 
-  #pragma omp parallel for    
+#pragma omp parallel for
   for (auto d = 0; d < ndim; d++) {
-      auto * d_code = codes + 256 * d;
-      std::sort(d_code , d_code + 256); 
+    auto *d_code = codes + 256 * d;
+    std::sort(d_code, d_code + 256);
   }
 
-  #pragma omp parallel for        
-  for (auto i = 0; i < total_n; i++) {           
-    auto * x_codebook = codebook + i  * ndim;
+#pragma omp parallel for
+  for (auto i = 0; i < total_n; i++) {
+    auto *x_codebook = codebook + i * ndim;
     for (auto d = 0; d < ndim; d++) {
-      auto * x_code = codes + 256 * d;
-      auto pos = std::lower_bound(x_code, x_code + 256, pdata[i * ndim + d]) - x_code;
-      if(pos == 256) { x_codebook[d] = 255; }
-      else if(pos == 0) {x_codebook[d] = 0; }
-      else {
-        x_codebook[d] = (
-        std::abs(x_code[pos-1] - pdata[i * ndim + d]) <
-        std::abs(x_code[pos] - pdata[i * ndim + d]) ? 
-        pos-1 : pos
-        );
-        }
-    }  
+      auto *x_code = codes + 256 * d;
+      auto pos =
+          std::lower_bound(x_code, x_code + 256, pdata[i * ndim + d]) - x_code;
+      if (pos == 256) {
+        x_codebook[d] = 255;
+      } else if (pos == 0) {
+        x_codebook[d] = 0;
+      } else {
+        x_codebook[d] = (std::abs(x_code[pos - 1] - pdata[i * ndim + d]) <
+                                 std::abs(x_code[pos] - pdata[i * ndim + d])
+                             ? pos - 1
+                             : pos);
+      }
+    }
   }
   delete[] pdata;
   pdata = nullptr;
 
   rc.RecordSection("load centroids of buckets and compute SQ done");
 
-  sq_hnswlib::SpaceInterface<float> *space= nullptr;
-  if (MetricType::L2==metric_type){
-    space=new sq_hnswlib::L2Space(ndim);
-  }
-  else if (MetricType::IP==metric_type) {
+  sq_hnswlib::SpaceInterface<float> *space = nullptr;
+  if (MetricType::L2 == metric_type) {
+    space = new sq_hnswlib::L2Space(ndim);
+  } else if (MetricType::IP == metric_type) {
     space = new sq_hnswlib::InnerProductSpace(ndim);
-  } else{
+  } else {
     std::cout << "invalid metric_type = " << (int)metric_type << std::endl;
     return;
   }
-  util::read_bin_file<uint32_t>(index_path + CLUSTER + COMBINE_IDS + BIN, pids, nids,
-                          nidsdim);
+  util::read_bin_file<uint32_t>(index_path + CLUSTER + COMBINE_IDS + BIN, pids,
+                                nids, nidsdim);
 
   auto index_hnsw = std::make_shared<sq_hnswlib::HierarchicalNSW<float>>(
-          space, total_n, hnswM, hnswefC,100,codes);
+      space, total_n, hnswM, hnswefC, 100, codes);
   index_hnsw->addPoint(codebook, pids[0]);
 #pragma omp parallel for
   for (int64_t i = 1; i < total_n; i++) {
@@ -391,16 +394,15 @@ void build_graph(const std::string &index_path, const int hnswM,
   std::cout << "build hnsw parameters:" << std::endl;
   std::cout << " index_path: " << index_path << " hnsw.M: " << hnswM
             << " hnsw.efConstruction: " << hnswefC
-            << " metric_type: " << (int)metric_type
-            << " sample: " << sample
+            << " metric_type: " << (int)metric_type << " sample: " << sample
             << std::endl;
 
   auto dis_computer = util::select_computer<DATAT, DATAT, DISTT>(metric_type);
   bool pickFurther = true;
   if (metric_type == MetricType::L2) {
-      pickFurther=true;
+    pickFurther = true;
   } else if (metric_type == MetricType::IP) {
-      pickFurther=false;
+    pickFurther = false;
   }
   DATAT *pdata = nullptr;
   uint32_t *pids = nullptr;
@@ -449,10 +451,11 @@ void build_graph(const std::string &index_path, const int hnswM,
     char *buf_begin = buf + sizeof(uint32_t);
 
     // calculate all vectors distance to centroid
-    DISTT* distance = new DISTT[entry_num];
+    DISTT *distance = new DISTT[entry_num];
     for (uint32_t j = 0; j < entry_num; ++j) {
-        char *entry_begin = buf_begin + entry_size * j;
-        distance[j] = dis_computer(reinterpret_cast<DATAT *>(entry_begin), pdata, ndim);
+      char *entry_begin = buf_begin + entry_size * j;
+      distance[j] =
+          dis_computer(reinterpret_cast<DATAT *>(entry_begin), pdata, ndim);
     }
 
     // for top distance samples distance
@@ -460,20 +463,22 @@ void build_graph(const std::string &index_path, const int hnswM,
     for (uint32_t j = 0; j < bucketSample; j++) {
       int32_t picked = -1;
       for (uint32_t k = 0; k < entry_num; k++) {
-          if (indices.find(k) != indices.end()) {
-              //already picked
-              continue;
-          }
-          if (picked == -1 || pickFurther? (distance[k] > distance[picked]) : (distance[k] < distance[picked])) {
-              picked = k;
-          }
+        if (indices.find(k) != indices.end()) {
+          // already picked
+          continue;
+        }
+        if (picked == -1 || pickFurther ? (distance[k] > distance[picked])
+                                        : (distance[k] < distance[picked])) {
+          picked = k;
+        }
       }
       if (picked == -1) {
-          break;
+        break;
       }
       indices.insert(picked);
       char *entry_begin = buf_begin + entry_size * picked;
-      index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin),bbann::util::gen_id(cid0, bid0, j + 1));
+      index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin),
+                           bbann::util::gen_id(cid0, bid0, j + 1));
     }
     delete[] distance;
     delete[] buf;
@@ -501,39 +506,43 @@ void build_graph(const std::string &index_path, const int hnswM,
       char *buf_begin = buf + sizeof(uint32_t);
 
       // calculate all distance to centroid
-      DISTT* distance = new DISTT[entry_num];
+      DISTT *distance = new DISTT[entry_num];
       for (uint32_t j = 0; j < entry_num; ++j) {
         char *entry_begin = buf_begin + entry_size * j;
-        distance[j] = dis_computer(reinterpret_cast<DATAT*>(entry_begin), pdata + i * ndim, ndim);
+        distance[j] = dis_computer(reinterpret_cast<DATAT *>(entry_begin),
+                                   pdata + i * ndim, ndim);
       }
 
       // for top distance samples distance
       std::unordered_set<int> indices;
       for (uint32_t j = 0; j < bucketSample; j++) {
-          int32_t picked = -1;
-          DISTT pickedDistance;
-          for (uint32_t k = 0; k < entry_num; k++) {
-              if (indices.find(k) != indices.end()) {
-                  //already picked
-                  continue;
-              }
-              if (picked == -1 || pickFurther? (distance[k] > distance[picked]) : (distance[k] < distance[picked])) {
-                  picked = k;
-              }
+        int32_t picked = -1;
+        DISTT pickedDistance;
+        for (uint32_t k = 0; k < entry_num; k++) {
+          if (indices.find(k) != indices.end()) {
+            // already picked
+            continue;
           }
-          if (picked == -1) {
-              break;
+          if (picked == -1 || pickFurther ? (distance[k] > distance[picked])
+                                          : (distance[k] < distance[picked])) {
+            picked = k;
           }
-          indices.insert(picked);
-          char *entry_begin = buf_begin + entry_size * picked;
-          index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin),bbann::util::gen_id(cid, bid, j + 1));
+        }
+        if (picked == -1) {
+          break;
+        }
+        indices.insert(picked);
+        char *entry_begin = buf_begin + entry_size * picked;
+        index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin),
+                             bbann::util::gen_id(cid, bid, j + 1));
       }
       delete[] distance;
       delete[] buf;
       fh.close();
     }
   }
-  std::cout << "hnsw totally add " << sample * nblocks << " points" << std::endl;
+  std::cout << "hnsw totally add " << sample * nblocks << " points"
+            << std::endl;
   rc.RecordSection("create index hnsw done");
   index_hnsw->saveIndex(index_path + HNSW + INDEX + BIN);
   rc.RecordSection("hnsw save index done");
@@ -594,7 +603,8 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len) {
   uint32_t placeholder = 1;
   uint32_t global_centroids_number = 0;
   uint32_t centroids_dim = 0;
-  util::get_bin_metadata(getClusterRawDataFileName(para.indexPrefixPath, 0), cluster_size, cluster_dim);
+  util::get_bin_metadata(getClusterRawDataFileName(para.indexPrefixPath, 0),
+                         cluster_size, cluster_dim);
 
   std::vector<DATAT> max_len(cluster_dim);
   std::vector<DATAT> min_len(cluster_dim);
@@ -603,8 +613,8 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len) {
     std::cout << "vector sq: read max/min from meta file" << std::endl;
     std::string meta_file = getSQMetaFileName(para.indexPrefixPath);
     IOReader meta_reader(meta_file);
-    meta_reader.read((char*)max_len.data(), sizeof(DATAT) * cluster_dim);
-    meta_reader.read((char*)min_len.data(), sizeof(DATAT) * cluster_dim);
+    meta_reader.read((char *)max_len.data(), sizeof(DATAT) * cluster_dim);
+    meta_reader.read((char *)min_len.data(), sizeof(DATAT) * cluster_dim);
   }
 
   {
@@ -637,8 +647,9 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len) {
       ids_reader.read((char *)&ids_dim, sizeof(uint32_t));
 
       if (para.vector_use_sq) {
-        entry_num = (para.blockSize - sizeof(uint32_t)) /
-                    (cluster_dim * sizeof(uint8_t) + ids_dim * sizeof(uint32_t));
+        entry_num =
+            (para.blockSize - sizeof(uint32_t)) /
+            (cluster_dim * sizeof(uint8_t) + ids_dim * sizeof(uint32_t));
       } else {
         entry_num = (para.blockSize - sizeof(uint32_t)) /
                     (cluster_dim * sizeof(DATAT) + ids_dim * sizeof(uint32_t));
@@ -693,28 +704,32 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len) {
         //           << " cur.num_elems:" << cur.num_elems
         //           << " cur.level:" << cur.level << std::endl;
         non_recursive_multilevel_kmeans<DATAT>(
-            i, // the index of k1 round k-means
-            cur.num_elems, // number vectors in this cluster
-            datai, // buffer to place all vectors
-            idi,   // buffer to place all ids
+            i,              // the index of k1 round k-means
+            cur.num_elems,  // number vectors in this cluster
+            datai,          // buffer to place all vectors
+            idi,            // buffer to place all ids
             cur.offset,     // the offset of to clustering data in this round
             cluster_dim,    // the dimension of vector
-            entry_num,      // threshold, determines when to stop recursive clustering
-            para.blockSize, // general 4096, determines how many vectors can be placed in a block
-            blk_num,        // output variable, number block output in this round clustering
-            data_writer,          // file writer 1: to output base vectors
+            entry_num,      // threshold, determines when to stop recursive
+                            // clustering
+            para.blockSize, // general 4096, determines how many vectors can be
+                            // placed in a block
+            blk_num,     // output variable, number block output in this round
+                         // clustering
+            data_writer, // file writer 1: to output base vectors
             centroids_writer,     // file writer 2: to output centroid vectors
             centroids_id_writer,  // file writer 3: to output centroid ids
             local_start_position, // the start position of all centroids id
-            cur.level,    // n-th round recursive clustering, start with 0
-            mutex,        // mutext to protect write out centroids
-            output_tasks, // output clustering tasks
-            para.vector_use_sq, // whether use scalar quantization on base vector
-            max_len, // the max values in each dimension
-            min_len, // the min values in each dimension
-            false,   // k-means parameter
-            avg_len  // k-means parameter
-            );
+            cur.level,          // n-th round recursive clustering, start with 0
+            mutex,              // mutext to protect write out centroids
+            output_tasks,       // output clustering tasks
+            para.vector_use_sq, // whether use scalar quantization on base
+                                // vector
+            max_len,            // the max values in each dimension
+            min_len,            // the min values in each dimension
+            false,              // k-means parameter
+            avg_len             // k-means parameter
+        );
 
         for (auto &output_task : output_tasks) {
           todo.push_back(output_task);
@@ -740,27 +755,31 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len) {
           //           << " cur.level:" << cur.level << std::endl;
           std::vector<ClusteringTask> output_tasks;
           non_recursive_multilevel_kmeans<DATAT>(
-                  i, // the index of k1 round k-means
-                  cur.num_elems, // number vectors in this cluster
-                  datai, // buffer to place all vectors
-                  idi,   // buffer to place all ids
-                  cur.offset,     // the offset of to clustering data in this round
-                  cluster_dim,    // the dimension of vector
-                  entry_num,      // threshold, determines when to stop recursive clustering
-                  para.blockSize, // general 4096, determines how many vectors can be placed in a block
-                  blk_num,        // output variable, number block output in this round clustering
-                  data_writer,          // file writer 1: to output base vectors
-                  centroids_writer,     // file writer 2: to output centroid vectors
-                  centroids_id_writer,  // file writer 3: to output centroid ids
-                  local_start_position, // the start position of all centroids id
-                  cur.level,    // n-th round recursive clustering, start with 0
-                  mutex,        // mutext to protect write out centroids
-                  output_tasks, // output clustering tasks
-                  para.vector_use_sq, // whether use scalar quantization on base vector
-                  max_len, // the max values in each dimension
-                  min_len, // the min values in each dimension
-                  false,   // k-means parameter
-                  avg_len  // k-means parameter
+              i,              // the index of k1 round k-means
+              cur.num_elems,  // number vectors in this cluster
+              datai,          // buffer to place all vectors
+              idi,            // buffer to place all ids
+              cur.offset,     // the offset of to clustering data in this round
+              cluster_dim,    // the dimension of vector
+              entry_num,      // threshold, determines when to stop recursive
+                              // clustering
+              para.blockSize, // general 4096, determines how many vectors can
+                              // be placed in a block
+              blk_num,     // output variable, number block output in this round
+                           // clustering
+              data_writer, // file writer 1: to output base vectors
+              centroids_writer,     // file writer 2: to output centroid vectors
+              centroids_id_writer,  // file writer 3: to output centroid ids
+              local_start_position, // the start position of all centroids id
+              cur.level,    // n-th round recursive clustering, start with 0
+              mutex,        // mutext to protect write out centroids
+              output_tasks, // output clustering tasks
+              para.vector_use_sq, // whether use scalar quantization on base
+                                  // vector
+              max_len,            // the max values in each dimension
+              min_len,            // the min values in each dimension
+              false,              // k-means parameter
+              avg_len             // k-means parameter
           );
           assert(output_tasks.empty());
         }
@@ -792,8 +811,10 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len) {
     global_centroids_number +=
         (end_position - global_start_position) / sizeof(uint32_t);
     // std::cout
-    //     << "calculate global_centroids_number by centroids id file position: "
-    //     << "global_centroids_number " << global_centroids_number << std::endl;
+    //     << "calculate global_centroids_number by centroids id file position:
+    //     "
+    //     << "global_centroids_number " << global_centroids_number <<
+    //     std::endl;
   }
 
   uint32_t centroids_id_dim = 1;
@@ -821,7 +842,7 @@ void hierarchical_clusters(const BBAnnParameters para, const double avg_len) {
   template void train_cluster<DATAT>(                                          \
       const std::string &raw_data_bin_file, const std::string &output_path,    \
       const int32_t K1, float **centroids, double &avg_len,                    \
-      bool vector_use_sq=false);                                               \
+      bool vector_use_sq = false);                                             \
   template void reservoir_sampling<DATAT>(const std::string &data_file,        \
                                           const size_t sample_num,             \
                                           DATAT *sample_data);
