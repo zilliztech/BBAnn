@@ -141,7 +141,6 @@ class BbANN(BaseANN):
         if not self.set_index_type(ds.distance(), ds.dtype):
             return False
 
-        self.para.dataFilePath = ds.get_dataset_fn()
         self.para.indexPrefixPath = index_dir+"/"
 
         start = time.time()
