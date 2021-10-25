@@ -278,7 +278,7 @@ a, b; float sx = 0; T* x = tdata + n * d;
 */
 
 template <typename T>
-inline void encode_uint8(T *max_len, T *min_len, T *data, uint8_t *code,
+inline void encode_uint8_2(T *max_len, T *min_len, T *data, uint8_t *code,
                          int64_t n, uint32_t dim) {
   for (int64_t i = 0; i < n; i++) {
     T x_temp;
@@ -296,7 +296,7 @@ inline void encode_uint8(T *max_len, T *min_len, T *data, uint8_t *code,
 }
 
 template <typename T>
-inline void decode_uint8(T *max_len, T *min_len, T *data, uint8_t *code,
+inline void decode_uint8_2(T *max_len, T *min_len, T *data, uint8_t *code,
                          int64_t n, uint32_t dim) {
   for (int64_t i = 0; i < n; i++) {
     auto *__restrict x = data + i * dim;
@@ -308,7 +308,7 @@ inline void decode_uint8(T *max_len, T *min_len, T *data, uint8_t *code,
 }
 
 template <typename T>
-inline void encode_uint8_2(T *max_len, T *min_len, T *data, uint8_t *code,
+inline void encode_uint8(T *max_len, T *min_len, T *data, uint8_t *code,
                            int64_t n, uint32_t dim) {
   for (int64_t i = 0; i < n; i++) {
     auto *__restrict x = data + i * dim;
@@ -320,7 +320,7 @@ inline void encode_uint8_2(T *max_len, T *min_len, T *data, uint8_t *code,
   }
 }
 template <typename T>
-inline void decode_uint8_2(T *max_len, T *min_len, T *data, uint8_t *code,
+inline void decode_uint8(T *max_len, T *min_len, T *data, uint8_t *code,
                            int64_t n, uint32_t dim) {
   for (int64_t i = 0; i < n; i++) {
     auto *__restrict x = data + i * dim;

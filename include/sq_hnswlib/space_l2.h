@@ -194,16 +194,15 @@ static float L2Sqr(const void *pVect1, const void *pVect2, const void *qty_ptr,
 
 #if defined(USE_SSE) || defined(USE_AVX)
   if (dim % 16 == 0)
-    L2SqrSIMD16Ext((void *)vec1.data(), (void *)vec2.data(), qty_ptr);
+    return L2SqrSIMD16Ext((void *)vec1.data(), (void *)vec2.data(), qty_ptr);
   else if (dim % 4 == 0)
-    L2SqrSIMD4Ext((void *)vec1.data(), (void *)vec2.data(), qty_ptr);
+    return L2SqrSIMD4Ext((void *)vec1.data(), (void *)vec2.data(), qty_ptr);
   else if (dim > 16)
-    L2SqrSIMD16ExtResiduals((void *)vec1.data(), (void *)vec2.data(), qty_ptr);
+    return L2SqrSIMD16ExtResiduals((void *)vec1.data(), (void *)vec2.data(), qty_ptr);
   else if (dim > 4)
-    L2SqrSIMD4ExtResiduals((void *)vec1.data(), (void *)vec2.data(), qty_ptr);
-#else
-  L2Sqr_float((void *)vec1.data(), (void *)vec2.data(), qty_ptr);
+    return L2SqrSIMD4ExtResiduals((void *)vec1.data(), (void *)vec2.data(), qty_ptr);
 #endif
+  return L2Sqr_float((void *)vec1.data(), (void *)vec2.data(), qty_ptr);
 }
 
 class L2Space : public SpaceInterface<float> {
