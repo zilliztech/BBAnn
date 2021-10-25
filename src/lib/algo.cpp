@@ -16,13 +16,6 @@ void search_graph_hnsw_sq(std::shared_ptr<sq_hnswlib::HierarchicalNSW<float>> in
                           const int nq, const int dq, const int nprobe,
                           const int refine_nprobe, const float *pquery,
                           uint32_t *buckets_label, float *centroids_dist) {
-  TimeRecorder rc("search graph");
-  std::cout << "search graph parameters:" << std::endl;
-  std::cout << " index_hnsw_sq: " << index_hnsw_sq << " nq: " << nq << " dq: " << dq
-            << " nprobe: " << nprobe << " refine_nprobe: " << refine_nprobe
-            << " pquery: " << static_cast<const void *>(pquery)
-            << " buckets_label: " << static_cast<void *>(buckets_label)
-            << std::endl;
   index_hnsw_sq->setEf(refine_nprobe);
   bool set_distance = centroids_dist != nullptr;
 #pragma omp parallel for
@@ -40,7 +33,6 @@ void search_graph_hnsw_sq(std::shared_ptr<sq_hnswlib::HierarchicalNSW<float>> in
       reti.pop();
     }
   }
-  rc.ElapseFromBegin("search graph done.");
 }
 
 template <typename DATAT, typename DISTT>
@@ -112,9 +104,9 @@ void train_cluster(const std::string &raw_data_bin_file,
       IOWriter meta_writer(meta_file);
       meta_writer.write((char*)max_len.data(), sizeof(DATAT) * dim);
       meta_writer.write((char*)min_len.data(), sizeof(DATAT) * dim);
-      for(int i =0; i< dim; i++) {
-          std::cout<<"dim: "<<i<<"max: "<<max_len[i]<<", min: "<<min_len[i]<<std::endl;
-      }
+      // for(int i =0; i< dim; i++) {
+      //     std::cout<<"dim: "<<i<<"max: "<<max_len[i]<<", min: "<<min_len[i]<<std::endl;
+      // }
   }
 
   delete[] sample_data;
@@ -328,10 +320,10 @@ void build_hnsw_sq(const std::string &index_path,
   }
 
   for (uint32_t i = 0; i < ndim; ++i) {
-      std::cout<<"training the dim :     "<<i<<std::endl;
+      // std::cout<<"training the dim :     "<<i<<std::endl;
       kmeans(sample_size, sample_data + i * sample_size, 1, 256, (float*)(codes + i * 256));
   }
-  std::cout<<"training kmeans down    "<<std::endl;
+  // std::cout<<"training kmeans down    "<<std::endl;
   delete [] sample_data;
 
   #pragma omp parallel for    
@@ -360,10 +352,7 @@ void build_hnsw_sq(const std::string &index_path,
   delete[] pdata;
   pdata = nullptr;
 
-
   rc.RecordSection("load centroids of buckets and compute SQ done");
-  rc.RecordSection("load centroids of buckets and compute SQ done");
-
 
   sq_hnswlib::SpaceInterface<float> *space= nullptr;
   if (MetricType::L2==metric_type){
@@ -468,7 +457,6 @@ void build_graph(const std::string &index_path, const int hnswM,
 
     // for top distance samples distance
     std::unordered_set<int> indices;
-    uint32_t one_percent = bucketSample / 100;
     for (uint32_t j = 0; j < bucketSample; j++) {
       int32_t picked = -1;
       for (uint32_t k = 0; k < entry_num; k++) {
@@ -486,7 +474,6 @@ void build_graph(const std::string &index_path, const int hnswM,
       indices.insert(picked);
       char *entry_begin = buf_begin + entry_size * picked;
       index_hnsw->addPoint(reinterpret_cast<DATAT *>(entry_begin),bbann::util::gen_id(cid0, bid0, j + 1));
-      if (j % one_percent == 0) std::cout << "HNSQ addPoint progress: " << j / one_percent << "%" << std::endl;
     }
     delete[] distance;
     delete[] buf;
