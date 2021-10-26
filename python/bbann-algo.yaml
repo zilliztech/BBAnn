@@ -590,11 +590,11 @@ text2image-1B:
       run-groups:
         base:
           args: |
-              [{"hnswM":32, "hnswefC":500, "K1":128, "blockSize":4096}]
+            [{"hnswM":32, "hnswefC":500, "K1":200, "blockSize":4096, "vector_use_sq":true, "use_hnsw_sq":true}]
           query-args: |
-              [{"nProbe":50, "efSearch":250, "K1":128, "blockSize":4096},
-              {"nProbe":100, "efSearch":500, "K1":128, "blockSize":4096},
-              {"nProbe":200, "efSearch":1000, "K1":128, "blockSize":4096}]
+            [{"nProbe":50, "efSearch":250, "K1":200, "blockSize":4096, "vector_use_sq":true, "use_hnsw_sq":true},
+              {"nProbe":100, "efSearch":500, "K1":200, "blockSize":4096, "vector_use_sq":true, "use_hnsw_sq":true},
+              {"nProbe":200, "efSearch":1000, "K1":200, "blockSize":4096, "vector_use_sq":true, "use_hnsw_sq":true}]
 ssnpp-10M:
     faiss-t1:
       docker-tag: billion-scale-benchmark-faissconda
@@ -747,9 +747,9 @@ text2image-1M:
       run-groups:
         base:
           args: |
-              [{"hnswM":32, "hnswefC":500, "K1":10, "blockSize":4096}]
+              [{"hnswM":32, "hnswefC":500, "K1":10, "blockSize":4096, "vector_use_sq":true, "use_hnsw_sq":true}]
           query-args: |
-              [{"nProbe":50, "efSearch":250, "K1":10, "blockSize":4096}]
+              [{"nProbe":50, "efSearch":250, "K1":10, "blockSize":4096, "vector_use_sq":true, "use_hnsw_sq":true}]
 text2image-10M:
    diskann-t2: 
       docker-tag: billion-scale-benchmark-diskann
