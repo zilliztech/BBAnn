@@ -94,6 +94,12 @@ public:
         free(linkLists_[i]);
     }
     free(linkLists_);
+
+    if (codes_) {
+        delete[] codes_;
+        codes_ = nullptr;
+    }
+
     delete visited_list_pool_;
   }
 
@@ -1208,7 +1214,7 @@ public:
             top_candidates.pop();
         }
         currObj = mutuallyConnectNewElement(data_point, cur_c, top_candidates,
-                                            level, false);
+                                            level, true);
       }
 
     } else {

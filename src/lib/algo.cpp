@@ -297,7 +297,7 @@ void build_hnsw_sq(const std::string &index_path, const int hnswM,
             << " hnsw.efConstruction: " << hnswefC
             << " metric_type: " << (int)metric_type << std::endl;
   uint32_t *pids = nullptr;
-  uint32_t npts, ndim, nids, nidsdim, npts2;
+  uint32_t ndim, nids, nidsdim, npts2;
   uint32_t total_n = 0;
   float *pdata = nullptr;
   util::read_bin_file(index_path + BUCKET + CENTROIDS + BIN, pdata, total_n,
@@ -376,11 +376,12 @@ void build_hnsw_sq(const std::string &index_path, const int hnswM,
   for (int64_t i = 1; i < total_n; i++) {
     index_hnsw->addPoint(codebook + i * ndim, pids[i]);
   }
-  std::cout << "hnsw totally add " << npts << " points" << std::endl;
   rc.RecordSection("create index hnsw done");
   index_hnsw->saveIndex(index_path + HNSW + INDEX + BIN);
   rc.RecordSection("hnsw save index done");
   delete[] pids;
+  delete[] codes;
+  delete[] codebook;
   pids = nullptr;
   rc.ElapseFromBegin("create index hnsw totally done");
 }
