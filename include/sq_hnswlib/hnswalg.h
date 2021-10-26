@@ -1214,7 +1214,7 @@ public:
             top_candidates.pop();
         }
         currObj = mutuallyConnectNewElement(data_point, cur_c, top_candidates,
-                                            level, true);
+                                            level, false);
       }
 
     } else {
