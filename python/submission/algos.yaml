@@ -282,7 +282,9 @@ msspacev-1B:
       run-groups:
         base:
           args: |
-              [{"hnswM":32, "hnswefC":500, "K1":128, "blockSize":4096, "sample":1, "identifier":"bbann"}]
+              [{"hnswM":32, "hnswefC":500, "K1":128, "blockSize":4096, "sample":1, "identifier":"bbann",
+                "url": "https://zilliznfs.blob.core.windows.net/bbann/Upload_Candidate_SPACEV_M32_Sample1"
+                }]
           query-args: |
               [
                 {"nProbe": 50, "efSearch":250, "K1":128, "blockSize":4096, "identifier": "bbann"},
@@ -489,7 +491,9 @@ ssnpp-1B:
       run-groups:
         base:
           args: |
-              [{"hnswM":32, "hnswefC":500, "K1":128, "blockSize":4096, "identifier":"bbann"}]
+              [{"hnswM":32, "hnswefC":500, "K1":128, "blockSize":4096, "identifier":"bbann",
+                "url": "https://zilliznfs.blob.core.windows.net/bbann/Upload_Candidate_SSNPP"
+                }]
           query-args: |
             [
               {"rangeSearchProbeCount":20, "efSearch":250, "K1":128, "blockSize":4096, "radiusFactor":0.95, "identifier":"bbann"},
