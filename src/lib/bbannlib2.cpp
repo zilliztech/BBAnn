@@ -1,6 +1,6 @@
 #include "lib/bbannlib2.h"
 #include "ann_interface.h"
-#include "sq_hnswlib/hnswalg.h"
+#include "hnswsqlib/hnswalg.h"
 #include "util/TimeRecorder.h"
 #include "util/file_handler.h"
 #include "util/heap.h"
@@ -63,17 +63,17 @@ bool BBAnnIndex2<dataT, distanceT>::LoadIndex(std::string &indexPathPrefix,
 
   if (para.use_hnsw_sq) {
 
-    sq_hnswlib::SpaceInterface<float> *space = nullptr;
+    hnswsqlib::SpaceInterface<float> *space = nullptr;
     if (MetricType::L2 == metric_) {
-      space = new sq_hnswlib::L2Space(dim);
+      space = new hnswsqlib::L2Space(dim);
     } else if (MetricType::IP == metric_) {
-      space = new sq_hnswlib::InnerProductSpace(dim);
+      space = new hnswsqlib::InnerProductSpace(dim);
     } else {
       return false;
     }
 
     index_hnsw_ = nullptr;
-    index_sq_hnsw_ = std::make_shared<sq_hnswlib::HierarchicalNSW<float>>(
+    index_sq_hnsw_ = std::make_shared<hnswsqlib::HierarchicalNSW<float>>(
         space, getHnswIndexFileName());
   } else {
     // hnswlib::SpaceInterface<distanceT> *space =
@@ -91,7 +91,7 @@ bool BBAnnIndex2<dataT, distanceT>::LoadIndex(std::string &indexPathPrefix,
 template <typename DATAT, typename DISTT>
 void search_bbann_queryonly(
     std::shared_ptr<hnswlib::HierarchicalNSW<DISTT>> index_hnsw,
-    std::shared_ptr<sq_hnswlib::HierarchicalNSW<float>> index_sq_hnsw,
+    std::shared_ptr<hnswsqlib::HierarchicalNSW<float>> index_sq_hnsw,
     const BBAnnParameters para, const int topk, const DATAT *pquery,
     uint32_t *answer_ids, DISTT *answer_dists, uint32_t nq, uint32_t dim) {
   TimeRecorder rc("search bigann");

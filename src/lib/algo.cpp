@@ -12,7 +12,7 @@ namespace bbann {
 std::string Hello() { return "Hello!!!!"; }
 
 void search_graph_hnsw_sq(
-    std::shared_ptr<sq_hnswlib::HierarchicalNSW<float>> index_hnsw_sq,
+    std::shared_ptr<hnswsqlib::HierarchicalNSW<float>> index_hnsw_sq,
     const int nq, const int dq, const int nprobe, const int refine_nprobe,
     const float *pquery, uint32_t *buckets_label, float *centroids_dist) {
   bool set_distance = centroids_dist != nullptr;
@@ -20,6 +20,7 @@ void search_graph_hnsw_sq(
   for (int64_t i = 0; i < nq; i++) {
     // move the duplicate logic into inner loop
     // TODO optimize this
+
     float *queryi_dist = set_distance ? centroids_dist + i * nprobe : nullptr;
     auto reti = index_hnsw_sq->searchKnn(pquery + i * dq, nprobe);
     auto p_labeli = buckets_label + i * nprobe;
@@ -303,65 +304,14 @@ void build_hnsw_sq(const std::string &index_path, const int hnswM,
   util::read_bin_file(index_path + BUCKET + CENTROIDS + BIN, pdata, total_n,
                       ndim);
 
-  float *codes = new float[256 * ndim];
-  uint8_t *codebook = new uint8_t[(uint64_t)total_n * (uint64_t)ndim];
-  memset(codebook, 0, sizeof(uint8_t) * (uint64_t)total_n * (uint64_t)ndim);
-  uint64_t sample_size = total_n * 0.01;
-  float *sample_data = new float[ndim * sample_size];
-  random_sampling_k2(pdata, total_n, ndim, sample_size, sample_data);
-  float temp;
-  // #pragma omp parallel for
-  for (int i = 0; i < sample_size; i++) {
-    for (int j = i; j < ndim; j++) {
-      temp = sample_data[sample_size * j + i];
-      sample_data[sample_size * j + i] = sample_data[i * ndim + j];
-      sample_data[i * ndim + j] = temp;
-    }
-  }
-
-  for (uint32_t i = 0; i < ndim; ++i) {
-    // std::cout<<"training the dim :     "<<i<<std::endl;
-    kmeans(sample_size, sample_data + i * sample_size, 1, 256,
-           (float *)(codes + i * 256));
-  }
-  // std::cout<<"training kmeans down    "<<std::endl;
-  delete[] sample_data;
-
-#pragma omp parallel for
-  for (auto d = 0; d < ndim; d++) {
-    auto *d_code = codes + 256 * d;
-    std::sort(d_code, d_code + 256);
-  }
-
-#pragma omp parallel for
-  for (auto i = 0; i < total_n; i++) {
-    auto *x_codebook = codebook + i * ndim;
-    for (auto d = 0; d < ndim; d++) {
-      auto *x_code = codes + 256 * d;
-      auto pos =
-          std::lower_bound(x_code, x_code + 256, pdata[i * ndim + d]) - x_code;
-      if (pos == 256) {
-        x_codebook[d] = 255;
-      } else if (pos == 0) {
-        x_codebook[d] = 0;
-      } else {
-        x_codebook[d] = (std::abs(x_code[pos - 1] - pdata[i * ndim + d]) <
-                                 std::abs(x_code[pos] - pdata[i * ndim + d])
-                             ? pos - 1
-                             : pos);
-      }
-    }
-  }
-  delete[] pdata;
-  pdata = nullptr;
 
   rc.RecordSection("load centroids of buckets and compute SQ done");
 
-  sq_hnswlib::SpaceInterface<float> *space = nullptr;
+  hnswsqlib::SpaceInterface<float> *space = nullptr;
   if (MetricType::L2 == metric_type) {
-    space = new sq_hnswlib::L2Space(ndim);
+    space = new hnswsqlib::L2Space(ndim);
   } else if (MetricType::IP == metric_type) {
-    space = new sq_hnswlib::InnerProductSpace(ndim);
+    space = new hnswsqlib::InnerProductSpace(ndim);
   } else {
     std::cout << "invalid metric_type = " << (int)metric_type << std::endl;
     return;
@@ -369,12 +319,15 @@ void build_hnsw_sq(const std::string &index_path, const int hnswM,
   util::read_bin_file<uint32_t>(index_path + CLUSTER + COMBINE_IDS + BIN, pids,
                                 nids, nidsdim);
 
-  auto index_hnsw = std::make_shared<sq_hnswlib::HierarchicalNSW<float>>(
-      space, total_n, hnswM, hnswefC, 100, codes);
-  index_hnsw->addPoint(codebook, pids[0]);
+  auto index_hnsw = std::make_shared<hnswsqlib::HierarchicalNSW<float>>(
+      space, total_n, hnswM, hnswefC, 100);
+  //train sq
+  index_hnsw->train_codebook(pdata, total_n);
+
+  index_hnsw->addPoint(pdata, pids[0]);
 #pragma omp parallel for
   for (int64_t i = 1; i < total_n; i++) {
-    index_hnsw->addPoint(codebook + i * ndim, pids[i]);
+    index_hnsw->addPoint(pdata + i * ndim, pids[i]);
   }
   std::cout << "hnsw totally add " << npts << " points" << std::endl;
   rc.RecordSection("create index hnsw done");
