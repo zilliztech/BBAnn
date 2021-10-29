@@ -603,31 +603,37 @@ namespace hnswsqlib {
 
         void encode_data() {
             size_t encode_data_size = sizeof(uint8_t) * scalar_quantizer_->get_dim();
-            size_t size_encode_data_per_element_ = size_links_level0_ + encode_data_size + sizeof(labeltype);
-            char* encode_data_level0_memory_ = (char *) malloc(cur_element_count * size_encode_data_per_element_);
+            size_t size_encode_data_per_element = size_links_level0_ + encode_data_size + sizeof(labeltype);
+            char* encode_data_level0_memory = (char *) malloc(cur_element_count * size_encode_data_per_element);
             size_t encode_data_offest = size_links_level0_;
             size_t encode_label_offest = size_links_level0_ + encode_data_size;
 
             for (auto i = 0; i < cur_element_count; i++) {
                 char * element = data_level0_memory_ + i * size_data_per_element_;
-                char * code = encode_data_level0_memory_ + i * size_encode_data_per_element_;
+                char * code = encode_data_level0_memory + i * size_encode_data_per_element;
                 memcpy(code, element, size_links_level0_);
                 scalar_quantizer_->encode_code((float*)(element + offsetData_), (uint8_t*)(code + encode_data_offest),scalar_quantizer_->get_dim());
                 memcpy(code + encode_label_offest, element + label_offset_, sizeof(labeltype));
             }
             free(data_level0_memory_);
-            data_level0_memory_ = encode_data_level0_memory_;
+            data_level0_memory_ = encode_data_level0_memory;
         }
 
         void saveIndex(const std::string &location) {
+
+            encode_data();
+            size_t encode_data_size = sizeof(uint8_t) * scalar_quantizer_->get_dim();
+            size_t size_encode_data_per_element = size_links_level0_ + encode_data_size + sizeof(labeltype);
+            size_t encode_label_offest = size_links_level0_ + encode_data_size;
+
             std::ofstream output(location, std::ios::binary);
             std::streampos position;
 
             writeBinaryPOD(output, offsetLevel0_);
             writeBinaryPOD(output, max_elements_);
             writeBinaryPOD(output, cur_element_count);
-            writeBinaryPOD(output, size_data_per_element_);
-            writeBinaryPOD(output, label_offset_);
+            writeBinaryPOD(output, size_encode_data_per_element);
+            writeBinaryPOD(output, encode_label_offest);
             writeBinaryPOD(output, offsetData_);
             writeBinaryPOD(output, maxlevel_);
             writeBinaryPOD(output, enterpoint_node_);
@@ -638,7 +644,7 @@ namespace hnswsqlib {
             writeBinaryPOD(output, mult_);
             writeBinaryPOD(output, ef_construction_);
 
-            output.write(data_level0_memory_, cur_element_count * size_data_per_element_);
+            output.write(data_level0_memory_, cur_element_count * size_encode_data_per_element);
 
 
 
