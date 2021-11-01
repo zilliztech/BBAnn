@@ -333,8 +333,19 @@ void build_hnsw_sq(const std::string &index_path, const int hnswM,
   rc.RecordSection("create index hnsw done");
   index_hnsw->saveIndex(index_path + HNSW + INDEX + BIN);
   rc.RecordSection("hnsw save index done");
-  delete[] pids;
-  pids = nullptr;
+  if(pids != nullptr) {
+    delete[] pids;
+    pids = nullptr;
+  }
+  if(pdata != nullptr) {
+    delete [] pdata;
+    pdata = nullptr;
+  }
+  if(space != nullptr) {
+    delete space;
+    space = nullptr;
+  }
+
   rc.ElapseFromBegin("create index hnsw totally done");
 }
 
@@ -495,7 +506,7 @@ void build_graph(const std::string &index_path, const int hnswM,
   }
   std::cout << "hnsw totally add " << sample * nblocks << " points"
             << std::endl;
-  rc.RecordSection("create index hnsw done");
+  rc.RecordSection("create F hnsw done");
   index_hnsw->saveIndex(index_path + HNSW + INDEX + BIN);
   rc.RecordSection("hnsw save index done");
   delete[] pdata;

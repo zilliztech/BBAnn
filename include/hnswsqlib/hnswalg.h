@@ -58,9 +58,6 @@ namespace hnswsqlib {
 
             visited_list_pool_ = new VisitedListPool(1, max_elements);
 
-            // init the scalar quantizer
-            scalar_quantizer_ = new ScalarQuantizer(*((size_t *) dist_func_param_));
-
             //initializations for special treatment of the first node
             enterpoint_node_ = -1;
             maxlevel_ = -1;
@@ -71,6 +68,9 @@ namespace hnswsqlib {
             size_links_per_element_ = maxM_ * sizeof(tableint) + sizeof(linklistsizeint);
             mult_ = 1 / log(1.0 * M_);
             revSize_ = 1.0 / mult_;
+
+            
+            scalar_quantizer_ = new ScalarQuantizer(*((size_t*)dist_func_param_));
         }
 
         struct CompareByFirst {
@@ -81,15 +81,15 @@ namespace hnswsqlib {
         };
 
         ~HierarchicalNSW() {
-
+            
             free(data_level0_memory_);
             for (tableint i = 0; i < cur_element_count; i++) {
                 if (element_levels_[i] > 0)
                     free(linkLists_[i]);
             }
             free(linkLists_);
-            delete visited_list_pool_;
             delete scalar_quantizer_;
+            delete visited_list_pool_;
         }
 
         size_t max_elements_;
@@ -179,7 +179,7 @@ namespace hnswsqlib {
 
             dist_t lowerBound;
             if (!isMarkedDeleted(ep_id)) {
-                dist_t dist = fstdistfunc_(data_point, getDataByInternalId(ep_id), dist_func_param_);
+                dist_t dist = fstdistfunc_(data_point, getDataByInternalId(ep_id), dist_func_param_, scalar_quantizer_);
                 top_candidates.emplace(dist, ep_id);
                 lowerBound = dist;
                 candidateSet.emplace(-dist, ep_id);
@@ -227,7 +227,7 @@ namespace hnswsqlib {
                     visited_array[candidate_id] = visited_array_tag;
                     char *currObj1 = (getDataByInternalId(candidate_id));
 
-                    dist_t dist1 = fstdistfunc_(data_point, currObj1, dist_func_param_);
+                    dist_t dist1 = fstdistfunc_(data_point, currObj1, dist_func_param_, scalar_quantizer_);
                     if (top_candidates.size() < ef_construction_ || lowerBound > dist1) {
                         candidateSet.emplace(-dist1, candidate_id);
 #ifdef USE_SSE
@@ -265,7 +265,7 @@ namespace hnswsqlib {
 
             dist_t lowerBound;
             if (!has_deletions || !isMarkedDeleted(ep_id)) {
-                dist_t dist = fstdistfunc_(data_point, getDataByInternalId(ep_id), dist_func_param_);
+                dist_t dist = fstdistfunc_(data_point, getDataByInternalId(ep_id), dist_func_param_, scalar_quantizer_);
                 lowerBound = dist;
                 top_candidates.emplace(dist, ep_id);
                 candidate_set.emplace(-dist, ep_id);
@@ -314,7 +314,7 @@ namespace hnswsqlib {
                         visited_array[candidate_id] = visited_array_tag;
 
                         char *currObj1 = (getDataByInternalId(candidate_id));
-                        dist_t dist = fstdistfunc_(data_point, currObj1, dist_func_param_);
+                        dist_t dist = fstdistfunc_(data_point, currObj1, dist_func_param_, scalar_quantizer_);
 
                         if (top_candidates.size() < ef || lowerBound > dist) {
                             candidate_set.emplace(-dist, candidate_id);
@@ -367,7 +367,7 @@ namespace hnswsqlib {
                     dist_t curdist =
                             fstdistfunc_(getDataByInternalId(second_pair.second),
                                          getDataByInternalId(curent_pair.second),
-                                         dist_func_param_);;
+                                         dist_func_param_, scalar_quantizer_);
                     if (curdist < dist_to_query) {
                         good = false;
                         break;
@@ -479,7 +479,7 @@ namespace hnswsqlib {
                     } else {
                         // finding the "weakest" element to replace it with the new one
                         dist_t d_max = fstdistfunc_(getDataByInternalId(cur_c), getDataByInternalId(selectedNeighbors[idx]),
-                                                    dist_func_param_);
+                                                    dist_func_param_, scalar_quantizer_);
                         // Heuristic:
                         std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst> candidates;
                         candidates.emplace(d_max, cur_c);
@@ -487,7 +487,7 @@ namespace hnswsqlib {
                         for (size_t j = 0; j < sz_link_list_other; j++) {
                             candidates.emplace(
                                     fstdistfunc_(getDataByInternalId(data[j]), getDataByInternalId(selectedNeighbors[idx]),
-                                                 dist_func_param_), data[j]);
+                                                 dist_func_param_, scalar_quantizer_), data[j]);
                         }
 
                         getNeighborsByHeuristic2(candidates, Mcurmax);
@@ -531,7 +531,7 @@ namespace hnswsqlib {
             std::priority_queue<std::pair<dist_t, tableint  >> top_candidates;
             if (cur_element_count == 0) return top_candidates;
             tableint currObj = enterpoint_node_;
-            dist_t curdist = fstdistfunc_(query_data, getDataByInternalId(enterpoint_node_), dist_func_param_);
+            dist_t curdist = fstdistfunc_(query_data, getDataByInternalId(enterpoint_node_), dist_func_param_, scalar_quantizer_);
 
             for (size_t level = maxlevel_; level > 0; level--) {
                 bool changed = true;
@@ -543,9 +543,12 @@ namespace hnswsqlib {
                     tableint *datal = (tableint *) (data + 1);
                     for (int i = 0; i < size; i++) {
                         tableint cand = datal[i];
-                        if (cand < 0 || cand > max_elements_)
+                        if (cand < 0 || cand > max_elements_) {
+                            std::cout<<"cand"<<cand<<" max_elements_"<<max_elements_<<std::endl;
                             throw std::runtime_error("cand error");
-                        dist_t d = fstdistfunc_(query_data, getDataByInternalId(cand), dist_func_param_);
+                        }
+                            
+                        dist_t d = fstdistfunc_(query_data, getDataByInternalId(cand), dist_func_param_, scalar_quantizer_);
 
                         if (d < curdist) {
                             curdist = d;
@@ -604,7 +607,7 @@ namespace hnswsqlib {
         void encode_data() {
             size_t encode_data_size = sizeof(uint8_t) * scalar_quantizer_->get_dim();
             size_t size_encode_data_per_element = size_links_level0_ + encode_data_size + sizeof(labeltype);
-            char* encode_data_level0_memory = (char *) malloc(cur_element_count * size_encode_data_per_element);
+            char* encode_data_level0_memory = new char [cur_element_count * size_encode_data_per_element];
             size_t encode_data_offest = size_links_level0_;
             size_t encode_label_offest = size_links_level0_ + encode_data_size;
 
@@ -612,11 +615,15 @@ namespace hnswsqlib {
                 char * element = data_level0_memory_ + i * size_data_per_element_;
                 char * code = encode_data_level0_memory + i * size_encode_data_per_element;
                 memcpy(code, element, size_links_level0_);
-                scalar_quantizer_->encode_code((float*)(element + offsetData_), (uint8_t*)(code + encode_data_offest),scalar_quantizer_->get_dim());
+                scalar_quantizer_->encode_code((float*)(element + offsetData_), (uint8_t*)(code + encode_data_offest), 1);
                 memcpy(code + encode_label_offest, element + label_offset_, sizeof(labeltype));
             }
-            free(data_level0_memory_);
-            data_level0_memory_ = encode_data_level0_memory;
+            //if(size_encode_data_per_element > size_data_per_element_) {
+            //    std::cout<<"realloc the data_level0_memory"<<std::endl;
+            //    data_level0_memory_ = (char*) realloc(data_level0_memory_, cur_element_count * size_encode_data_per_element);
+            //}
+            memcpy(data_level0_memory_, encode_data_level0_memory, cur_element_count * size_encode_data_per_element);
+            delete [] encode_data_level0_memory;
         }
 
         void saveIndex(const std::string &location) {
@@ -781,7 +788,7 @@ namespace hnswsqlib {
 
 
             // alloc memory and read codes from another file
-            scalar_quantizer_ = new ScalarQuantizer(*((size_t*)s->get_dist_func_param()));
+            scalar_quantizer_ = new ScalarQuantizer(*((size_t*)dist_func_param_));
             std::ifstream codes_input(location + ".codebook", std::ios::binary);
             codes_input.read((char*)scalar_quantizer_->get_codebook(), scalar_quantizer_->get_codebook_size());
             codes_input.close();
@@ -913,7 +920,7 @@ namespace hnswsqlib {
                         if (cand == neigh)
                             continue;
 
-                        dist_t distance = fstdistfunc_(getDataByInternalId(neigh), getDataByInternalId(cand), dist_func_param_);
+                        dist_t distance = fstdistfunc_(getDataByInternalId(neigh), getDataByInternalId(cand), dist_func_param_, scalar_quantizer_);
                         if (candidates.size() < elementsToKeep) {
                             candidates.emplace(distance, cand);
                         } else {
@@ -948,7 +955,7 @@ namespace hnswsqlib {
         void repairConnectionsForUpdate(const void *dataPoint, tableint entryPointInternalId, tableint dataPointInternalId, int dataPointLevel, int maxLevel) {
             tableint currObj = entryPointInternalId;
             if (dataPointLevel < maxLevel) {
-                dist_t curdist = fstdistfunc_(dataPoint, getDataByInternalId(currObj), dist_func_param_);
+                dist_t curdist = fstdistfunc_(dataPoint, getDataByInternalId(currObj), dist_func_param_, scalar_quantizer_);
                 for (int level = maxLevel; level > dataPointLevel; level--) {
                     bool changed = true;
                     while (changed) {
@@ -966,7 +973,7 @@ namespace hnswsqlib {
                             _mm_prefetch(getDataByInternalId(*(datal + i + 1)), _MM_HINT_T0);
 #endif
                             tableint cand = datal[i];
-                            dist_t d = fstdistfunc_(dataPoint, getDataByInternalId(cand), dist_func_param_);
+                            dist_t d = fstdistfunc_(dataPoint, getDataByInternalId(cand), dist_func_param_, scalar_quantizer_);
                             if (d < curdist) {
                                 curdist = d;
                                 currObj = cand;
@@ -997,7 +1004,7 @@ namespace hnswsqlib {
                 if (filteredTopCandidates.size() > 0) {
                     bool epDeleted = isMarkedDeleted(entryPointInternalId);
                     if (epDeleted) {
-                        filteredTopCandidates.emplace(fstdistfunc_(dataPoint, getDataByInternalId(entryPointInternalId), dist_func_param_), entryPointInternalId);
+                        filteredTopCandidates.emplace(fstdistfunc_(dataPoint, getDataByInternalId(entryPointInternalId), dist_func_param_, scalar_quantizer_), entryPointInternalId);
                         if (filteredTopCandidates.size() > ef_construction_)
                             filteredTopCandidates.pop();
                     }
@@ -1040,6 +1047,7 @@ namespace hnswsqlib {
                 }
 
                 if (cur_element_count >= max_elements_) {
+                    std::cout<<"cur_element_count"<<cur_element_count<<" "<<"max elements"<<max_elements_<<std::endl;
                     throw std::runtime_error("The number of elements exceeds the specified limit");
                 };
 
@@ -1084,7 +1092,7 @@ namespace hnswsqlib {
 
                 if (curlevel < maxlevelcopy) {
 
-                    dist_t curdist = fstdistfunc_(data_point, getDataByInternalId(currObj), dist_func_param_);
+                    dist_t curdist = fstdistfunc_(data_point, getDataByInternalId(currObj), dist_func_param_, scalar_quantizer_);
                     for (int level = maxlevelcopy; level > curlevel; level--) {
 
 
@@ -1101,7 +1109,7 @@ namespace hnswsqlib {
                                 tableint cand = datal[i];
                                 if (cand < 0 || cand > max_elements_)
                                     throw std::runtime_error("cand error");
-                                dist_t d = fstdistfunc_(data_point, getDataByInternalId(cand), dist_func_param_);
+                                dist_t d = fstdistfunc_(data_point, getDataByInternalId(cand), dist_func_param_, scalar_quantizer_);
                                 if (d < curdist) {
                                     curdist = d;
                                     currObj = cand;
@@ -1120,7 +1128,7 @@ namespace hnswsqlib {
                     std::priority_queue<std::pair<dist_t, tableint>, std::vector<std::pair<dist_t, tableint>>, CompareByFirst> top_candidates = searchBaseLayer(
                             currObj, data_point, level);
                     if (epDeleted) {
-                        top_candidates.emplace(fstdistfunc_(data_point, getDataByInternalId(enterpoint_copy), dist_func_param_), enterpoint_copy);
+                        top_candidates.emplace(fstdistfunc_(data_point, getDataByInternalId(enterpoint_copy), dist_func_param_, scalar_quantizer_), enterpoint_copy);
                         if (top_candidates.size() > ef_construction_)
                             top_candidates.pop();
                     }
@@ -1145,11 +1153,12 @@ namespace hnswsqlib {
 
         std::priority_queue<std::pair<dist_t, labeltype >>
         searchKnn(const void *query_data, size_t k) const {
+            std::cout<<"enter point "<<enterpoint_node_<<std::endl;
             std::priority_queue<std::pair<dist_t, labeltype >> result;
             if (cur_element_count == 0) return result;
 
             tableint currObj = enterpoint_node_;
-            dist_t curdist = fstdistfunc_(query_data, getDataByInternalId(enterpoint_node_), dist_func_param_);
+            dist_t curdist = fstdistfunc_(query_data, getDataByInternalId(enterpoint_node_), dist_func_param_, scalar_quantizer_);
 
             for (int level = maxlevel_; level > 0; level--) {
                 bool changed = true;
@@ -1165,11 +1174,15 @@ namespace hnswsqlib {
                     tableint *datal = (tableint *) (data + 1);
                     for (int i = 0; i < size; i++) {
                         tableint cand = datal[i];
-                        if (cand < 0 || cand > max_elements_)
+                        if (cand < 0 || cand > max_elements_){
+                            std::cout<<"level"<<level<<"cand"<<cand<<" max_elements_"<<max_elements_<<std::endl;
                             throw std::runtime_error("cand error");
-                        dist_t d = fstdistfunc_(query_data, getDataByInternalId(cand), dist_func_param_);
+                        }
+                            
+                        dist_t d = fstdistfunc_(query_data, getDataByInternalId(cand), dist_func_param_, scalar_quantizer_);
 
                         if (d < curdist) {
+                            std::cout<<"cand "<<cand<<" dis "<<d<<"currobj"<<currObj<<" dis "<<curdist<<std::endl;
                             curdist = d;
                             currObj = cand;
                             changed = true;

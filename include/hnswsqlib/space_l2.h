@@ -1,10 +1,11 @@
 #pragma once
 #include "hnswlib.h"
+#include "hnswalg.h"
 #include "scalar_quantizer.h"
 
 namespace hnswsqlib {
 
-    static float
+    inline float
     L2Sqr(const void *pVect1v, const void *pVect2v, const void *qty_ptr) {
         float *pVect1 = (float *) pVect1v;
         float *pVect2 = (float *) pVect2v;
@@ -23,7 +24,7 @@ namespace hnswsqlib {
 #if defined(USE_AVX)
 
     // Favor using AVX if available.
-    static float
+    inline float
     L2SqrSIMD16Ext(const void *pVect1v, const void *pVect2v, const void *qty_ptr) {
         float *pVect1 = (float *) pVect1v;
         float *pVect2 = (float *) pVect2v;
@@ -58,7 +59,7 @@ namespace hnswsqlib {
 
 #elif defined(USE_SSE)
 
-    static float
+    inline float
     L2SqrSIMD16Ext(const void *pVect1v, const void *pVect2v, const void *qty_ptr) {
         float *pVect1 = (float *) pVect1v;
         float *pVect2 = (float *) pVect2v;
@@ -108,7 +109,7 @@ namespace hnswsqlib {
 #endif
 
 #if defined(USE_SSE) || defined(USE_AVX)
-    static float
+    inline float
     L2SqrSIMD16ExtResiduals(const void *pVect1v, const void *pVect2v, const void *qty_ptr) {
         size_t qty = *((size_t *) qty_ptr);
         size_t qty16 = qty >> 4 << 4;
@@ -124,7 +125,7 @@ namespace hnswsqlib {
 
 
 #ifdef USE_SSE
-    static float
+    inline float
     L2SqrSIMD4Ext(const void *pVect1v, const void *pVect2v, const void *qty_ptr) {
         float PORTABLE_ALIGN32 TmpRes[8];
         float *pVect1 = (float *) pVect1v;
@@ -151,7 +152,7 @@ namespace hnswsqlib {
         return TmpRes[0] + TmpRes[1] + TmpRes[2] + TmpRes[3];
     }
 
-    static float
+    inline float
     L2SqrSIMD4ExtResiduals(const void *pVect1v, const void *pVect2v, const void *qty_ptr) {
         size_t qty = *((size_t *) qty_ptr);
         size_t qty4 = qty >> 2 << 2;
@@ -167,6 +168,46 @@ namespace hnswsqlib {
     }
 #endif
 
+static float 
+    L2sqr_without_code(const void *pVect1v, const void *pVect2v, const void *qty_ptr, ScalarQuantizer *scalar_quantizer) {
+        size_t qty = *((size_t *) qty_ptr);
+    #if defined(USE_SSE) || defined(USE_AVX)
+        if (qty % 16 == 0)
+            return L2SqrSIMD16Ext((void*)pVect1v, (void*)pVect2v, qty_ptr);
+        else if (qty % 4 == 0)
+            return L2SqrSIMD4Ext((void*)pVect1v, (void*)pVect2v, qty_ptr);
+        else if (qty > 16)
+            return L2SqrSIMD16ExtResiduals((void*)pVect1v, (void*)pVect2v, qty_ptr);
+        else if (qty > 4)
+            return L2SqrSIMD4ExtResiduals((void*)pVect1v, (void*)pVect2v, qty_ptr);
+        #else
+            return L2Sqr((void*)pVect1v, (void*)pVect2v, qty_ptr);
+        #endif
+}
+
+static float
+    L2sqr_with_code(const void *pVect1v, const void *pVect2v, const void *qty_ptr, ScalarQuantizer *scalar_quantizer) {
+        size_t qty = *((size_t *) qty_ptr);
+        float *pVect1 = (float *) pVect1v;
+        float *pVect2 = new float[qty];
+        float result ;
+        scalar_quantizer->decode_code(pVect2, (uint8_t*)pVect2v, 1);
+        #if defined(USE_SSE) || defined(USE_AVX)
+        if (qty % 16 == 0)
+            result = L2SqrSIMD16Ext((void*)pVect1, (void*)pVect2, qty_ptr);
+        else if (qty % 4 == 0)
+            result = L2SqrSIMD4Ext((void*)pVect1, (void*)pVect2, qty_ptr);
+        else if (qty > 16)
+            result = L2SqrSIMD16ExtResiduals((void*)pVect1, (void*)pVect2, qty_ptr);
+        else if (qty > 4)
+            result = L2SqrSIMD4ExtResiduals((void*)pVect1, (void*)pVect2, qty_ptr);
+        #else
+            result = L2Sqr((void*)pVect1, (void*)pVect2, qty_ptr);
+        #endif
+        delete [] pVect2;
+        return result;
+    }
+
     class L2Space : public SpaceInterface<float> {
 
         DISTFUNC<float> fstdistfunc_;
@@ -174,17 +215,8 @@ namespace hnswsqlib {
         size_t dim_;
     public:
         L2Space(size_t dim) {
-            fstdistfunc_ = L2Sqr;
-        #if defined(USE_SSE) || defined(USE_AVX)
-            if (dim % 16 == 0)
-                fstdistfunc_ = L2SqrSIMD16Ext;
-            else if (dim % 4 == 0)
-                fstdistfunc_ = L2SqrSIMD4Ext;
-            else if (dim > 16)
-                fstdistfunc_ = L2SqrSIMD16ExtResiduals;
-            else if (dim > 4)
-                fstdistfunc_ = L2SqrSIMD4ExtResiduals;
-        #endif
+            fstdistfunc_ = L2sqr_without_code;
+       
             dim_ = dim;
             data_size_ = dim * sizeof(float);
         }
@@ -204,6 +236,33 @@ namespace hnswsqlib {
         ~L2Space() {}
     };
 
+    class L2SQSpace: public SpaceInterface<float> {
+        DISTFUNC<float> fstdistfunc_;
+        size_t data_size_;
+        size_t dim_;
+    public:
+        L2SQSpace(size_t dim) {
+            fstdistfunc_ = L2sqr_with_code;
+            dim_ = dim;
+            data_size_ = dim_ * sizeof(uint8_t);
+        }
+
+        size_t get_data_size() {
+            return data_size_;
+        }
+
+        DISTFUNC<float> get_dist_func() {
+            return fstdistfunc_;
+        }
+
+        void *get_dist_func_param() {
+            return &dim_;
+        }
+
+        ~L2SQSpace() {}
+    };
+
+    /*
     static int
     L2SqrI4x(const void *__restrict pVect1, const void *__restrict pVect2, const void *__restrict qty_ptr) {
 
@@ -277,42 +336,6 @@ namespace hnswsqlib {
 
         ~L2SpaceI() {}
     };
-
-    class L2SQSpace: public SpaceInterface<float> {
-        DISTFUNC<float> fstdistfunc_;
-        size_t data_size_;
-        size_t dim_;
-        ScalarQuantizer& scalarQuantizer_;
-    public:
-        L2SQSpace(size_t dim, ScalarQuantizer &scalarQuantizer) {
-            fstdistfunc_ = L2sqr_with_code;
-            dim_ = dim;
-            scalarQuantizer_ = scalarQuantizer;
-        }
-
-        size_t get_data_size() {
-            return data_size_;
-        }
-
-        DISTFUNC<float> get_dist_func() {
-            return fstdistfunc_;
-        }
-
-        void *get_dist_func_param() {
-            return &dim_;
-        }
-
-        static float
-        L2sqr_with_code(const void *pVect1v, const void *pVect2v, const void *qty_ptr) {
-            size_t qty = *((size_t *) qty_ptr);
-            float *pVect1 = (float *) pVect1v;
-            float *pVect2 = new float[qty];
-           // scalarQuantizer_.decode_code(pVect2, pVect2v, 1, qty);
-        }
-
-
-        ~L2SQSpace() {}
-    };
-
+    */
 
 }

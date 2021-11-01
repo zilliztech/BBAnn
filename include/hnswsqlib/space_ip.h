@@ -1,9 +1,10 @@
 #pragma once
 #include "hnswlib.h"
+#include "hnswalg.h"
 
 namespace hnswsqlib {
 
-    static float
+    inline float
     InnerProduct(const void *pVect1, const void *pVect2, const void *qty_ptr) {
         size_t qty = *((size_t *) qty_ptr);
         float res = 0;
@@ -17,7 +18,7 @@ namespace hnswsqlib {
 #if defined(USE_AVX)
 
 // Favor using AVX if available.
-    static float
+    inline float
     InnerProductSIMD4Ext(const void *pVect1v, const void *pVect2v, const void *qty_ptr) {
         float PORTABLE_ALIGN32 TmpRes[8];
         float *pVect1 = (float *) pVect1v;
@@ -66,7 +67,7 @@ namespace hnswsqlib {
 
 #elif defined(USE_SSE)
 
-    static float
+    inline float
     InnerProductSIMD4Ext(const void *pVect1v, const void *pVect2v, const void *qty_ptr) {
         float PORTABLE_ALIGN32 TmpRes[8];
         float *pVect1 = (float *) pVect1v;
@@ -126,7 +127,7 @@ namespace hnswsqlib {
 
 #if defined(USE_AVX)
 
-    static float
+    inline float
     InnerProductSIMD16Ext(const void *pVect1v, const void *pVect2v, const void *qty_ptr) {
         float PORTABLE_ALIGN32 TmpRes[8];
         float *pVect1 = (float *) pVect1v;
@@ -164,7 +165,7 @@ namespace hnswsqlib {
 
 #elif defined(USE_SSE)
 
-      static float
+      inline float
       InnerProductSIMD16Ext(const void *pVect1v, const void *pVect2v, const void *qty_ptr) {
         float PORTABLE_ALIGN32 TmpRes[8];
         float *pVect1 = (float *) pVect1v;
@@ -212,7 +213,7 @@ namespace hnswsqlib {
 #endif
 
 #if defined(USE_SSE) || defined(USE_AVX)
-    static float
+    inline float
     InnerProductSIMD16ExtResiduals(const void *pVect1v, const void *pVect2v, const void *qty_ptr) {
         size_t qty = *((size_t *) qty_ptr);
         size_t qty16 = qty >> 4 << 4;
@@ -225,7 +226,7 @@ namespace hnswsqlib {
         return res + res_tail - 1.0f;
     }
 
-    static float
+    inline float
     InnerProductSIMD4ExtResiduals(const void *pVect1v, const void *pVect2v, const void *qty_ptr) {
         size_t qty = *((size_t *) qty_ptr);
         size_t qty4 = qty >> 2 << 2;
@@ -241,6 +242,47 @@ namespace hnswsqlib {
     }
 #endif
 
+static float 
+    InnerProduct_without_code(const void *pVect1v, const void *pVect2v, const void *qty_ptr, ScalarQuantizer *scalar_quantizer) {
+       //std::cout<<"ip without code"<<std::endl;
+        size_t qty = *((size_t *) qty_ptr);
+        #if defined(USE_SSE) || defined(USE_AVX)
+        if (qty % 16 == 0)
+            return InnerProductSIMD16Ext(pVect1v, pVect2v, qty_ptr);
+        else if (qty % 4 == 0)
+            return InnerProductSIMD4Ext(pVect1v, pVect2v, qty_ptr);
+        else if (qty > 16)
+            return InnerProductSIMD16ExtResiduals(pVect1v, pVect2v, qty_ptr);
+        else if (qty > 4)
+            return InnerProductSIMD4ExtResiduals(pVect1v, pVect2v, qty_ptr);
+        #else
+            return InnerProduct(pVect1v, pVect2v, qty_ptr);
+        #endif
+    }
+
+static float
+    InnerProduct_with_code(const void *pVect1v, const void *pVect2v, const void *qty_ptr, ScalarQuantizer *scalar_quantizer) {
+        size_t qty = *((size_t *) qty_ptr);
+        float *pVect1 = (float *) pVect1v;
+        float *pVect2 = new float[qty];
+        float result ;
+        scalar_quantizer->decode_code(pVect2, (uint8_t*)pVect2v, 1);
+        #if defined(USE_SSE) || defined(USE_AVX)
+        if (qty % 16 == 0)
+            result = InnerProductSIMD16Ext((void*)pVect1, (void*)pVect2, qty_ptr);
+        else if (qty % 4 == 0)
+            result = InnerProductSIMD4Ext((void*)pVect1, (void*)pVect2, qty_ptr);
+        else if (qty > 16)
+            result = InnerProductSIMD16ExtResiduals((void*)pVect1, (void*)pVect2, qty_ptr);
+        else if (qty > 4)
+            result = InnerProductSIMD4ExtResiduals((void*)pVect1, (void*)pVect2, qty_ptr);
+        #else
+            result = InnerProduct((void*)pVect1, (void*)pVect2, qty_ptr);
+        #endif
+        delete [] pVect2;
+        return result;
+    }
+
     class InnerProductSpace : public SpaceInterface<float> {
 
         DISTFUNC<float> fstdistfunc_;
@@ -248,17 +290,7 @@ namespace hnswsqlib {
         size_t dim_;
     public:
         InnerProductSpace(size_t dim) {
-            fstdistfunc_ = InnerProduct;
-    #if defined(USE_AVX) || defined(USE_SSE)
-            if (dim % 16 == 0)
-                fstdistfunc_ = InnerProductSIMD16Ext;
-            else if (dim % 4 == 0)
-                fstdistfunc_ = InnerProductSIMD4Ext;
-            else if (dim > 16)
-                fstdistfunc_ = InnerProductSIMD16ExtResiduals;
-            else if (dim > 4)
-                fstdistfunc_ = InnerProductSIMD4ExtResiduals;
-    #endif
+            fstdistfunc_ = InnerProduct_without_code;
             dim_ = dim;
             data_size_ = dim * sizeof(float);
         }
@@ -276,6 +308,32 @@ namespace hnswsqlib {
         }
 
     ~InnerProductSpace() {}
+    };
+
+    class InnerProductSQSpace: public SpaceInterface<float> {
+        DISTFUNC<float> fstdistfunc_;
+        size_t data_size_;
+        size_t dim_;
+    public:
+        InnerProductSQSpace(size_t dim) {
+            fstdistfunc_ = InnerProduct_with_code;
+            dim_ = dim;
+            data_size_ = dim_ * sizeof(uint8_t);
+        }
+
+        size_t get_data_size() {
+            return data_size_;
+        }
+
+        DISTFUNC<float> get_dist_func() {
+            return fstdistfunc_;
+        }
+
+        void *get_dist_func_param() {
+            return &dim_;
+        }
+
+        ~InnerProductSQSpace() {}
     };
 
 

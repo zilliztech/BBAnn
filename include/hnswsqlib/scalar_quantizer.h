@@ -18,7 +18,7 @@ namespace hnswsqlib {
             dim_code_num_ = 2;
             total_codes_num_ = dim_ * dim_code_num_;
             codes_size_ = total_codes_num_ * sizeof(float);
-            codebook_.assign(0.0, total_codes_num_);
+            codebook_.assign(total_codes_num_, 0.0);
         }
 
         ScalarQuantizer(size_t dim, float* codebook) {
@@ -30,7 +30,7 @@ namespace hnswsqlib {
         }
 
         inline void train_codebook(float* data, int64_t n) {
-            bbann::train_code<float>(codebook_.data(), codebook_.data() + dim_, data, n, (uint32_t)dim_);
+            bbann::train_code<float>(codebook_.data(), (float*)(codebook_.data() + dim_), data, n, (uint32_t)dim_);
         }
 
         void encode_code(float* data, uint8_t* codes, int64_t n) {

@@ -27,6 +27,7 @@
 #include <vector>
 #include <iostream>
 #include <string.h>
+#include "scalar_quantizer.h"
 
 namespace hnswsqlib {
     typedef size_t labeltype;
@@ -50,7 +51,7 @@ namespace hnswsqlib {
     }
 
     template<typename MTYPE>
-    using DISTFUNC = MTYPE(*)(const void *, const void *, const void *);
+    using DISTFUNC = MTYPE(*)(const void *, const void *, const void *, hnswsqlib::ScalarQuantizer *);
 
 
     template<typename MTYPE>
@@ -105,3 +106,4 @@ namespace hnswsqlib {
 #include "space_l2.h"
 #include "space_ip.h"
 #include "hnswalg.h"
+
