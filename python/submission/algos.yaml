@@ -571,7 +571,9 @@ text2image-1B:
       run-groups:
         base:
           args: |
-              [{"hnswM":32, "hnswefC":500, "K1":200, "blockSize":8192, "vector_use_sq":true, "use_hnsw_sq": false, "identifier":"bbann"}]
+              [{"hnswM":32, "hnswefC":500, "K1":200, "blockSize":8192, "vector_use_sq":true, "use_hnsw_sq": false, "identifier":"bbann",
+                "url": "https://zilliznfs.blob.core.windows.net/bbann/BBANN_Text2Image_M32_BPP2_SQSample1"
+                }]
           query-args: |
               [
                 {"nProbe":60, "efSearch":100,"K1":200, "blockSize":8192, "vector_use_sq":true, "use_hnsw_sq": false, "identifier":"bbann"},
