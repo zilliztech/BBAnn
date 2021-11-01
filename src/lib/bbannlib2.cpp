@@ -65,9 +65,9 @@ bool BBAnnIndex2<dataT, distanceT>::LoadIndex(std::string &indexPathPrefix,
 
     hnswsqlib::SpaceInterface<float> *space = nullptr;
     if (MetricType::L2 == metric_) {
-      space = new hnswsqlib::L2Space(dim);
+      space = new hnswsqlib::L2SQSpace(dim);
     } else if (MetricType::IP == metric_) {
-      space = new hnswsqlib::InnerProductSpace(dim);
+      space = new hnswsqlib::InnerProductSQSpace(dim);
     } else {
       return false;
     }
